@@ -79,11 +79,13 @@ bool node_serialize(FILE *f, void *obj)
 
 void *node_deserialize(FILE *f)
 {
+  int success;
   node n = ralloc(test_rgn, struct node_);
   
-  fread((void *)&n->data, sizeof(int), 1, f);
-  fread((void *)&n->left, sizeof(void *), 1, f);
-  fread((void *)&n->right, sizeof(void *), 1, f);
+  success = fread((void *)&n->data, sizeof(int), 1, f);
+  success &= fread((void *)&n->left, sizeof(void *), 1, f);
+  success &= fread((void *)&n->right, sizeof(void *), 1, f);
+  assert(success);
 
   return n;
 }
@@ -138,10 +140,10 @@ static void pt_serialize()
     n4->left = n1;
     n4->right = n1;
 
-    hash_table_insert(table, (hash_key)"n1", (hash_data)n1->data);
-    hash_table_insert(table, (hash_key)"n2", (hash_data)n2->data);
-    hash_table_insert(table, (hash_key)"n3", (hash_data)n3->data);
-    hash_table_insert(table, (hash_key)"n4", (hash_data)n4->data);
+    hash_table_insert(table, (hash_key)"n1", (hash_data)(long)n1->data);
+    hash_table_insert(table, (hash_key)"n2", (hash_data)(long)n2->data);
+    hash_table_insert(table, (hash_key)"n3", (hash_data)(long)n3->data);
+    hash_table_insert(table, (hash_key)"n4", (hash_data)(long)n4->data);
   }
 
   /* Serialize it */
@@ -173,6 +175,7 @@ static void pt_serialize()
 static void pt_deserialize()
 {
   node n = NULL;
+  int success;
   FILE *infile = NULL;
   hash_table table = NULL;
   deserialize_fn_ptr deserialize_fns[5] = {nonptr_data_deserialize,
@@ -194,10 +197,11 @@ static void pt_deserialize()
   }
 
   /* Read in the old address of n1 and store it as n */
-  fread((void *)&n, sizeof(void *), 1, infile);
+  success = fread((void *)&n, sizeof(void *), 1, infile);
 
   /* Read in the old address of table and store it as table */
-  fread((void *)&table, sizeof(void *), 1, infile);
+  success &= fread((void *)&table, sizeof(void *), 1, infile);
+  assert(success);
 
   deserialize_all(infile, deserialize_fns, set_fields_fns, 5);
   
@@ -247,22 +251,22 @@ static void pt_deserialize()
     hash_table_scan(table,&scan);
 
     while(hash_table_next(&scan, &next_key, &next_data)) {
-      if ((int)next_data == 1) {
+      if ((INT_PTR)next_data == 1) {
 	if (strcmp("n1",next_key)) {
 	  fail("hash table doesn't map n1 correctly.\n");
 	}
       }
-      else if ((int)next_data == 2) {
+      else if ((INT_PTR)next_data == 2) {
 	if (strcmp("n2",next_key)) {
 	  fail("hash table doesn't map n2 correctly.\n");
 	}
       }
-      else if ((int)next_data == 3) {
+      else if ((INT_PTR)next_data == 3) {
 	if (strcmp("n3",next_key)) {
 	  fail("hash table doesn't map n3 correctly.\n");
 	}
       }
-      else if ((int)next_data == 4) {
+      else if ((INT_PTR)next_data == 4) {
 	if (strcmp("n4",next_key)) {
 	  fail("hash toble doesn't map n4 correctly.\n");
 	}

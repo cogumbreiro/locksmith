@@ -271,8 +271,13 @@ else
  EXEEXT         = .byte
  MOVEAFTERCAMLC = cmi cmo
  COMPILETOWHAT  = bytecode
- CAMLC          = $(CAMLDIR)ocamlc $(COMPILE_FLAGS)
- CAMLLINK       = $(CAMLDIR)ocamlc -custom  $(LINK_FLAGS)
+ ifdef PROFILE
+   CAMLC          = $(CAMLDIR)ocamlcp -p a $(COMPILE_FLAGS)
+   CAMLLINK       = $(CAMLDIR)ocamlcp -p a -custom  $(LINK_FLAGS)
+ else
+   CAMLC          = $(CAMLDIR)ocamlc $(COMPILE_FLAGS)
+   CAMLLINK       = $(CAMLDIR)ocamlc -custom  $(LINK_FLAGS)
+ endif
  CAML_NOOPT     = 1
 endif
 
@@ -287,7 +292,11 @@ ifdef CAML_NOOPT
    LINK_FLAGS       += -ccopt /Zi -ccopt /Od
  else
    COMPILE_FLAGS    += -g -ccopt -g
-   LINK_FLAGS       += -g -ccopt -g
+   ifdef MINGW
+     LINK_FLAGS       += -g
+   else
+     LINK_FLAGS       += -g -ccopt -g
+   endif
  endif
 else
   ifdef WIN32
@@ -306,6 +315,7 @@ vpath %.ml  $(SOURCEDIRS) $(OBJDIR)
 vpath %.mli $(SOURCEDIRS) $(OBJDIR)
 vpath %.c   $(SOURCEDIRS)
 vpath %.p4  $(SOURCEDIRS)
+
 
 
 #  Secondaries are intermediates that we don't want make to delete

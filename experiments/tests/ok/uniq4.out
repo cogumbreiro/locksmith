@@ -10,38 +10,7 @@ Warning: Possible data race: &j:uniq4.c:5 is not protected!
     &j:uniq4.c:5
   locks acquired:
     <empty>
-  in: FORK at uniq4.c:27 
-             
-
-  dereference of &j:uniq4.c:5 at uniq4.c:17
-    &j:uniq4.c:5
-  locks acquired:
-    concrete l:uniq4.c:24
-    l:uniq4.c:6
-  in: FORK at uniq4.c:27 
-             
-
-  dereference of &j:uniq4.c:5 at uniq4.c:15
-    &j:uniq4.c:5
-  locks acquired:
-    <empty>
-  in: FORK at uniq4.c:26 
-             
-
-  dereference of &j:uniq4.c:5 at uniq4.c:17
-    &j:uniq4.c:5
-  locks acquired:
-    concrete l:uniq4.c:24
-    l:uniq4.c:6
-  in: FORK at uniq4.c:26 
-             
-
-  dereference of &j:uniq4.c:5 at uniq4.c:15
-    &j:uniq4.c:5
-  locks acquired:
-    <empty>
   in: main at uniq4.c:22 
-             
 
   dereference of &j:uniq4.c:5 at uniq4.c:17
     &j:uniq4.c:5
@@ -49,6 +18,6 @@ Warning: Possible data race: &j:uniq4.c:5 is not protected!
     concrete l:uniq4.c:24
     l:uniq4.c:6
   in: main at uniq4.c:22 
-             
+
 
 *************************** DONE ***************************

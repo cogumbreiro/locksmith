@@ -9,20 +9,7 @@ Warning: Possible data race: &shared:test6.c:3 is not protected!
   locks acquired:
     <empty>
   in: main at test6.c:16  -> test6.c:19
-             
-
-  dereference of &shared:test6.c:3 at test6.c:9
-    &shared:test6.c:3
-  locks acquired:
-    <empty>
   in: main at test6.c:16  -> test6.c:20
-             
 
-  dereference of &shared:test6.c:3 at test6.c:9
-    &shared:test6.c:3
-  locks acquired:
-    <empty>
-  in: FORK at test6.c:13 
-             
 
 *************************** DONE ***************************

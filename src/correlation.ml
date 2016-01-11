@@ -53,6 +53,7 @@ let do_one_by_one = ref false
 let do_sort_derefs = ref false
 let do_count_phi_visits = ref false
 let do_hashcons = ref true
+let do_count_race_locations = ref false
 
 type correlation = {
   corr_rhos : rhoSet;  (* pointers *)
@@ -70,7 +71,7 @@ type guard = { (* these are computed at solution time *)
   guard_correlation: correlation;
 
   guard_location: Cil.location;  (* program location *)
-  guard_path : Cil.location list  (* path from dereference to main() or fork() *)
+  guard_path : phi list  (* path from dereference to main() or fork() *)
 }
 
 let guard_equals (g1: guard) (g2: guard) : bool =
@@ -136,6 +137,10 @@ let options = [
   "--no-hashcons",
     Arg.Clear(do_hashcons),
     " Don't use hashconsing to ID guarded-by structs.";
+
+  "--count-race-locations",
+    Arg.Set(do_count_race_locations),
+    " Count how many concrete locations have a race.";
 ]
 
 module DerefH = Hashtbl.Make(
@@ -172,8 +177,8 @@ let deref (r: rho) (p: phi) (e: effect) : unit = begin
       DerefH.add all_derefs (r,p,e,!Cil.currentLoc) !deref_no;
     end
   else if !debug then
-    ignore(E.log "omitting existing dereference: %a %a %a at %a\n"
-      d_rho r d_phi p d_effect e Cil.d_loc !Cil.currentLoc)
+    ignore(E.log "omitting existing dereference: %a %a at %a\n"
+      d_rho r d_phi p Cil.d_loc !Cil.currentLoc)
 end
 
 (* a list of all \corr edges *)
@@ -195,30 +200,23 @@ let d_guard (phi_name: doc)() (g: guard) =
       ++ text "  " ++ (d_lockset () g.guard_correlation.corr_locks) ++ line
       ++ text "in: " ++ phi_name
       ++ (List.fold_left
-           (fun d l -> d ++ text " -> " ++ Cil.d_loc () l)
+           (fun d p -> d ++ text " -> " ++ d_phi () p)
            nil
            g.guard_path)
     ++ unalign
   ++ unalign in
   r
 
-let d_deref_report () (g, p, r: guard * phi * rho) : doc =
+let d_deref_report () (g, r: guard * rho) : doc =
   dprintf "@[dereference of %a at %a\n  \
              %a\
            locks acquired:\n  \
              %a\n\
-           in: %a %t
            @]"
            d_rho g.guard_rho
            Cil.d_loc g.guard_location
            d_rhopath (r, g.guard_rho)
            d_lockset g.guard_correlation.corr_locks
-           d_phi p
-           (fun () -> List.fold_left
-             (fun d l -> d ++ dprintf " -> %a" Cil.d_loc l)
-             nil
-             g.guard_path)
-           (*(d_list " -> " Cil.d_loc) g.guard_path*)
   
 
 (***************
@@ -263,7 +261,7 @@ module GB =
       if c < 0 then -1 else if c > 0 then 1 else
       let c = Corr.compare g1.guard_correlation g2.guard_correlation in
       if c < 0 then -1 else if c > 0 then 1 else
-      compare_lists Cil.compareLoc g1.guard_path g2.guard_path
+      compare_lists Phi.compare g1.guard_path g2.guard_path
   end
 module GBHashconsMap = Map.Make(GB)
 
@@ -276,7 +274,7 @@ let make_guard (r: rho)
                (ls: lockSet)
                (frompack: bool)
                (l: Cil.location)
-               (path: Cil.location list)
+               (path: phi list)
                : guard = begin
   assert (not (RhoSet.is_empty rs));
   let c = {
@@ -407,6 +405,7 @@ module GBTransfer : BackwardsTransfer with type state = GBSet.t =
       GBSet.for_all (fun g -> is_in g s1 && is_in g s2) differences
 
     let merge_state = GBSet.union
+
     let is_relevant p =
       try
         ignore(get_phi_kind p);
@@ -425,20 +424,20 @@ module GBTransfer : BackwardsTransfer with type state = GBSet.t =
           PhiForked ->
               GBSet.empty
            *)
-        | PhiSplitCall(_, p', l) -> 
+        | PhiSplitCall(_, p') ->
             let (a) = get_split_state p' in
             if !debug then ignore(E.log "going through split at %a, adding %a\n"
-                                  Cil.d_loc l d_lockset a);
+                                  Cil.d_loc (location_of_phi p) d_lockset a);
             GBSet.fold
               (fun g acc ->
-                GBSet.add 
-                  (
-                    let c = g.guard_correlation in
-                    let gl = LockSet.union c.corr_locks a in
-                    if LockSet.equal gl c.corr_locks && List.mem l g.guard_path then g else
-                    make_guard g.guard_rho c.corr_rhos gl g.guard_closed g.guard_location
-                      (l::g.guard_path))
-                  acc)
+               GBSet.add
+                 (
+                   let c = g.guard_correlation in
+                   let gl = LockSet.union c.corr_locks a in
+                   if LockSet.equal gl c.corr_locks && List.mem p g.guard_path then g else
+                   make_guard g.guard_rho c.corr_rhos gl g.guard_closed g.guard_location
+                     (p::g.guard_path))
+                 acc)
               gbset
               GBSet.empty
         | PhiSplitReturn(_, p') ->
@@ -454,6 +453,21 @@ module GBTransfer : BackwardsTransfer with type state = GBSet.t =
               end;
             end;
             empty_state
+        | PhiForked
+        | PhiPacked ->
+            (* close and record in path *)
+            GBSet.fold
+              (fun g s ->
+                let gg = make_guard g.guard_rho
+                                    g.guard_correlation.corr_rhos
+                                    g.guard_correlation.corr_locks
+                                    true (* close guard across fork point *) 
+                                    g.guard_location
+                                    (if k = PhiForked then (p::g.guard_path) else g.guard_path)
+                in
+                  GBSet.add gg s)
+              gbset
+              GBSet.empty
         | _ -> gbset
       end
     let translate_state_out state inst =
@@ -594,24 +608,49 @@ let get_protection_set (r: rho) : lockSet =
 
 let racefound : rhoSet ref = ref RhoSet.empty
 
-let d_rho_guards () (r, phiguards: rho * (phi * (guard list)) list) : doc =
-  let f d (p, sorted_guards) =
-    List.fold_left
-      (fun d g ->
-        if RhoSet.mem r g.guard_correlation.corr_rhos
-        then d ++ (if d <> nil then line ++ line else nil) ++
-             (d_deref_report () (g,p,r))
-        else d)
-      d
-      sorted_guards
+let d_rho_guards () (r, phiguards: rho * (phi * guard) list) : doc =
+  let rec print_guards d gl =
+    let rec filter_guard d g gl ret =
+      match gl with
+        [] -> d, ret
+      | (p',g')::gl ->
+          if (Corr.compare g.guard_correlation g'.guard_correlation = 0)
+             && (Cil.compareLoc g.guard_location g'.guard_location = 0)
+             && (Rho.equal g'.guard_rho g.guard_rho)
+          then
+            filter_guard
+              (d ++ dprintf "in: %a%t\n" d_phi p'
+                 (fun () -> List.fold_left
+                      (fun d p -> d ++ dprintf " -> %a" Cil.d_loc (location_of_phi p))
+                      nil
+                      g'.guard_path))
+              g gl ret
+          else filter_guard d g gl ((p',g')::ret)
+    in
+    match gl with
+      [] -> d
+    | (p,g)::_ as gl ->
+        let d = d ++ (if d <> nil then line else nil)
+                ++ (d_deref_report () (g,r))
+        in
+        let d, rest = filter_guard d g gl [] in
+        print_guards d (List.rev rest)
   in
-  align ++ (
-    List.fold_left f nil phiguards
-  ) ++ unalign
+  let relevant = 
+    List.filter
+      (fun (_, g) -> RhoSet.mem r g.guard_correlation.corr_rhos)
+      phiguards
+  in
+  align ++ (print_guards nil relevant) ++ unalign
 
-let check_race (phiguards: (phi * guard list) list) (r: rho) : unit =
+(* Checks a concrete location at a given point phi for race (empty gb-set).
+ * The given phi is normally a fork point (or the beginning of main()).
+ * Returns true if there was a race on this location, even if it is a duplicate
+ * and has been printed before.
+ *)
+let check_race (phiguards: (phi * guard) list) (r: rho) : bool =
   if !debug then ignore(E.log "checking protection for %a\n" d_rho r);
-  if !do_group_warnings && RhoSet.mem r !racefound then () else
+  if !do_group_warnings && RhoSet.mem r !racefound then true else
   if Shared.is_ever_shared r then begin
     (*ignore(E.log " It is shared, check protection set\n");*)
     let crs = concrete_rhoset (get_rho_p2set_m r) in
@@ -625,6 +664,7 @@ let check_race (phiguards: (phi * guard list) list) (r: rho) : unit =
           d_rho r d_rho_guards (r, phiguards));
       end;
       racefound := RhoSet.union crs !racefound;
+      true
     end else if (LockSet.is_empty (concrete_lockset ls)) then begin
       if !do_group_warnings then begin
         ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
@@ -634,24 +674,33 @@ let check_race (phiguards: (phi * guard list) list) (r: rho) : unit =
           d_rho r d_lockset ls d_rho_guards (r, phiguards));
       end;
       racefound := RhoSet.union crs !racefound;
-    end else
+      true
+    end else begin
       if !do_print_guarded_by then
         ignore(E.log "%a is protected by:\n  %a\n" d_rho r d_lockset ls);
+      false
+    end
   end
+    else false (* not shared *)
   (*else ignore(E.log " It's not shared, no need to protect it\n")*)
 
-let check_races () : unit =
-  let f p =
+let check_races () : unit = begin
+  let f p : (phi * guard) list =
     let gset =
       try PhiHT.find GBTransfer.state_after_phi p
       with Not_found -> GBSet.empty
     in
     let sorted_guards =
       List.sort GB.compare (GBSet.elements gset)
-    in p,sorted_guards
+    in List.map (fun g -> p,g) sorted_guards
   in
-  let phiguards = List.map f !starting_phis in
-  Labelflow.concrete_rho_iter (check_race phiguards)
+  let phiguards = List.flatten (List.map f !starting_phis) in
+  let count = ref 0 in
+  let all = ref 0 in
+  Labelflow.concrete_rho_iter (fun r -> incr all; if check_race phiguards r then incr count);
+  if !do_count_race_locations then
+    ignore(E.log "racy/total concrete locations: %d / %d\n" !count !all);
+end
 
 let escapes (l: lock) (ls, rs: lockSet * rhoSet) : bool =
   LockSet.mem l (close_lockset ls)

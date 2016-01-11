@@ -38,7 +38,7 @@
 
 EXTERN_C_BEGIN
 
-typedef int stamp;
+typedef INT_PTR stamp;
 
 DECLARE_LIST(stamp_list,stamp);
 

@@ -66,8 +66,8 @@ struct Hash_table
 
   int key_persist_kind; 	/* Kind for persistent keys */
   int data_persist_kind;	/* Kind for persistent data */
-  int hash_fn_id;		
-  int keyeq_fn_id; 
+  INT_PTR hash_fn_id;		
+  INT_PTR keyeq_fn_id; 
 
   bucket *table;		/* Array of (size) buckets */
 };
@@ -477,13 +477,24 @@ static unsigned long get_num_buckets(bucket b) {
 bool hash_table_serialize(FILE *f, void *obj)
 {
   unsigned long i;
+  int sz;
   bucket cur;
   hash_table ht = (hash_table)obj;
   assert(f);
   assert(obj);
 
-  fwrite(&ht->hash, sizeof(void *) * 2 + sizeof(unsigned long) * 3 + 
-	 sizeof(int) *4, 1, f);
+  sz =
+    sizeof(ht->hash) +
+    sizeof(ht->cmp) +
+    sizeof(ht->size) +
+    sizeof(ht->log2size) +
+    sizeof(ht->used) +
+    sizeof(ht->key_persist_kind) +
+    sizeof(ht->data_persist_kind) +
+    sizeof(ht->hash_fn_id) +
+    sizeof(ht->keyeq_fn_id);
+
+  fwrite(&ht->hash, sz, 1, f);
   
   serialize_object(ht->hash, 1);
   serialize_object(ht->cmp, 1);
@@ -507,6 +518,7 @@ void *hash_table_deserialize(FILE *f)
 {
   hash_table ht = NULL;
   unsigned long i;
+  int sz, success = 1;
   bucket newbucket, *prev;
 
   assert(f);
@@ -516,23 +528,35 @@ void *hash_table_deserialize(FILE *f)
   ht->hash = NULL;
   ht->cmp = NULL;
 
-  fread(&ht->hash, sizeof(void *) * 2 + sizeof(unsigned long) * 3 + 4 * sizeof(int), 1, f);
+  sz =
+    sizeof(ht->hash) +
+    sizeof(ht->cmp) +
+    sizeof(ht->size) +
+    sizeof(ht->log2size) +
+    sizeof(ht->used) +
+    sizeof(ht->key_persist_kind) +
+    sizeof(ht->data_persist_kind) +
+    sizeof(ht->hash_fn_id) +
+    sizeof(ht->keyeq_fn_id);
+  
+  success = fread(&ht->hash, sz, 1, f);
 
   /* Read all the key/value pairs into the temporary region */
   ht->table = rarrayalloc(ht->r, ht->size, bucket);
   for (i = 0; i < ht->size; i++) {
-    unsigned long num_buckets,j;
-    fread(&num_buckets, sizeof(unsigned long), 1, f); 
+    unsigned long num_buckets = 0, j;
+    success &= fread(&num_buckets, sizeof(unsigned long), 1, f);
     prev = &ht->table[i];
     for (j = 0; j < num_buckets; j++) {
       newbucket = ralloc(ht->r, struct bucket_);
-      fread(&newbucket->key, sizeof(hash_key) + sizeof(hash_data), 1 ,f);
+      success &= fread(&newbucket->key, sizeof(hash_key) + sizeof(hash_data), 1 ,f);
       newbucket->next = NULL;
       assert(!*prev);
       *prev = newbucket;
       prev = &newbucket->next;
     }
   }
+  assert(success);
   return ht;
 }
 

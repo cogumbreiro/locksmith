@@ -47,7 +47,7 @@ struct list_node_
 struct list 
 {
   region r;
-  int st;
+  INT_PTR st;
   int length;
   int persist_kind;
   list_node sameregion head;
@@ -58,7 +58,7 @@ region list_header_region = NULL;
 region list_node_region = NULL;
 region list_strnode_region = NULL;
 
-int stamp_fresh();
+INT_PTR stamp_fresh();
 
 struct list *new_list(region r, int persist_kind)
 {
@@ -514,8 +514,8 @@ struct list *list_merge(struct list *a,struct list *b, comparator_fn cmp)
   return list_sort( list_append(a,b),cmp);
 }
 
-void list_scan(struct list *a,struct list_scanner *scan)
-{ 
+void list_scan(struct list *a, struct list_scanner *scan)
+{
   scan->l = a;
   scan->cur = a->head;
 }
@@ -527,7 +527,7 @@ bool list_next(struct list_scanner *scan, void **data)
   else
     {
       if (data)
-	*data = scan->cur->data;
+        *data = scan->cur->data;
       scan->cur = scan->cur->next;
       return TRUE;
     }
@@ -587,9 +587,9 @@ bool list_serialize(FILE *f, void *obj)
   assert(f);
   assert(obj);
 
-/*   fwrite((void *)&l->length, sizeof(int), 1, f); */
-/*   fwrite((void *)&l->persist_kind, sizeof(int), 1, f); */
-  fwrite(&l->st, 3 *sizeof(int), 1 ,f);
+  fwrite(&l->st, sizeof(l->st), 1 ,f);
+  fwrite((void *)&l->length, sizeof(l->length), 1, f);
+  fwrite((void *)&l->persist_kind, sizeof(l->persist_kind), 1, f);
 
   scan_node(l->head, n) {
     fwrite((void *)&n->data, sizeof(void *), 1, f);
@@ -605,27 +605,30 @@ bool list_serialize(FILE *f, void *obj)
 void *list_deserialize(FILE *f)
 {
   struct list *result = NULL;
-  int length, persist_kind, i,st;
+  int length = 0, persist_kind = 0, i;
+  int success;
+  INT_PTR st = 0;
   assert(f);
 
   /* Read in the stamp */
-  fread(&st, sizeof(int), 1, f);
+  success = fread(&st, sizeof(st), 1, f);
   
   /* Read in the length */
-  fread(&length, sizeof(int), 1, f);
+  success &= fread(&length, sizeof(length), 1, f);
   
   /* Read in the persist kind */
-  fread(&persist_kind, sizeof(int), 1, f);
+  success &= fread(&persist_kind, sizeof(persist_kind), 1, f);
   
   result = new_list(permanent, persist_kind);
   
   for (i = 0; i < length; i++) {
     void *data = NULL;
-    fread((void *)&data, sizeof(void *), 1, f);
+    success &= fread((void *)&data, sizeof(void *), 1, f);
     list_append_tail(data, result);
   }
   
   result->st = st;
+  assert(success);
   assert(result->length == length);
 
   return result;
@@ -644,7 +647,7 @@ bool list_set_fields(void *obj)
   return TRUE;
 }
 
-int list_stamp(struct list *l)
+INT_PTR list_stamp(struct list *l)
 {
   return l->st;
 }

@@ -4,34 +4,18 @@ shared: &m:alias.c:5
 
 Warning: Possible data race: &m:alias.c:5 is not protected!
  references:
-  dereference of &m:alias.c:5 at alias.c:16
-    &m:alias.c:5
-  locks acquired:
-    <empty>
-  in: FORK at alias.c:28 
-             
-
   dereference of k:alias.c:9 at alias.c:10
     &m:alias.c:5 => cast:alias.c:9 at dostuff alias.c:25
-                 => k:alias.c:9 
-  locks acquired:
-    <empty>
-  in: FORK at alias.c:27 
-             
-
-  dereference of k:alias.c:9 at alias.c:10
-    &m:alias.c:5 => cast:alias.c:9 at dostuff alias.c:25
-                 => k:alias.c:9 
+                 => k:alias.c:9
   locks acquired:
     <empty>
   in: main at alias.c:21 
-             
 
   dereference of &m:alias.c:5 at alias.c:16
     &m:alias.c:5
   locks acquired:
     <empty>
   in: main at alias.c:21 
-             
+
 
 *************************** DONE ***************************

@@ -9,22 +9,13 @@ Warning: Possible data race: &j:switch.c:4 is not protected!
   locks acquired:
     concrete l:switch.c:18
     l:switch.c:5
-  in: FORK at switch.c:20 
-             
-
-  dereference of &j:switch.c:4 at switch.c:11
-    &j:switch.c:4
-  locks acquired:
-    concrete l:switch.c:18
-    l:switch.c:5
   in: main at switch.c:16 
-             
 
   dereference of &j:switch.c:4 at switch.c:29
     &j:switch.c:4
   locks acquired:
     <empty>
   in: main at switch.c:16 
-             
+
 
 *************************** DONE ***************************

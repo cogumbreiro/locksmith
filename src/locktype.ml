@@ -86,6 +86,8 @@ let make_phi (s: string) (k: CF.phi_kind) : phi =
 let debug = ref false
 let debug_void = ref false
 let debug_one_effect = ref false
+let do_typing_stats = ref false
+let do_starting_forks = ref false
 
 let do_void_conflate = ref false
 let do_void_single = ref false
@@ -97,11 +99,21 @@ let do_compact_structs = ref false
 let do_one_effect = ref true
 let do_context_sensitive = ref true
 let do_field_sensitive = ref true
+let do_asm = ref true
+let do_contextual = ref false
 
 let options = [
   "--debug-typing",
     Arg.Set(debug),
     " Print progress information during the typechecking phase (constraint generation)";
+
+  "--do-typing-stats",
+    Arg.Set(do_typing_stats),
+    " Print statistics on void*/lazy field results and fork/non-fork functions";
+
+  "--do-starting-forks",
+    Arg.Set(do_starting_forks),
+    " Consider thread creation points to be independent"; 
 
   "--no-void",
     Arg.Set(do_void_conflate),
@@ -137,7 +149,7 @@ let options = [
 
   "--debug-one-effect",
     Arg.Set(debug_one_effect),
-    " Use only one effect variable for the whole body of non-forking functions";
+    " Print details about forking/non-forking functions";
 
   "--context-insensitive",
     Arg.Clear(do_context_sensitive),
@@ -146,6 +158,14 @@ let options = [
   "--field-insensitive",
     Arg.Clear(do_field_sensitive),
     " Field-insensitive analysis: all fields of a struct are aliased.";
+
+  "--no-asm",
+    Arg.Clear(do_asm),
+    " Ignore asm blocks.";
+
+  "--contextual",
+    Arg.Set(do_contextual),
+    " Use the function call rule from the contextual-effects paper.";
 (*
   "--compact-structs",
      Arg.Set(do_compact_structs),
@@ -158,23 +178,6 @@ exception TypingBug
 let current_function : fundec ref = ref Cil.dummyFunDec
 let current_chi: chi ref = ref (make_chi "X")
 let pragmaKeyword : string = "existential"
-
-(*POLYVIOS: commented out, scoped effects (chi) don't slow us down much*)
-(*****************************************************************************)
-(* THIS IS VERY UGLY AND SHOULD GO AWAY:
- * Override to do nothing when lockpick isn't enabled.
- * It saves some chi labels from getting into banshee when not necessary... *)
-(*let make_chi, chi_flows, set_atomic_chi, add_to_read_chi, add_to_write_chi,
-    set_global_chi, inst_chi =
-  if !Lockpick.do_lockpick then
-    make_chi, chi_flows, set_atomic_chi, add_to_read_chi, add_to_write_chi,
-    set_global_chi, inst_chi
-  else
-    let f1 _ = () in
-    let f2 _ _ = () in
-    let f4 _ _ _ _ = () in
-    (fun _ -> !current_chi), f2, f1, f2, f2, f1, f4
-*)
 
 let forced_effect: effect option ref = ref None
 let force_effect (e: effect) : unit = begin
@@ -199,13 +202,18 @@ let functions_that_call_fork : (string, unit) Hashtbl.t = Hashtbl.create 117
 let typenames : (string, Cil.typ) Hashtbl.t = Hashtbl.create 117
 let locktypes : Cil.typ list ref = ref []
 let locktypesigs : Cil.typsig list ref = ref []
-let fun_to_chi : chi Strmap.t ref = ref Strmap.empty
+let atomic_functions : (Cil.fundec, chi) Hashtbl.t = Hashtbl.create 42
 
 class unrollTypeVisitor = object
   inherit nopCilVisitor
   method vglob = function
     | GType(ti, _) ->
-        Hashtbl.add typenames ti.tname (Cil.unrollTypeDeep ti.ttype);
+        let t = (Cil.unrollTypeDeep ti.ttype) in
+        Hashtbl.add typenames ti.tname t;
+        if List.mem ti.tname !Conf.lock_type_names then (
+          locktypes := TNamed(ti,[])::!locktypes;
+          locktypesigs := (typeSig ti.ttype)::(typeSig t)::!locktypesigs;
+        );
         DoChildren
     | GCompTag(ci,_) ->
         Hashtbl.add typenames ("struct "^ci.cname) (TComp(ci,[]));
@@ -447,7 +455,6 @@ let inst_vinfo_hash : vinfo VinfoInstHash.t = VinfoInstHash.create 100
 let inst_edges : unit InstEdgeTbl.t = InstEdgeTbl.create 100
 let sub_edges : TauPairSet.t ref = ref TauPairSet.empty
 let current_uniqueness : Uniq.state ref = ref Uniq.empty_state
-let down_rules : (S.epsilon * env * Strset.t * S.epsilon) list ref = ref []
 let eval_after_typing : (Cil.location * (unit -> unit)) Q.t = Q.create ()
 
 let global_vars_computed = ref false
@@ -475,7 +482,6 @@ let clear_globals() : unit = begin
   sub_edges := TauPairSet.empty;
   thread_local_rhos := RhoSet.empty;
   current_uniqueness := Uniq.empty_state;
-  down_rules := [];
 end
 
 type label =
@@ -582,6 +588,7 @@ let uniq2str u =
 
 
 let read_rho (r: rho) (p: phi) (e:effect) (u:uniq): unit =
+  if !debug then ignore(E.log "%a: read access to %a\n" d_loc !currentLoc d_rho r);
   if LF.Rho.equal r unknown_rho then () else
   if !do_uniq && (safe_ignore u) then (
     (* SANITY; thread_local_rhos is obsolete *)
@@ -599,6 +606,7 @@ let read_rho (r: rho) (p: phi) (e:effect) (u:uniq): unit =
   )
 
 let write_rho (r: rho) (p: phi) (e:effect) (u:uniq): unit =
+  if !debug then ignore(E.log "%a: write access to %a\n" d_loc !currentLoc d_rho r);
   if LF.Rho.equal r unknown_rho then () else
   if !do_uniq && (safe_ignore u) then (
     (* SANITY; thread_local_rhos is obsolete *)
@@ -763,7 +771,8 @@ and d_tau_r (t:tau) (known: TauSet.t) : doc =
           unalign ++ text ")\n->^{" ++
           align ++
             d_effect () fi.fd_input_effect ++ text ",\n" ++
-            d_effect () fi.fd_output_effect ++ text "}" ++
+            d_effect () fi.fd_output_effect ++ text ",\n" ++
+            d_chi () fi.fd_chi ++ text "}" ++
           unalign ++ line ++
           text "(" ++
           align ++
@@ -880,7 +889,7 @@ let make_vinfo (r: rho): vinfo =
   Q.push vd worklist_vinfo;
   vd
 
-let make_cinfo (r: rho) (c: compinfo) (name: LN.label_name) =
+let make_cinfo (c: compinfo) (name: LN.label_name) =
   if !debug_void then ignore(E.log "make_cinfo: #%d at %a\n" !next_info d_loc !Cil.currentLoc);
   let ci = U.uref {
     compinfo = c;
@@ -891,7 +900,7 @@ let make_cinfo (r: rho) (c: compinfo) (name: LN.label_name) =
     cinfo_known = [];
     cinfo_from_rho = None;
     cinfo_to_rho = None;
-    cinfo_field_rho = if !do_field_sensitive then None else Some r;
+    cinfo_field_rho = if !do_field_sensitive then None else Some (make_rho name false);
     cinfo_alloc = [];
     cinfo_inst_in_edges = InstHT.create 1;
     cinfo_inst_out_edges = InstHT.create 1;
@@ -905,7 +914,7 @@ let mkEmptyExist ts : tau =
   let e = {
     exist_tau = integer_tau;
     exist_effect = LF.make_effect "exists" true;
-    exist_phi = make_phi "exists" CF.PhiVar;
+    exist_phi = make_phi "exists" CF.PhiPacked;
     exist_abs = [];
     exist_rhoset = RhoSet.empty;
     exist_lockset = LockSet.empty;
@@ -1044,8 +1053,13 @@ let set_globals () : unit = begin
     (fun t ->
       count := !count + 1;
       if !debug then
-        ignore(E.log "setting malloc/addr var %d/%d %s: %a\n" !count max (Lprof.timestamp ()) d_short_tau t);
-      set_global_tau_r t KMalloc_Addr empty_labelsets)
+        ignore(E.log "setting malloc/addr var %d/%d %s: %a\n"
+                     !count max (Lprof.timestamp ()) d_short_tau t);
+      set_global_tau_r t KMalloc_Addr empty_labelsets;
+      if !debug then
+        ignore(E.log "done setting malloc/addr var %d/%d %s: %a\n"
+                     !count max (Lprof.timestamp ()) d_short_tau t)
+    )
     !global_malloc_addr_tau;
   global_malloc_addr_tau := [];
   (** Cleanup **)
@@ -1069,7 +1083,6 @@ end
  *)
 let rec allocate (t: tau) : unit = begin
   match t.t with
-  | ITBuiltin_va_list _ -> assert false
   | ITVoid None
   | ITTrylockInt _ 
   | ITAbs _ ->
@@ -1077,6 +1090,7 @@ let rec allocate (t: tau) : unit = begin
   | ITExists _ ->
       ignore(error "%a: trying to allocate existential type" Cil.d_loc !Cil.currentLoc);
       raise TypingBug
+  | ITBuiltin_va_list ur
   | ITVoid (Some ur) ->
       let u = (U.deref ur) in
       u.vinfo_alloc <- !Cil.currentLoc ::u.vinfo_alloc;
@@ -1085,9 +1099,10 @@ let rec allocate (t: tau) : unit = begin
   | ITPtr(_, _) -> () (* pointer allocation doesn't allocate a value for it *)
   | ITFun _ -> assert false (* allocating a function?! *)
   | ITLock(_) -> ()
-  | ITComp ci  ->
+  | ITComp ci  -> begin
       let c = (U.deref ci) in
       c.cinfo_alloc <- !Cil.currentLoc::c.cinfo_alloc;
+    end
 end
 
 let rec visit_concrete_tau (f: rho -> unit) (t: tau) : unit = begin
@@ -1245,20 +1260,7 @@ let down e1 env live_vars e2 =
       let rs' = RhoSet.union rs (get_global_var_rhos ()) in
       if !debug then ignore(E.log "down filters on: %a\n" d_lockset ls');
       S.epsilon_filter e1 (ls',rs') e2)
-    (*down_rules := (e1,env,live_vars,e2)::!down_rules*)
   else S.epsilon_flow e1 e2
-
-(*
-let apply_down () =
-  List.iter
-    (fun (e1,env,live_vars,e2) ->
-      let ls,rs = find_live_vars env live_vars in
-      let ls' = LockSet.union ls (get_global_var_locks ()) in
-      let rs' = RhoSet.union rs (get_global_var_rhos ()) in
-      if !debug then ignore(E.log "down filters on: %a\n" d_lockset ls');
-      S.epsilon_filter e1 (ls',rs') e2)
-    !down_rules
-*)
 
 
 (*****************************************************************************)
@@ -1367,8 +1369,7 @@ and reannotate (t: tau)
         newt
     | ITLock(_) -> make_tau (ITLock(make_lock name false)) t.ts
     | ITComp(c1) ->
-        let r = make_rho name false in
-        let c2 = make_cinfo r (U.deref c1).compinfo name in
+        let c2 = make_cinfo (U.deref c1).compinfo name in
         let rt = make_tau (ITComp(c2)) t.ts in
         (U.deref c2).cinfo_known <- (t.ts,rt)::known;
         rt
@@ -1403,7 +1404,7 @@ and annotate (t: typ)
   else
   if
     let t = Cil.unrollTypeDeep t in
-    try (List.memq t !locktypes)
+    try (List.mem (typeSig t) !locktypesigs)
     with Not_found -> false
   then make_tau (ITLock(make_lock name false)) STLock
   else
@@ -1427,9 +1428,12 @@ and annotate (t: typ)
             (U.deref vi).vinfo_known <- (ts,rt)::known;
             rt
         | TComp(c, al) ->
-            let r = make_rho name false in
-            let cinfo = make_cinfo r c (LN.Deref name) in
-            let rt1 = make_tau (ITComp cinfo) tsptr in
+            let rt1 = annotate tptd known (LN.Deref name) in
+            let r = 
+              match rt1.t with
+                ITComp(ci) when not !do_field_sensitive -> getSome (U.deref ci).cinfo_field_rho
+              | _ -> make_rho name false
+            in
             let rt, ts =
               if (!do_existentials && is_existential c.cname al) then (
                 let t = mkEmptyExist rt1.ts in
@@ -1437,27 +1441,13 @@ and annotate (t: typ)
                 t, (STExists tsptr)
                ) else rt1, tsptr
             in
-            (U.deref cinfo).cinfo_known <- (ts,rt)::known;
             let pt = make_tau (ITPtr(ref rt, r)) (STPtr ts) in
             pt
         | TNamed(ti, attr) ->
-            let b =
-              try
-                List.memq (Hashtbl.find typenames ti.tname) !locktypes
-              with Not_found -> false
-            in
-            if (List.mem ti.tname !Conf.lock_type_names || b)
-            then
-              let tref = make_tau (ITLock(make_lock (LN.Deref name) false)) STLock in
-              make_tau (ITPtr(ref tref, make_rho name false)) (STPtr STLock)
-            else
-              annotate (TPtr (Cil.typeAddAttributes attr ti.ttype, [])) known (LN.Deref name)
+            annotate (TPtr (Cil.typeAddAttributes attr ti.ttype, [])) known name
         | _ ->
-            let rtptr = make_tau (ITInt false) tsptr in
-            let rtref = ref rtptr in
-            let rt = make_tau (ITPtr(rtref, make_rho name false)) ts in
-            rtref := annotate tptd ((*(ts, rt)::*)known) (LN.Deref name);
-            rt
+            let rtptr = annotate tptd known (LN.Deref name) in
+            make_tau (ITPtr(ref rtptr, make_rho name false)) ts
       end
   end
   | TInt(_,_) -> integer_tau
@@ -1500,24 +1490,15 @@ and annotate (t: typ)
       fi.fd_arg_tau_list <- argtypes;
       fun_tau
   | TNamed(ti, attr) ->
-      let b =
-        try
-          List.memq (Hashtbl.find typenames ti.tname) !locktypes
-        with Not_found -> false
-      in
-      if (List.mem ti.tname !Conf.lock_type_names || b)
-      then make_tau (ITLock(make_lock name false)) STLock
-      else annotate ti.ttype known name
+      annotate ti.ttype known name
   | TComp(c, al) ->
-      let r = make_rho (LN.AddrOf name) false in
-      let cinfo = make_cinfo r c name in
+      let cinfo = make_cinfo c name in
       let rt = make_tau (ITComp cinfo) ts in
       (U.deref cinfo).cinfo_known <- (ts,rt)::known;
       rt
   | TEnum(_,_) -> integer_tau
   | TBuiltin_va_list(_) ->
       let r = make_rho name false in
-      (*make_rho (LN.Const "va_list") false*)
       let vi = make_vinfo r in
       let rt = make_tau (ITBuiltin_va_list vi) ts in
       assert ((U.deref vi).vinfo_known = []);
@@ -1692,17 +1673,8 @@ and unify_cinfo (x, y: compdata*compdata) : compdata =
           StrHT.add tgt.cinfo_fields f (r,t);
         end
       ) src.cinfo_fields;
+      StrHT.clear src.cinfo_fields;
     tgt
-  end
-
-and unify_cinfo_inst (x, y: field_set*field_set) : field_set =
-  (* Put entries from small table into large *)
-  let small,large = if StrHT.length x < StrHT.length y then x,y else y,x in
-  begin
-    StrHT.iter 
-      (fun fld v -> (StrHT.replace large fld v))
-      small;
-    large
   end
 
 and sub_tau (src: tau) (tgt: tau) : unit =
@@ -2818,7 +2790,8 @@ let handle_fork (_: exp list)
       let phi_before = input_phi in
       let phi_forked = make_phi "FORK" CF.PhiForked in
       let phi_after = make_phi "afterfork" CF.PhiVar in
-      CF.starting_phis := phi_forked::!CF.starting_phis;
+      if !do_starting_forks then
+        CF.starting_phis := phi_forked::!CF.starting_phis;
       CF.phi_flows phi_forked fi.fd_input_phi;
       CF.phi_flows phi_before phi_after;
       CF.phi_flows phi_before phi_forked;      
@@ -2981,9 +2954,7 @@ let handle_start_unpack (el: exp list)
               make_tau (ITPtr(ref ei.exist_tau, ptr_rho))
                        (STPtr ei.exist_tau.ts)
             in
-            let unpack_phi = make_phi "unpack" (CF.PhiPack ei.exist_phi) in
-            CF.phi_flows ei.exist_phi unpack_phi;
-            CF.phi_flows unpack_phi input_phi;
+            CF.phi_flows ei.exist_phi input_phi;
             let eff = LF.make_effect "unpack" true in
             effect_flows eff ei.exist_effect;
             effect_flows eff input_effect;
@@ -3070,7 +3041,7 @@ let handle_pack (el: exp list) (* arguments to pack, should be singleton list *)
         instantiate tabs tinst false i;
         let et = mkEmptyExist tabs.ts in
         fillExist et tabs;
-        let pack_phi = make_phi "pack" (CF.PhiPack input_phi)  in
+        let pack_phi = make_phi "pack" CF.PhiPacked  in
         CF.phi_flows input_phi pack_phi;
         (match et.t with
           ITExists ei ->
@@ -3247,7 +3218,7 @@ let rec type_instr input_lock_effect
             make_phi "ret" (CF.PhiSplitReturn(fi.fd_lock_effect, call_inphi))
           in
           let call_phi =
-            make_phi "call" (CF.PhiSplitCall(fi.fd_lock_effect, ret_phi, !Cil.currentLoc))
+            make_phi "call" (CF.PhiSplitCall(fi.fd_lock_effect, ret_phi))
           in
           let out_phi = make_phi "out" CF.PhiVar in
           CF.phi_flows call_inphi call_phi;
@@ -3256,7 +3227,7 @@ let rec type_instr input_lock_effect
             fd_arg_tau_list = callargs;
             fd_lock_effect = input_lock_effect;
             fd_input_phi = call_phi;
-            fd_input_effect = call_ineff;
+            fd_input_effect = if !do_contextual then fi.fd_input_effect else call_ineff;
             fd_output_tau = callrett;
             fd_output_phi = ret_phi;
             fd_output_effect = fi.fd_output_effect;
@@ -3264,6 +3235,21 @@ let rec type_instr input_lock_effect
             fd_chi = !current_chi;
           }) callts in
           sub_tau e_type callt;
+          if !do_contextual then begin
+            (*ignore(E.log "adding %a to %a\n" d_chi fi.fd_chi d_effect call_ineff);
+            defer(
+              fun () -> begin
+                let rx,wx = solve_chi_m fi.fd_chi in
+                let re,we = solve_effect_m fi.fd_output_effect in
+                let ree,wee = solve_effect_m call_ineff in
+                ignore(E.log "chi solution:\n  read: %a\n  write: %a\n\n" d_rhoset rx d_rhoset wx);
+                ignore(E.log "eff solution:\n  read: %a\n  write: %a\n\n" d_rhoset re d_rhoset we);
+                ignore(E.log "ineff solution:\n  read: %a\n  write: %a\n\n" d_rhoset ree d_rhoset wee);
+              end
+            );*)
+            chi_in_effect fi.fd_chi call_ineff;
+            effect_flows fi.fd_output_effect call_ineff;
+          end;
           (call_env, out_phi, fi.fd_output_effect),
            S.uplus input_epsilon fi.fd_epsilon
         end
@@ -3272,7 +3258,7 @@ let rec type_instr input_lock_effect
         raise TypingBug
       end
     end
-  | Asm(_,_,outlist, inlist,_,loc) ->
+  | Asm(_,_,outlist, inlist,_,loc) -> if !do_asm then (
       currentLoc := loc;
       let rasm = make_rho (LN.Const "asm") false in
       let (env,phi,eff) = List.fold_left
@@ -3296,9 +3282,13 @@ let rec type_instr input_lock_effect
           (oenv, ophi, oeff))
         (env, phi, eff) outlist
       in
-      add_to_read_effect rasm eff;
+      write_rho rasm phi eff NotUnq;
+      (*add_to_read_effect rasm eff;
+      add_to_read_chi rasm !current_chi;
       add_to_write_effect rasm eff;
+      add_to_write_chi rasm !current_chi;*)
       (env, phi, eff), input_epsilon
+    ) else (input_env, input_phi, input_effect), input_epsilon
 
 
 (*****************************************************************************)
@@ -3429,6 +3419,9 @@ let addvars (varlist: varinfo list) env : (string * tau) list * env =
   in
     (typelist,!envref)
 
+let forker = ref 0
+let non_forker = ref 0
+
 let addfun (fd: fundec) : unit = begin
   if !debug then ignore (E.log "typing function %s %s\n" fd.svar.vname (Lprof.timestamp ()));
   let location1 = !Cil.currentLoc in
@@ -3442,12 +3435,15 @@ let addfun (fd: fundec) : unit = begin
   let use_one_effect = !do_one_effect
     && not (Hashtbl.mem functions_that_call_fork fd.svar.vname)
   in
-  if use_one_effect then begin
+  if use_one_effect then (
     if !debug_one_effect then ignore(E.log "function %s doesn't call fork\n" fd.svar.vname);
     let e = LF.make_effect (fd.svar.vname^"-singleton") false in
     force_effect e;
-  end
-  else if !debug_one_effect then ignore(E.log "function %s calls fork\n" fd.svar.vname);
+    incr non_forker;
+  ) else (
+    if !debug_one_effect then ignore(E.log "function %s calls fork\n" fd.svar.vname);
+    incr forker;
+  );
 
   (* actual work *)
   begin
@@ -3456,7 +3452,7 @@ let addfun (fd: fundec) : unit = begin
       current_function := fd;
       Cil.currentLoc := location1;
       let name = LN.Const fd.svar.vname in
-      let ret_type = annotate tret [] name in
+      let ret_type = annotate tret [] (LN.Field (name, "return")) in
       let in_phi = make_phi (fd.svar.vname) CF.PhiVar in
       if fd.svar.vname = "main" then
         CF.starting_phis := in_phi::!CF.starting_phis;
@@ -3479,8 +3475,8 @@ let addfun (fd: fundec) : unit = begin
       let input_lock_effect = make_lock_effect () in
       current_chi := make_chi "X";
       if is_atomic fd.svar then (
-        set_atomic_chi !current_chi;
-        fun_to_chi := Strmap.add fd.svar.vname !current_chi !fun_to_chi
+        assert (not (Hashtbl.mem atomic_functions fd));
+        Hashtbl.add atomic_functions fd !current_chi
       );
       Cil.currentLoc := location2;
       let out_phi = make_phi (fd.svar.vname^"_out") CF.PhiVar in
@@ -3650,44 +3646,67 @@ let propagate_cinfo_i (ci1: cinfo) (ci2: cinfo) (i: instantiation): unit =
   ()
   
 let dump_vinfo_stats () : unit =
-  ignore(E.log "calculating void* statistics\n");
+  if !debug then ignore(E.log "calculating void* statistics\n");
   let (t,c,e,s) = List.fold_left
     (fun (t,c,e,s) v ->
       let xd = U.deref v in
-      match List.length (get_vinfo_types xd.vinfo_types) with
-        0 -> (t+1,c,e+1,s)
-      | 1 -> (t+1,c,e,s+1)
+      match (get_vinfo_types xd.vinfo_types) with
+        [] -> (t+1,c,e+1,s)
+      | [_] -> (t+1,c,e,s+1)
       | _ -> (t+1,c+1,e,s))
     (0,0,0,0)
     !all_vinfo
   in
-  ignore(E.log "Void-type-analysis statistics\n");
-  ignore(E.log "total     : %d\n" t);
-  ignore(E.log "empty     : %d\n" e);
-  ignore(E.log "singleton : %d\n" s);
-  ignore(E.log ">=2       : %d\n" c);
+  ignore(E.log "Void-types statistics: \n");
+  ignore(E.log "total-void-types       : %d\n" t);
+  ignore(E.log "empty-void-types       : %d\n" e);
+  ignore(E.log "singleton-void-types   : %d\n" s);
+  ignore(E.log "polymorphic-void-types : %d\n" c);
   ignore(E.log "\n")
 
 let dump_cinfo_stats () : unit =
-  ignore(E.log "calculating struct statistics\n");
+  if !debug then ignore(E.log "calculating struct statistics\n");
   let ih = Hashtbl.create 100 in
-  let (t,tf,uf) = List.fold_left
-    (fun (t,tf,uf) c ->
+  let ch = Hashtbl.create 100 in
+  let total_struct_types = ref 0 in
+  let total_field_types = ref 0 in
+  let used_field_types = ref 0 in
+  let total_struct_instances = ref 0 in
+  let total_field_instances = ref 0 in
+  let used_field_instances = ref 0 in
+  List.iter
+    (fun c ->
       let cd = U.deref c in
-      if Hashtbl.mem ih cd.cinfo_id then (t,tf,uf)
-      else (
+      if not (Hashtbl.mem ih cd.cinfo_id) then (
         Hashtbl.add ih cd.cinfo_id ();
-        (t+1,
-        tf + (List.length cd.compinfo.cfields),
-        uf+(StrHT.length cd.cinfo_fields)))
+        incr total_struct_instances;
+        if not (Hashtbl.mem ch cd.compinfo) then (
+          Hashtbl.add ch cd.compinfo Strset.empty;
+          incr total_struct_types;
+          total_field_types := !total_field_types + (List.length cd.compinfo.cfields);
+        );
+        total_field_instances := !total_field_instances + (List.length cd.compinfo.cfields);
+        used_field_instances := !used_field_instances + (StrHT.length cd.cinfo_fields);
+        StrHT.iter
+          (fun s _ ->
+            let set = Hashtbl.find ch cd.compinfo in
+            if not (Strset.mem s set) then (
+              Hashtbl.replace ch cd.compinfo (Strset.add s set);
+              incr used_field_types
+            )
+          )
+          cd.cinfo_fields
       )
-    (0,0,0)
-    !all_cinfo
-  in
+    )
+    !all_cinfo;
   ignore(E.log "Struct-field optimization statistics\n");
-  ignore(E.log "total struct types: %d\n" t);
-  ignore(E.log "total fields      : %d\n" tf);
-  ignore(E.log "used fields       : %d\n" uf);
+  ignore(E.log "total-struct-types     : %d\n" !total_struct_types);
+  ignore(E.log "total-field-types      : %d\n" !total_field_types);
+  ignore(E.log "used-field-types       : %d\n" !used_field_types);
+  ignore(E.log "total-struct-instances : %d\n" !total_struct_instances);
+  ignore(E.log "init-struct-instances  : %d\n" !next_info);
+  ignore(E.log "total-field-instances  : %d\n" !total_field_instances);
+  ignore(E.log "used-field-instances   : %d\n" !used_field_instances);
   ignore(E.log "\n")
 
 let solve_vinfo_cinfo_constraints () : unit =
@@ -3722,6 +3741,7 @@ let solve_vinfo_cinfo_constraints () : unit =
       end
   done;
   (* Step 2: ``Allocate'' all the vinfos *)
+  if !debug then ignore(E.log "allocating vinfos\n");
   List.iter
     (fun x ->
       let xd = U.deref x in
@@ -3737,36 +3757,49 @@ let solve_vinfo_cinfo_constraints () : unit =
     )
     !all_vinfo;
   (* Step 3:  ``Allocate'' all the cinfos *)
-  let scanned = Hashtbl.create 1000 in
-  List.iter
-    (fun x ->
-      let xd = U.deref x in
-      if not (Hashtbl.mem scanned xd.cinfo_id) then begin
-        Hashtbl.add scanned xd.cinfo_id ();
-        List.iter (fun loc ->
-          if !do_field_sensitive then
-            StrHT.iter
-              (fun f (r,t) ->
-                let name = (LN.Field (LN.Const "alloc", f)) in
-                Cil.currentLoc := loc;
-                let rc = make_rho name true in
-                unify_rho rc r;
-                allocate t;
-                Cil.currentLoc := locUnknown;
-              )
-              xd.cinfo_fields
-          else (
-            let name = (LN.Const "alloc") in
-            Cil.currentLoc := loc;
-            let rc = make_rho name true in
-            unify_rho rc (getSome xd.cinfo_field_rho);
-            Cil.currentLoc := locUnknown;
+  if !debug then ignore(E.log "allocating cinfos\n");
+  (*let scanned = Hashtbl.create 1000 in*)
+  let one_more = ref true in
+  while !one_more do
+    one_more := false;
+    (*if !debug_void then ignore(E.log "total: %d cinfos\n" (List.length !all_cinfo));*)
+    List.iter
+      (fun x ->
+        let xd = U.deref x in
+        (*if not (Hashtbl.mem scanned xd.cinfo_id) then*)
+        begin
+          (*Hashtbl.add scanned xd.cinfo_id ();*)
+          let l = xd.cinfo_alloc in
+          xd.cinfo_alloc <- [];
+          List.iter (fun loc ->
+            one_more := true;
+            (*Hashtbl.remove scanned xd.cinfo_id;*)
+            if !do_field_sensitive then
+              StrHT.iter
+                (fun f (r,t) ->
+                  let name = (LN.Field (LN.Const "alloc", f)) in
+                  Cil.currentLoc := loc;
+                  let rc = make_rho name true in
+                  unify_rho rc r;
+                  allocate t;
+                  Cil.currentLoc := locUnknown;
+                )
+                xd.cinfo_fields
+            else (
+              let n = sprintf "alloc(%d)" (StrHT.length xd.cinfo_fields) in
+              let name = (LN.Const n) in
+              Cil.currentLoc := loc;
+              let rc = make_rho name true in
+              unify_rho rc (getSome xd.cinfo_field_rho);
+              Cil.currentLoc := locUnknown;
+            )
           )
-        )
-        xd.cinfo_alloc
-      end
-    )
-    !all_cinfo
+          l;
+        end
+      )
+      !all_cinfo
+  done
+
 
 let filter_quantified (l: attrparam list) : unit =
   let err () =
@@ -3841,13 +3874,27 @@ class constraintVisitor = object
           let t = annotate vi.vtype [] name in
           match t.t with
             ITFun _ -> make_tau (ITAbs (ref t)) (STAbs t.ts)
-          | _ -> allocate t; t
+          | _ -> begin
+            allocate t;
+            (* bug fix: if vi is a global array, then we need to
+             * explicitly allocate its elements, because "allocate t"
+             * will not allocate under the pointer
+             *)
+            (match t.t,vi.vtype with
+              ITPtr(tr,r), TArray(_,_,_) ->
+                allocate !tr;
+                let r' = make_rho (LN.Deref name) true in
+                unify_rho r' r
+              | _ -> ()
+            );
+            t
+            end
         in
         let var_rho =
           try
             let (old_type, old_rho) = env_lookup vi.vname !global_env in
             unify_types old_type var_type;
-            old_rho
+            update_rho_location old_rho loc
           with Not_found -> make_rho (LN.AddrOf name) true
         in
         global_env := env_add_var !global_env vi.vname (var_type, var_rho);
@@ -3913,17 +3960,6 @@ let init f : unit = begin
   if !debug then ignore(E.log "unroll types\n");
   let tv = new unrollTypeVisitor in
   visitCilFileSameGlobals tv f;
-  List.iter
-    (fun s ->
-      try
-        let locktype = (Hashtbl.find typenames s) in
-        let locktypesig = Cil.typeSig locktype in
-        locktypes := locktype::!locktypes;
-        locktypesigs := locktypesig::!locktypesigs;
-      with Not_found -> ()
-    )
-    !Conf.lock_type_names;
-
   global_env := {
     goto_tbl = Hashtbl.create 1;
     var_map =
@@ -3976,6 +4012,12 @@ let generate_constraints (f: file) : unit = begin
 
   if !debug then ignore(E.log "solve void* and lazy-struct-field constraints\n");
   solve_vinfo_cinfo_constraints ();
+  if !do_typing_stats then begin
+    dump_vinfo_stats ();
+    dump_cinfo_stats ();
+    ignore(E.log "forker functions: %d\n" !forker);
+    ignore(E.log "non-forker functions: %d\n" !non_forker);
+  end;
   Lprof.endtime "typing-void*";
   if !debug then ignore(E.log "solve void* and lazy-struct-field constraints done\n");
 
@@ -3996,10 +4038,5 @@ let generate_constraints (f: file) : unit = begin
   if not (Strset.is_empty useundef) then
     ignore(E.log "functions declared and used but not defined:\n");
   Strset.iter handle_undef_function useundef;
-  if !debug then begin
-    ignore(E.log "solved void variables:\n");
-    dump_vinfo_stats ();
-    dump_cinfo_stats ();
-  end;
   clear_globals();
 end

@@ -1,4 +1,6 @@
+AT = @
 LOCKSMITH_MODULES = \
+  rmalias \
 	lockutil \
 	worklist \
 	dotpretty \
@@ -17,8 +19,10 @@ LOCKSMITH_MODULES = \
 	correlation \
 	semiunification \
 	locktype \
-	lockpick \
-#	locksmith
+	lockalloc \
+#	lockpick \
+#	locksmith \
+#	stmizer
 
 LOCKSMITH_CMODULES = bansheeifc
 CP4S        += locksettings.p4
@@ -40,13 +44,13 @@ export CAML_CFLAGS
 export CP4S
 
 all:
-	$(MAKE) -C banshee NO_BANSHEE_ROLLBACK=1 NO_HASH_BOUNDS=1 all
-	LINKFLAGS="$(LINKFLAGS)" $(MAKE) -C cil
+	$(AT)$(MAKE) -C banshee NO_BANSHEE_ROLLBACK=1 NO_HASH_BOUNDS=1 all
+	$(AT)LINKFLAGS="$(LINKFLAGS)" $(MAKE) -C cil
 
 profile:
-	$(MAKE) -C banshee NO_BANSHEE_ROLLBACK=1 NO_HASH_BOUNDS=1 DEBUG=1 DEBUG_RALLOC=1 all
-	LINKFLAGS="$(LINKFLAGS)" $(MAKE) -C cil PROFILE=1
+	$(AT)$(MAKE) -C banshee NO_BANSHEE_ROLLBACK=1 NO_HASH_BOUNDS=1 DEBUG=1 DEBUG_RALLOC=1 all
+	$(AT)LINKFLAGS="$(LINKFLAGS)" $(MAKE) -C cil PROFILE=1
 
 clean:
-	$(MAKE) -C banshee clean
-	$(MAKE) -C cil clean
+	$(AT)$(MAKE) -C banshee clean
+	$(AT)$(MAKE) -C cil clean

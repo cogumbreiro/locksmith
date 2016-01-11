@@ -134,7 +134,6 @@ int main() {
         break;
     }
   }
-  if (line) free(line);
   return EXIT_SUCCESS;
 }
 

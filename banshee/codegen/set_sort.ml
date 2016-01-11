@@ -67,7 +67,7 @@ class setsort_gen =
 	 $EXPRID $EXPRID_zero(void);\n\
 	 $EXPRID $EXPRID_one(void);\n\
          $EXPRID $EXPRID_wild(void);\n\
-     int $EXPRID_get_stamp($EXPRID e);\n\
+     INT_PTR $EXPRID_get_stamp($EXPRID e);\n\
 	 $EXPRID $EXPRID_fresh(const char *name);\n\
 	 $EXPRID $EXPRID_union($EXPRID_list exprs);\n\
 	 $EXPRID $EXPRID_inter($EXPRID_list exprs);\n\
@@ -974,11 +974,11 @@ class setsort_gen =
 		   Expr (e ^ "_print(arg1,temp);\n}"); ]
       in
       let base_statements = 
-	[ Expr ("fprintf(arg1,\"%s::%d\","
-		^"sv_get_name((setif_var)arg2),sv_get_stamp((setif_var)arg2));");
+	[ Expr ("fprintf(arg1,\"%s::%ld\","
+		^"sv_get_name((setif_var)arg2), (long) sv_get_stamp((setif_var)arg2));");
 	  Expr ("fprintf(arg1,\"0\");");
 	  Expr ("fprintf(arg1,\"1\");");
-	  Expr ("fprintf(arg1,setif_get_constant_name(arg2));") ] 
+	  Expr ("fprintf(arg1, \"%s\", setif_get_constant_name(arg2));") ] 
 	@ [union_statement] @ [inter_statement]
       in  
       let gen_proj_case (c,is_param, grp_opt) e' n =

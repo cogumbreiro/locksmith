@@ -89,7 +89,7 @@ stamp stamp_fresh_large(void)
 
 stamp stamp_string(const char *str) deletes
 {
-  int st;
+  INT_PTR st;
   assert(str_hash != NULL);
 
   if (! hash_table_lookup(str_hash,(hash_key)str, (hash_data *) &st))

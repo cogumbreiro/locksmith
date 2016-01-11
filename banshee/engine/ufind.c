@@ -335,12 +335,12 @@ bool uf_element_serialize(FILE *f, void *obj)
   assert(f);
   assert(obj);
   
-  fwrite((void *)&elt->kind, sizeof(int), 1, f);
-  fwrite((void *)&elt->rank, sizeof(int), 1, f);
-  fwrite((void *)&elt->persist_kind, sizeof(int), 1, f);
-  fwrite((void *)&elt->info, sizeof(void *), 1, f);
-  fwrite((void *)&elt->link, sizeof(void *), 1, f);
-  fwrite((void *)&elt->elt_stack, sizeof(void *), 1, f);
+  fwrite((void *)&elt->kind, sizeof(elt->kind), 1, f);
+  fwrite((void *)&elt->rank, sizeof(elt->rank), 1, f);
+  fwrite((void *)&elt->persist_kind, sizeof(elt->persist_kind), 1, f);
+  fwrite((void *)&elt->info, sizeof(elt->info), 1, f);
+  fwrite((void *)&elt->link, sizeof(elt->link), 1, f);
+  fwrite((void *)&elt->elt_stack, sizeof(elt->elt_stack), 1, f);
 
   serialize_object(elt->info, elt->persist_kind);
   serialize_banshee_object(elt->link, uf_element);
@@ -352,13 +352,15 @@ bool uf_element_serialize(FILE *f, void *obj)
 void *uf_element_deserialize(FILE *f)
 {
   uf_element elt = ralloc(uf_element_region, struct uf_element_);
+  int success = 1;
 
-  fread((void *)&elt->kind, sizeof(int), 1, f);
-  fread((void *)&elt->rank, sizeof(int), 1, f);
-  fread((void *)&elt->persist_kind, sizeof(int), 1, f);
-  fread((void *)&elt->info, sizeof(void *), 1, f);
-  fread((void *)&elt->link, sizeof(void *), 1, f);
-  fread((void *)&elt->elt_stack, sizeof(void *), 1, f);
+  success &= fread((void *)&elt->kind, sizeof(elt->kind), 1, f);
+  success &= fread((void *)&elt->rank, sizeof(elt->rank), 1, f);
+  success &= fread((void *)&elt->persist_kind, sizeof(elt->persist_kind), 1, f);
+  success &= fread((void *)&elt->info, sizeof(elt->info), 1, f);
+  success &= fread((void *)&elt->link, sizeof(elt->link), 1, f);
+  success &= fread((void *)&elt->elt_stack, sizeof(elt->elt_stack), 1, f);
+  assert(success);
 
   return elt;
 }
@@ -393,11 +395,13 @@ bool ustack_elt_serialize(FILE *f, void *obj)
 
 void *ustack_elt_deserialize(FILE *f)
 {
+  int success = 1;
   ustack_elt elt = ralloc(ustack_element_region, struct ustack_elt_);
   
-  fread((void *)&elt->nonroot, sizeof(uf_element), 1, f);
-  fread((void *)&elt->old_info, sizeof(void *), 1, f);
-  fread((void *)&elt->persist_kind, sizeof(int), 1, f);
+  success &= fread((void *)&elt->nonroot, sizeof(uf_element), 1, f);
+  success &= fread((void *)&elt->old_info, sizeof(void *), 1, f);
+  success &= fread((void *)&elt->persist_kind, sizeof(int), 1, f);
+  assert(success);
   
   return elt;
 }
@@ -420,8 +424,10 @@ void uf_serialize(FILE *f)
 
 void uf_deserialize(FILE *f)
 {
+  int success = 1;
   assert(f);
-  fread((void *)&ustack, sizeof(union_stack), 1, f);
+  success &= fread((void *)&ustack, sizeof(union_stack), 1, f);
+  assert(success);
 }
 
 void uf_set_fields()
@@ -437,7 +443,9 @@ void write_module_uf(FILE *f)
 
 void update_module_uf(translation t, FILE *f)
 {
-  fread((void *)&ustack, sizeof(union_stack), 1, f);
+  int success = 1;
+  success &= fread((void *)&ustack, sizeof(union_stack), 1, f);
+  assert(success);
   update_pointer(t, (void **)&ustack);
 }
 

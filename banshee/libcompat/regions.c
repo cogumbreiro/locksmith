@@ -43,11 +43,17 @@
 #include <stdio.h>
 #include <string.h>
 
-#define RPAGESIZE (1 << RPAGELOG)
+#define RPAGESIZE (1UL << RPAGELOG)
+#define RMAXMAP  (1UL << (RMAXMEMLOG - RMAPLOG - RPAGELOG))
 #define K 4
-#define MAXPAGE (1ULL << (RMAXMEMLOG - RPAGELOG))
+//#define MAXPAGE (1UL << (RMAXMEMLOG - RPAGELOG - RMAPLOG))
+#define RMAXPAGE  (1UL << RMAPLOG)
 
-#define PAGENB(x) (((__rcintptr)(x) >> RPAGELOG) & ((1ULL << RMAXMEMLOG) - 1))
+
+//#define PAGENB(x) (((__rcintptr)(x) >> RPAGELOG) & ((1ULL << RMAXMEMLOG) - 1))
+#define MAPNB(x) (((__rcintptr)(x) >> (RPAGELOG + RMAPLOG)) & ((1UL << (RMAXMEMLOG - RMAPLOG - RPAGELOG)) - 1))
+#define PAGENB(x) ((__rcintptr)(x) >> RPAGELOG) & ((1UL << RMAPLOG) - 1)
+
 
 #define ALIGN(x, n) (((x) + ((n) - 1)) & ~((n) - 1))
 #define PALIGN(x, n) ((void *)ALIGN((__rcintptr)(x), n))
@@ -328,7 +334,7 @@ void __deleteregion_array(int n, region *regions)
 
 region regionof(void *ptr)
 {
-  return __rcregionmap[(unsigned long)ptr >> RPAGELOG];
+  return *get_or_alloc_regionmap(MAPNB(ptr), PAGENB(ptr)); //__rcregionmap[(unsigned long)ptr >> RPAGELOG];
 }
 
 void region_init(void)
@@ -377,8 +383,7 @@ static FILE *out;
 
 static void printref(void *x)
 {
-  if (x >= (void *)__rcregionmap && x < (void *)&__rcregionmap[MAXPAGE])
-    return;
+  if (x >= (void *)__rcregionmap && x < (void *)&__rcregionmap[RMAXMAP]) return;
 
 #ifdef RCPAIRS
   if (x >= (void *)__rcregions && x < (void *)&__rcregions[MAXREGIONS])

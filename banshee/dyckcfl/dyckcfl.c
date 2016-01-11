@@ -341,13 +341,11 @@ void make_dyck_contra_close_edge(dyck_node n1, dyck_node n2, int index)
 }
 
 // FIX: Clusters must be the same size. 
-void make_clustered_dyck_open_edges(dyck_node n1s[], dyck_node n2,
-				    int indices[], int length)
+void make_clustered_dyck_open_edges(dyck_node n1s[], dyck_node n2, int indices[], int length)
 {
   // This is a degenerate cluster: mark it as such and go on
   if (length == 1) {
-    hash_table_insert(unclustered_indices, (void *)indices[0], 
-		      (void *) indices[0]);
+    hash_table_insert(unclustered_indices, (void *)(INT_PTR)indices[0], (void *)(INT_PTR) indices[0]);
     make_dyck_open_edge(n1s[0],n2,indices[0]);
   }
   else {
@@ -358,7 +356,7 @@ void make_clustered_dyck_open_edges(dyck_node n1s[], dyck_node n2,
     // Safety check: if any of the indices occured before, they must
     // have occurred in a cluster with exactly the same indices
     for (i = 0; i < length; i++) {
-      if (hash_table_lookup(clustered_indices, (void *)indices[i], (hash_data *)&result)) {
+      if (hash_table_lookup(clustered_indices, (void *)(INT_PTR)indices[i], (hash_data *)&result)) {
 	if (last_result) { assert(last_result == result); }
 	last_result = result;
 #ifdef DYCK_DOT_DEBUG
@@ -389,7 +387,7 @@ void make_clustered_dyck_open_edges(dyck_node n1s[], dyck_node n2,
       rarraycopy(result->indices,indices,length,int);
 
       for (i = 0; i < length; i++) {
-	hash_table_insert(clustered_indices, (void *)indices[i], result);
+        hash_table_insert(clustered_indices, (void *)(INT_PTR)indices[i], result);
       }
 
     }
@@ -398,11 +396,9 @@ void make_clustered_dyck_open_edges(dyck_node n1s[], dyck_node n2,
     if (result->length != length) {
       printf("Warning: forced to uncluster a length %d cluster.\n",length);
       for (i = 0; i < length; i++) {
-	hash_table_insert(unclustered_indices, (void *)indices[i], 
-			  (void *) indices[i]);
-	make_dyck_open_edge(n1s[i],n2,indices[i]);
+        hash_table_insert(unclustered_indices, (void *)(INT_PTR)indices[i], (void *)(INT_PTR)indices[i]);
+        make_dyck_open_edge(n1s[i],n2,indices[i]);
       }
-
     }
     else {
       my_call_setif_inclusion(constructor_expr(result->c,exprs,length), 
@@ -413,14 +409,14 @@ void make_clustered_dyck_open_edges(dyck_node n1s[], dyck_node n2,
 
 static bool is_unclustered_index(int index)
 {
-  return hash_table_lookup(unclustered_indices,(void *)index,NULL);
+  return hash_table_lookup(unclustered_indices, (void *)(INT_PTR)index, NULL);
 }
 
 static cluster_cons get_cluster_constructor(int index)
 {
   cluster_cons result = NULL;
 
-  hash_table_lookup(clustered_indices,(void *)index,(hash_data *) &result);
+  hash_table_lookup(clustered_indices, (void *)(INT_PTR)index, (hash_data *) &result);
 
   // FIX : put a warning here, if the thing doesn't exist
 
@@ -543,7 +539,7 @@ static bool dyck_check_pn_reaches_aux(gen_e target, gen_e current,
 	else if (target && expr_eq(target,current)) return TRUE;
 
 // Already searched from this point
-	if (hash_table_lookup(visited,(void *)expr_stamp(current),NULL)) return FALSE;
+	if (hash_table_lookup(visited, (void *)expr_stamp(current), NULL)) return FALSE;
 
 // Otherwise, mark this node visited
 	hash_table_insert(visited,(void *)expr_stamp(current),(void *)expr_stamp(current));

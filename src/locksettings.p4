@@ -141,13 +141,17 @@ let special_functions : handler Strmap.t ref = ref (
   Strmap.add "__constant_memcpy" Memcpy (
   Strmap.add "__builtin_memset" Memset (
   Strmap.add "__builtin_strcmp" Strcmp (
+  Strmap.add "__builtin_memcmp" Strcmp (
   Strmap.add "__builtin_strncmp" Strcmp (
   Strmap.add "strncmp" Strcmp (
   Strmap.add "strcmp" Strcmp (
   Strmap.add "__builtin_va_start" Va_start (
   Strmap.add "va_start" Va_start (
+  Strmap.add "stdarg_start" Va_start (
+  Strmap.add "__builtin_stdarg_start" Va_start (
   Strmap.add "memset" Memset (
-  Strmap.empty)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+  Strmap.add "__memset_generic" Memset (
+  Strmap.empty)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
 
 let add_to_sf h s =
   special_functions := Strmap.add s h !special_functions
@@ -194,6 +198,6 @@ let options = [
        special_functions := Strmap.empty;
        parse_settings filename
      ),
-     "Load a separate settings file instead of defaults.";
+     " Load a separate settings file instead of defaults.";
 ]
 

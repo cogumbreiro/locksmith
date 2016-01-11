@@ -35,13 +35,23 @@
 #define REGIONS_H
 
 #include "../engine/linkage.h"
+#include <inttypes.h>
 
 EXTERN_C_BEGIN
 
 /* In a perfect world, this would be the definition of RMAXMEMLOG. */
-/* #define RMAXMEMLOG (8*sizeof (void*)) */
-#define RMAXMEMLOG 36
-#define RPAGELOG 13
+
+#if defined (__ia64__) || defined(__x86_64__)
+  #define INT_PTR unsigned long
+  #define RMAXMEMLOG (8*sizeof (void*))
+  #define RMAPLOG 20
+  #define RPAGELOG 24
+#else
+  #define INT_PTR unsigned int
+  #define RMAXMEMLOG 36
+  #define RMAPLOG 10
+  #define RPAGELOG 14
+#endif
 
 typedef struct region_ *region;
 extern region permanent;
@@ -137,7 +147,7 @@ extern translation deserialize(char *, char *, Updater *, region);
 extern void update_pointer(translation, void **);
 extern void *translate_pointer(translation, void *);
 
-#define TRANSLATEPOINTER(m,a) ((*(m->map + (((unsigned int) a) >> SHIFT))) + (((unsigned int) a) & 0x00001FFF))
+#define TRANSLATEPOINTER(m,a) ((*(m->map + (((INT_PTR) a) >> SHIFT))) + (((INT_PTR) a) & 0x00001FFF))
 #define UPDATEPOINTER(map,loc) *(loc) = TRANSLATEPOINTER(map,loc)
 
 EXTERN_C_END

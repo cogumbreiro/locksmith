@@ -191,7 +191,9 @@ let set_shared (rs: rhoSet) (ps:phi list) (es:effect list): unit =
           es;
       if not !flow_effect || !flow_compare then
         List.iter (function (p:phi) ->
-          set_state_before p crs; starting_phis := p::!starting_phis) ps
+          set_state_before p crs;
+          starting_phis := p::!starting_phis)
+        ps
     end
 
 let forkn = ref 0
@@ -247,7 +249,13 @@ end
 
 let dump_shared () : unit =
   assert (!solved);
-  ignore(E.log "shared: %a\n" d_rhoset (concrete_rhoset !all_shared_rho))
+  let cs = concrete_rhoset !all_shared_rho in
+  ignore(E.log "shared: %a\n" d_rhoset cs);
+  if !debug then begin
+    ignore(E.log "sharedv %d / %d\n" (RhoSet.cardinal !all_shared_rho) (count_rho ()));
+    ignore(E.log "sharedc %d / %d\n" (RhoSet.cardinal cs) (RhoSet.cardinal !all_concrete_rho));
+    ignore(E.log "allc: %a\n" d_rhoset !all_concrete_rho)
+  end
 
 (* let memoized_shared_rho : bool RhoHT.t = RhoHT.create 1000 *)
 

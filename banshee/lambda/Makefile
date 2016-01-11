@@ -42,7 +42,7 @@ TARGETS =  $(LAMBDA).h $(LAMBDA).c $(LAMBDA).o
 
 TAGFILES = $(LAMBDA).h $(LAMBDA).c
 
-CC = gcc
+#CC = gcc
 
 ifdef DEBUG
 CFLAGS = -I$(engine_dir) -I$(region_dir) -Ddeletes= -Dtraditional= \

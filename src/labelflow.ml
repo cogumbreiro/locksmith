@@ -64,29 +64,23 @@ module type CFLT =
   sig
     type node
     type instantiation
-    type edge =
-      | SubEdge of node * node
-      | OpenEdge of node * node * instantiation
-      | CloseEdge of node * node * instantiation
-
     module InstHT : Hashtbl.S with type key = instantiation
-    module Node : Set.OrderedType with type t = node
+    module Node : Lockutil.HashedOrderedType with type t = node
     module NodeSet : Set.S with type elt = node
     module NodeHT : Hashtbl.S with type key = node
 
     val options : (string * Arg.spec * string) list
 
-    val make_node : string -> bool -> Cil.location -> bool -> node
+    val make_node : string -> bool -> Cil.fundec option -> Cil.location -> bool -> node
+    val update_node_location : node -> Cil.location -> node
     val string_of_node : node -> string
     val dotstring_of_node : node -> string
     val fresh_inst : unit -> instantiation
-    val make_inst_edge : node -> node -> bool -> instantiation -> unit
     val make_sub_edge : node -> node -> unit
+    val make_open_edge : node -> node -> instantiation -> unit
+    val make_close_edge : node -> node -> instantiation -> unit
     val set_global : node -> unit
     val is_global : node -> bool
-    val reaches_m : node -> node -> bool
-    val print_graph : out_channel -> NodeSet.t
-    val hash : node -> int
     val is_concrete : node -> bool
     val string_of_inst : instantiation -> string
     val total_nodes : unit -> int
@@ -95,13 +89,122 @@ module type CFLT =
     val get_all_that_reach_pn : node -> (node -> 'a) ->
                                ('a -> 'b -> 'b) -> 'b -> 'b
     val done_adding : unit -> unit
-    val shortest_path : node -> node -> edge list
   end
 
 module CFL : CFLT = (* choose one: *)
   (*Falsecfl*)
   Bansheemlifc
   (*Mycfl*)
+
+module Graph =
+  struct
+    open CFL
+    type edge =
+      | SubEdge of node * node
+      | OpenEdge of node * node * instantiation
+      | CloseEdge of node * node * instantiation
+
+    module Edge =
+      struct
+        type t = edge
+        let compare e1 e2 = Pervasives.compare e1 e2
+      end
+    module EdgeSet = Set.Make(Edge)
+
+    let edges : EdgeSet.t ref = ref EdgeSet.empty
+    let sub_edges : node NodeHT.t = NodeHT.create 100
+    let open_edges : (node*instantiation) NodeHT.t = NodeHT.create 100
+    let close_edges : (node*instantiation) NodeHT.t = NodeHT.create 100
+
+    let make_sub_edge x y =
+      edges := EdgeSet.add (SubEdge(x, y)) !edges;
+      NodeHT.add sub_edges x y;
+      CFL.make_sub_edge x y
+
+    let make_open_edge x y i =
+      edges := EdgeSet.add (OpenEdge(x, y, i)) !edges;
+      NodeHT.add open_edges x (y,i);
+      CFL.make_open_edge x y i
+
+    let make_close_edge x y i =
+      edges := EdgeSet.add (CloseEdge(x, y, i)) !edges;
+      NodeHT.add close_edges x (y,i);
+      CFL.make_close_edge x y i
+
+    let make_inst_edge n1 n2 p i =
+      if p then make_close_edge n1 n2 i
+      else make_open_edge n2 n1 i
+
+    let print_graph outf : NodeSet.t = begin
+      let ns = ref NodeSet.empty in
+      let dotstring_of_edge (e: edge) : string =
+        match e with
+        | SubEdge(n1, n2) ->
+            ns := NodeSet.add n1 (NodeSet.add n2 !ns);
+            ("\"" ^ (dotstring_of_node n1)
+            ^ "\" -> \"" ^ (dotstring_of_node n2) ^ "\";\n")
+        | OpenEdge(n1, n2, i) ->
+            ns := NodeSet.add n1 (NodeSet.add n2 !ns);
+            ("\"" ^ (dotstring_of_node n1)
+            ^ "\" -> \"" ^ (dotstring_of_node n2)
+            ^ "\" [label=\"(" ^ (string_of_inst i) ^ "\"];\n")
+        | CloseEdge(n1, n2, i) ->
+            ns := NodeSet.add n1 (NodeSet.add n2 !ns);
+            ("\"" ^ (dotstring_of_node n1)
+            ^ "\" -> \"" ^ (dotstring_of_node n2)
+            ^ "\" [label=\")" ^ (string_of_inst i) ^ "\"];\n")
+      in
+
+      EdgeSet.iter 
+        (fun e -> Printf.fprintf outf "%s" (dotstring_of_edge e))
+        !edges;
+
+      NodeSet.iter
+        (fun n ->
+          if CFL.is_concrete n then
+            Printf.fprintf outf "\"%s\" [shape=\"box\"];\n" (dotstring_of_node n);
+          if CFL.is_global n then
+            Printf.fprintf outf "\"%s\" [peripheries=2]\n" (dotstring_of_node n);
+        )
+        !ns;
+      !ns
+    end
+
+    let shortest_path n1 n2 =
+      let find_all ht n =
+        try NodeHT.find_all ht n
+        with Not_found -> [] in
+      let visited = NodeHT.create 10000 in
+      let q : (node * edge list) Queue.t = Queue.create() in
+      let rec bfs () =
+        if Queue.is_empty q then raise Not_found;
+        let n,path = Queue.pop q in
+        if Node.equal n n2 then List.rev path
+        else if NodeHT.mem visited n then bfs()
+        else (
+          NodeHT.add visited n ();
+          List.iter
+            (fun n' ->
+              if not (NodeHT.mem visited n') then
+                Queue.push (n', SubEdge(n,n')::path) q)
+            (find_all sub_edges n);
+          List.iter
+            (fun (n',i) ->
+              if not (NodeHT.mem visited n') then
+                Queue.push (n', OpenEdge(n,n',i)::path) q)
+            (find_all open_edges n);
+          List.iter
+            (fun (n',i) ->
+              if not (NodeHT.mem visited n') then
+              Queue.push (n', CloseEdge(n,n',i)::path) q)
+            (find_all close_edges n);
+          bfs()
+        )
+      in
+      Queue.push (n1,[]) q;
+      bfs ()
+
+  end
 
 type node = CFL.node
 
@@ -151,13 +254,13 @@ module Rho : Lockutil.HashedOrderedType with type t = rho =
       CFL.Node.compare x.rho_cfl_node y.rho_cfl_node
     let equal (x: t) (y: t) : bool =
       (CFL.Node.compare x.rho_cfl_node y.rho_cfl_node = 0)
-    let hash (x: t) : int = CFL.hash x.rho_cfl_node
+    let hash (x: t) : int = CFL.Node.hash x.rho_cfl_node
   end
 module RhoHT = Hashtbl.Make(Rho)
 module RhoSet = Set.Make(Rho)
 type rhoSet = RhoSet.t
 
-type rhopath = CFL.edge list
+type rhopath = Graph.edge list
 
 module Lock =
   struct
@@ -166,7 +269,7 @@ module Lock =
       CFL.Node.compare x.lock_cfl_node y.lock_cfl_node
     let equal (x: t) (y: t) : bool = 
       (CFL.Node.compare x.lock_cfl_node y.lock_cfl_node = 0)
-    let hash (x: t) : int = CFL.hash x.lock_cfl_node
+    let hash (x: t) : int = CFL.Node.hash x.lock_cfl_node
   end
 module LockHT = Hashtbl.Make(Lock)
 module LockSet = Set.Make(Lock)
@@ -270,6 +373,30 @@ let d_rho () rho =
     (if !debug then (CFL.dotstring_of_node rho.rho_cfl_node)
     else (CFL.string_of_node rho.rho_cfl_node))
 
+let d_rhopath () (fromrho, torho: rho * rho) : doc =
+  let path =
+    try Graph.shortest_path fromrho.rho_cfl_node torho.rho_cfl_node 
+    with Not_found -> []
+  in
+  let rec d_rp p =
+    match p with
+      [] -> nil
+    | Graph.SubEdge(_, n2)::tl -> 
+        let r2 = NodeHT.find all_rho n2 in
+        (dprintf " => %a\n" d_rho r2) ++ d_rp tl
+    | Graph.OpenEdge(_, n2, i)::tl ->
+        let r2 = NodeHT.find all_rho n2 in
+        let i' = CFL.InstHT.find all_inst i in
+        (dprintf " => %a at %a\n" d_rho r2 d_instantiation i') ++ d_rp tl
+    | Graph.CloseEdge(_, n2, i)::tl ->
+        let r2 = NodeHT.find all_rho n2 in
+        let i' = CFL.InstHT.find all_inst i in
+        (dprintf " => %a at %a\n" d_rho r2 d_instantiation i') ++ d_rp tl
+  in
+  d_rho () fromrho ++ align ++ 
+    (if path = [] then line else d_rp path)
+    ++ unalign
+
 (* rhoSet formatting *)
 let d_rhoset () (rs: rhoSet) : doc =
   if RhoSet.is_empty rs then text "<empty>" else
@@ -286,30 +413,6 @@ let d_rhoset () (rs: rhoSet) : doc =
       rs
       nil ++*)
   unalign
-
-let d_rhopath () (fromrho, torho: rho * rho) : doc =
-  let path =
-    try CFL.shortest_path fromrho.rho_cfl_node torho.rho_cfl_node 
-    with Not_found -> []
-  in
-  let rec d_rp p =
-    match p with
-      [] -> nil
-    | CFL.SubEdge(_, n2)::tl -> 
-        let r2 = NodeHT.find all_rho n2 in
-        (dprintf " => %a\n" d_rho r2) ++ d_rp tl
-    | CFL.OpenEdge(_, n2, i)::tl ->
-        let r2 = NodeHT.find all_rho n2 in
-        let i' = CFL.InstHT.find all_inst i in
-        (dprintf " => %a at %a\n" d_rho r2 d_instantiation i') ++ d_rp tl
-    | CFL.CloseEdge(_, n2, i)::tl ->
-        let r2 = NodeHT.find all_rho n2 in
-        let i' = CFL.InstHT.find all_inst i in
-        (dprintf " => %a at %a\n" d_rho r2 d_instantiation i') ++ d_rp tl
-  in
-  d_rho () fromrho ++ align ++ 
-    (if path = [] then line else d_rp path)
-    ++ unalign
 
 (* effect formatting *)
 let d_effect () (e: effect) : doc =
@@ -334,14 +437,15 @@ let d_chi () (x: chi) : doc =
  * graph construction
  *********************)
 
-let done_adding_instantiations () : unit =
-  CFL.done_adding ()
+let done_adding = CFL.done_adding
 
 (* create a simple CFL node. it's marked as concrete if concrete=true.
  * the new node is tagged by "name"
  *)
 let make_node (name: string) (concrete: bool) (tagged: bool) : node =
-  let n = CFL.make_node name concrete !Cil.currentLoc tagged in
+  let f = match !Cil.currentGlobal with Cil.GFun (f, _) -> Some f | _ -> None in
+  let l = !Cil.currentLoc in
+  let n = CFL.make_node name concrete f l tagged in
   (*ignore(E.log "creating %s\n" (CFL.string_of_node n));*)
   n
 
@@ -388,6 +492,11 @@ let make_rho (n: LN.label_name) (concrete: bool) : rho =
   NodeHT.add all_rho r.rho_cfl_node r;
   r
 
+let update_rho_location rho loc =
+  ignore (CFL.update_node_location rho.rho_cfl_node loc); rho
+
+let count_rho () = !rho_no
+
 (* mark r as global, unless it is in the set qs *)
 let set_global_rho (r: rho) : unit =
   CFL.set_global r.rho_cfl_node
@@ -402,7 +511,7 @@ let unknown_rho : rho = make_rho (LN.Const "unknown") false
 let rho_flows r1 r2 = begin
   if Rho.equal r1 unknown_rho then ()
   else if Rho.equal r2 unknown_rho then ()
-  else CFL.make_sub_edge r1.rho_cfl_node r2.rho_cfl_node
+  else Graph.make_sub_edge r1.rho_cfl_node r2.rho_cfl_node
 end
 
 (* creates a unification constraint between x and y.
@@ -443,7 +552,7 @@ let inst_rho (rabs: rho)
     Hashtbl.add i.inst_rho rabs rinst;
     Hashtbl.add i.inst_rho_r rinst rabs;
   end);
-  CFL.make_inst_edge rabs.rho_cfl_node rinst.rho_cfl_node polarity i.inst_id
+  Graph.make_inst_edge rabs.rho_cfl_node rinst.rho_cfl_node polarity i.inst_id
 end
 
 
@@ -475,7 +584,7 @@ let unknown_lock : lock = make_lock (LN.Const "unknown") false
 let lock_flows l1 l2 = begin
   if Lock.equal l1 unknown_lock then ()
   else if Lock.equal l2 unknown_lock then ()
-  else CFL.make_sub_edge l1.lock_cfl_node l2.lock_cfl_node
+  else Graph.make_sub_edge l1.lock_cfl_node l2.lock_cfl_node
 end
 
 (* empty lock.  should never include any concrete lock in its solution *)
@@ -489,16 +598,16 @@ let set_global_lock (r: lock) : unit =
 let inst_lock labs linst i = begin
   Hashtbl.add i.inst_locks labs linst;
   Hashtbl.add i.inst_locks_r linst labs;
-  CFL.make_inst_edge labs.lock_cfl_node linst.lock_cfl_node true i.inst_id;
-  CFL.make_inst_edge labs.lock_cfl_node linst.lock_cfl_node false i.inst_id;
+  Graph.make_inst_edge labs.lock_cfl_node linst.lock_cfl_node true i.inst_id;
+  Graph.make_inst_edge labs.lock_cfl_node linst.lock_cfl_node false i.inst_id;
 end
 
 (* unify two lock variables *)
 let unify_locks (l1: lock) (l2: lock) : unit =
   if Lock.equal l1 l2 then ()
   else (
-    CFL.make_sub_edge l1.lock_cfl_node l2.lock_cfl_node;
-    CFL.make_sub_edge l2.lock_cfl_node l1.lock_cfl_node;
+    Graph.make_sub_edge l1.lock_cfl_node l2.lock_cfl_node;
+    Graph.make_sub_edge l2.lock_cfl_node l1.lock_cfl_node;
   )
 
 (* mark a lock as non-linear *)
@@ -514,7 +623,7 @@ module CH = Hashtbl.Make(
     let equal (l1,i1 : t) (l2,i2 : t) : bool =
       (CFL.Node.compare l1.lock_cfl_node l2.lock_cfl_node = 0)
       && (i1.inst_id = i2.inst_id)
-    let hash (l,i : t) = 2 * (CFL.hash l.lock_cfl_node) + Hashtbl.hash i.inst_id
+    let hash (l,i : t) = 2 * (CFL.Node.hash l.lock_cfl_node) + Hashtbl.hash i.inst_id
   end)
 
 let clone_map = CH.create 10
@@ -599,7 +708,6 @@ let empty_effect : effect = make_effect "empty" false
 
 let chi_no = ref 0
 let all_chi = ref []
-let all_atomic_chi = ref []
 let make_chi (s: string) : chi =
   incr chi_no;
   let e = {
@@ -609,32 +717,29 @@ let make_chi (s: string) : chi =
   all_chi := e::!all_chi;
   e
 
-let set_atomic_chi x =
-  all_atomic_chi := x::!all_atomic_chi
-
 let inst_chi xabs xinst polarity i = begin
-  CFL.make_inst_edge xabs.chi_read_node xinst.chi_read_node polarity i.inst_id;
-  CFL.make_inst_edge xabs.chi_write_node xinst.chi_write_node polarity i.inst_id;
+  Graph.make_inst_edge xabs.chi_read_node xinst.chi_read_node polarity i.inst_id;
+  Graph.make_inst_edge xabs.chi_write_node xinst.chi_write_node polarity i.inst_id;
 end
 
 let add_to_read_chi r x =
-  CFL.make_sub_edge r.rho_cfl_node x.chi_read_node
+  Graph.make_sub_edge r.rho_cfl_node x.chi_read_node
 let add_to_write_chi r x =
-  CFL.make_sub_edge r.rho_cfl_node x.chi_write_node
+  Graph.make_sub_edge r.rho_cfl_node x.chi_write_node
 let set_global_chi x =
   CFL.set_global x.chi_read_node;
   CFL.set_global x.chi_write_node
 let chi_flows x1 x2 : unit =
   if x1 == x2 then () else begin
-    CFL.make_sub_edge x1.chi_read_node x2.chi_read_node;
-    CFL.make_sub_edge x1.chi_write_node x2.chi_write_node;
+    Graph.make_sub_edge x1.chi_read_node x2.chi_read_node;
+    Graph.make_sub_edge x1.chi_write_node x2.chi_write_node;
   end
 
 let make_lock_effect () = make_lock (LN.Const "lock effect") false
 
 let set_global_lock_effect = set_global_lock
 let inst_lock_effect labs linst polarity i = begin
-  CFL.make_inst_edge labs.lock_cfl_node linst.lock_cfl_node polarity i.inst_id;
+  Graph.make_inst_edge labs.lock_cfl_node linst.lock_cfl_node polarity i.inst_id;
 end
 let lock_effect_flows = lock_flows
 
@@ -656,46 +761,51 @@ let set_global_effect (e: effect) (qs: effectSet) : unit =
  *)
 let effect_flows e1 e2 = 
   if Effect.compare e1 e2 = 0 then () else begin
-    CFL.make_sub_edge (e1.effect_read_node) (e2.effect_read_node);
-    CFL.make_sub_edge (e1.effect_write_node) (e2.effect_write_node);
+    Graph.make_sub_edge (e1.effect_read_node) (e2.effect_read_node);
+    Graph.make_sub_edge (e1.effect_write_node) (e2.effect_write_node);
     if !flow_effect then
-      CFL.make_sub_edge (e2.effect_share_node) (e1.effect_share_node);
-    (*CFL.make_sub_edge (e1.effect_lock_node) (e2.effect_lock_node);*)
+      Graph.make_sub_edge (e2.effect_share_node) (e1.effect_share_node);
+    (*Graph.make_sub_edge (e1.effect_lock_node) (e2.effect_lock_node);*)
   end
+
+let chi_in_effect c e = begin
+  Graph.make_sub_edge (c.chi_read_node) (e.effect_read_node);
+  Graph.make_sub_edge (c.chi_write_node) (e.effect_write_node);
+end
 
 (* instantiation effect eabs to einst with polarity "polarity" at
  * instantiation site i
  *)
 let inst_effect eabs einst polarity i = begin
-  CFL.make_inst_edge eabs.effect_read_node einst.effect_read_node polarity i.inst_id;
-  CFL.make_inst_edge eabs.effect_write_node einst.effect_write_node polarity i.inst_id;
+  Graph.make_inst_edge eabs.effect_read_node einst.effect_read_node polarity i.inst_id;
+  Graph.make_inst_edge eabs.effect_write_node einst.effect_write_node polarity i.inst_id;
   if !flow_effect then
-    CFL.make_inst_edge eabs.effect_share_node einst.effect_share_node (not polarity) i.inst_id;
-  (*CFL.make_inst_edge eabs.effect_lock_node einst.effect_lock_node polarity i.inst_id;*)
+    Graph.make_inst_edge eabs.effect_share_node einst.effect_share_node (not polarity) i.inst_id;
+  (*Graph.make_inst_edge eabs.effect_lock_node einst.effect_lock_node polarity i.inst_id;*)
 end
 
 (* create an "effect-membership" edge: loc is read in ef *)
 let add_to_read_effect (loc: rho) (ef: effect) : unit =
   if Effect.compare ef empty_effect = 0
-  then ();
+  then () else
     (*raise (LabelFlowBug "cannot add variables to the empty effect");*)
   (* UPDATE: reading in the empty effect is ok.  we need it *)
   if Rho.compare loc unknown_rho = 0 then ()
-  else CFL.make_sub_edge loc.rho_cfl_node ef.effect_read_node
+  else Graph.make_sub_edge loc.rho_cfl_node ef.effect_read_node
 
 (* create an "effect-membership" edge: loc is written in ef *)
 let add_to_write_effect (loc: rho) (ef: effect) : unit =
   if Effect.compare ef empty_effect = 0
   then raise (LabelFlowBug "cannot add variables to the empty effect");
   if Rho.compare loc unknown_rho = 0 then ()
-  else CFL.make_sub_edge loc.rho_cfl_node ef.effect_write_node
+  else Graph.make_sub_edge loc.rho_cfl_node ef.effect_write_node
 
 (* create an "effect-membership" edge: loc is written in ef *)
 let add_to_share_effect (loc: rho) (ef: effect) : unit =
   if Effect.compare ef empty_effect = 0
   then raise (LabelFlowBug "cannot add variables to the empty sharing effect");
   if Rho.compare loc unknown_rho = 0 then ()
-  else CFL.make_sub_edge loc.rho_cfl_node ef.effect_share_node
+  else Graph.make_sub_edge loc.rho_cfl_node ef.effect_share_node
       (* note: don't check !flow_effect here; won't get called unless
 	 !flow_effect is turned on in the first place *)
 
@@ -705,7 +815,7 @@ let add_to_share_effect (loc: rho) (ef: effect) : unit =
 let add_to_lock_effect (l: lock) (ef: lock_effect) : unit = begin
   assert (l <> unknown_lock);
   assert (ef <> unknown_lock);
-  CFL.make_sub_edge l.lock_cfl_node ef.lock_cfl_node
+  Graph.make_sub_edge l.lock_cfl_node ef.lock_cfl_node
 end
 
 (* return the join of two effects
@@ -769,9 +879,6 @@ let get_rho_p2set_pn (r: rho) : rhoSet = begin
   rhoset
 end
 
-let lock_reaches_matched l1 l2 =
-  CFL.reaches_m l1.lock_cfl_node l2.lock_cfl_node
-
 (* set closure wrt "flows to". unknowns are removed from the solution *)
 let close_lockset (ls: lockSet) : lockSet = begin
   let f (l: lock) (s: lockSet) =
@@ -823,6 +930,7 @@ let solve_rw_effect_pn (e: effect) : (rhoSet * rhoSet) = begin
   (x,y)
 end
 
+(*
 let solve_rw_effect_m (e: effect) : (rhoSet * rhoSet) = begin
   if !debug then ignore(E.log "solving r/w effect (matched):");
   let solv n =
@@ -837,6 +945,7 @@ let solve_rw_effect_m (e: effect) : (rhoSet * rhoSet) = begin
   if !debug then ignore(E.log "\n");
   (x,y)
 end
+*)
 
 let solve_share_effect_pn (e: effect) : rhoSet = begin
   if !debug then ignore(E.log "solving sharing effect:");
@@ -883,6 +992,16 @@ let solve_chi_pn (x: chi) : (rhoSet * rhoSet) = begin
   (r,w)
 end
 
+let dump_all_chi () =
+  if !debug then ignore(E.log "dump chi\n");
+  List.iter
+    (fun x ->
+      ignore(E.log "%a :\n" d_chi x);
+      let r,w = solve_chi_m x in
+      ignore(E.log "  read: %a\n" d_rhoset r);
+      ignore(E.log "  write: %a\n" d_rhoset w)
+    )
+    !all_chi
 
 (* translate a lock positively through the given instantiation
  * (outwards, abstract becomes instance)
@@ -917,7 +1036,6 @@ let translate_lockset_out (i:instantiation) (ls: lockSet) : lockSet =
  *) 
 let translate_lock_r i l =
   if not l.lock_linear then unknown_lock else
-  (*if CFL.reaches_m l.lock_cfl_node i.inst_lock_effect.effect_lock_node then*)
     try
       Hashtbl.find i.inst_locks_r l
     with Not_found ->
@@ -981,28 +1099,31 @@ let translate_rhoset_in (i: instantiation) (rs: rhoSet) : rhoSet =
     rs
     RhoSet.empty
 
-(* lockSet that's not translated through i *)
-(*let untranslated_lockset_in (i: instantiation) (ls: lockSet) : lockSet =
-  LockSet.fold
-    (fun l s ->
-      let l' =
-        if CFL.reaches_m l.lock_cfl_node i.inst_lock_effect.effect_lock_node
-        then unknown_lock
-        else l
-      in
-      LockSet.add l' s)
-    ls
-    LockSet.empty
-*)
+let solve_lock_effect_m (e: lock_effect) : lockSet = begin
+  if !debug then ignore(E.log "solving lock effect:");
+  let solv n =
+    CFL.get_all_that_reach_m
+      n
+      (fun x -> try NodeHT.find all_locks x with Not_found -> unknown_lock)
+      LockSet.add
+      LockSet.empty
+  in
+  solv e.lock_cfl_node
+end
 
 let split_lockset (ls: lockSet) (eff: lock_effect) =
-  LockSet.fold
+  let eff_solution = solve_lock_effect_m eff in
+  let reaching = LockSet.inter eff_solution ls in
+  let nonreaching = LockSet.diff ls reaching in
+  (reaching, nonreaching)
+  (*LockSet.fold
     (fun l (reaching, nonreaching) ->
       if CFL.reaches_m l.lock_cfl_node eff.lock_cfl_node
       then LockSet.add l reaching, nonreaching
       else reaching, LockSet.add l nonreaching)
     ls
     (LockSet.empty, LockSet.empty)
+    *)
 
 let inst_iter (f: instantiation -> unit) : unit =
   CFL.InstHT.iter (fun _ -> f) all_inst
@@ -1031,7 +1152,7 @@ end
  ***************)
 
 let print_graph (outf: out_channel) : unit = begin
-  let ns = CFL.print_graph outf in
+  let ns = Graph.print_graph outf in
   CFL.NodeSet.iter
     (fun n ->
       try

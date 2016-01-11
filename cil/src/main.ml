@@ -136,7 +136,7 @@ let rec processOneFile (cil: C.file) =
             if not (CK.checkFile [] cil) && !Cilutil.strictChecking then begin
               E.error ("Feature \"%s\" left CIL's internal data "
                        ^^"structures in an inconsistent state. "
-                       ^^"(See the warnings above)\n") fdesc.C.fd_name
+                       ^^"(See the warnings above)") fdesc.C.fd_name
             end
           end
         end)
@@ -202,7 +202,7 @@ let theMain () =
         [ 
           "--out", Arg.String (openFile "output" 
                                  (fun oc -> outChannel := Some oc)),
-              " the name of the output CIL file.  The cilly script sets this for you.";
+              " the name of the output CIL file.\n\t\t\t\tThe cilly script sets this for you.";
           "--mergedout", Arg.String (openFile "merged output"
                                        (fun oc -> mergedChannel := Some oc)),
               " specify the name of the merged file";
@@ -223,20 +223,20 @@ let theMain () =
       Testcil.doit !Cilutil.testcil
     end else
       (* parse each of the files named on the command line, to CIL *)
-      let files = List.map parseOneFile !Ciloptions.fileNames in
+      let files = Util.list_map parseOneFile !Ciloptions.fileNames in
 
       (* if there's more than one source file, merge them together; *)
       (* now we have just one CIL "file" to deal with *)
       let one =
         match files with
           [one] -> one
-        | [] -> E.s (E.error "No arguments for CIL\n")
+        | [] -> E.s (E.error "No arguments for CIL")
         | _ ->
             let merged =
               Stats.time "merge" (Mergecil.merge files)
                 (if !outName = "" then "stdout" else !outName) in
             if !E.hadErrors then
-              E.s (E.error "There were errors during merging\n");
+              E.s (E.error "There were errors during merging");
             (* See if we must save the merged file *)
             (match !mergedChannel with
               None -> ()

@@ -38,6 +38,7 @@
 
 open Escape
 open Pretty
+open Cilint
 (* open Trace      (\* sm: 'trace' function *\) *)
 module E = Errormsg
 module H = Hashtbl
@@ -61,6 +62,16 @@ let cilVersionRevision = Cilversion.cilVersionRev
 let msvcMode = ref false              (* Whether the pretty printer should 
                                        * print output for the MS VC 
                                        * compiler. Default is GCC *)
+let c99Mode = ref false (* True to handle ISO C 99 vs 90 changes.
+			   So far only affects integer parsing. *)
+
+(* Set this to true to get old-style handling of gcc's extern inline C extension:
+   old-style: the extern inline definition is used until the actual definition is
+     seen (as long as optimization is enabled)
+   new-style: the extern inline definition is used only if there is no actual
+     definition (as long as optimization is enabled)
+   Note that CIL assumes that optimization is always enabled ;-) *)
+let oldstyleExternInline = ref false
 
 let useLogicalOperators = ref false
 
@@ -69,7 +80,7 @@ module M = Machdep
 (* Cil.initCil will set this to the current machine description.
    Makefile.cil generates the file obj/@ARCHOS@/machdep.ml,
    which contains the descriptions of gcc and msvc. *)
-let theMachine : M.mach ref = ref M.gcc
+let envMachine : M.mach option ref = ref None
 
 
 let lowerConstants: bool ref = ref true
@@ -260,6 +271,7 @@ and ikind =
     IChar       (** [char] *)
   | ISChar      (** [signed char] *)
   | IUChar      (** [unsigned char] *)
+  | IBool       (** [_Bool (C99)] *)
   | IInt        (** [int] *)
   | IUInt       (** [unsigned int] *)
   | IShort      (** [short] *)
@@ -369,6 +381,9 @@ and enuminfo = {
                                                       constants. *) 
     mutable eattr: attributes;         (** Attributes *)
     mutable ereferenced: bool;         (** True if used. Initially set to false*)
+    mutable ekind: ikind;
+    (** The integer kind used to represent this enum. Per ANSI-C, this
+      * should always be IInt, but gcc allows other integer kinds *)
 }
 
 (** Information about a defined type *)
@@ -428,6 +443,9 @@ and varinfo = {
 
     mutable vdescrpure: bool;           (** Indicates whether the vdescr above
                                             is a pure expression or call.
+                                            True for all CIL expressions and
+                                            Lvals, but false for e.g. function
+                                            calls.
                                             Printing a non-pure vdescr more
                                             than once may yield incorrect
                                             results. *)
@@ -1045,6 +1063,17 @@ let startsWith (prefix: string) (s: string) : bool =
   (String.sub s 0 prefixLen) = prefix
 )
 
+let endsWith (suffix: string) (s: string) : bool = 
+  let suffixLen = String.length suffix in
+  let sLen = String.length s in
+  sLen >= suffixLen && 
+  (String.sub s (sLen - suffixLen) suffixLen) = suffix
+
+let stripUnderscores (s: string) : string = 
+  if (startsWith "__" s) && (endsWith "__" s) then
+    String.sub s 2 ((String.length s) - 4)
+  else
+    s
 
 let get_instrLoc (inst : instr) =
   match inst with
@@ -1097,7 +1126,7 @@ let d_thisloc (_: unit) : doc = d_loc () !currentLoc
 let error (fmt : ('a,unit,doc) format) : 'a = 
   let f d = 
     E.hadErrors := true; 
-    ignore (eprintf "@!%t: Error: %a@!" 
+    ignore (eprintf "%t: Error: %a@!" 
               d_thisloc insert d);
     nil
   in
@@ -1106,7 +1135,7 @@ let error (fmt : ('a,unit,doc) format) : 'a =
 let unimp (fmt : ('a,unit,doc) format) : 'a = 
   let f d = 
     E.hadErrors := true; 
-    ignore (eprintf "@!%t: Unimplemented: %a@!" 
+    ignore (eprintf "%t: Unimplemented: %a@!" 
               d_thisloc insert d);
     nil
   in
@@ -1115,7 +1144,7 @@ let unimp (fmt : ('a,unit,doc) format) : 'a =
 let bug (fmt : ('a,unit,doc) format) : 'a = 
   let f d = 
     E.hadErrors := true; 
-    ignore (eprintf "@!%t: Bug: %a@!" 
+    ignore (eprintf "%t: Bug: %a@!" 
               d_thisloc insert d);
     E.showContext ();
     nil
@@ -1125,7 +1154,7 @@ let bug (fmt : ('a,unit,doc) format) : 'a =
 let errorLoc (loc: location) (fmt : ('a,unit,doc) format) : 'a = 
   let f d = 
     E.hadErrors := true; 
-    ignore (eprintf "@!%a: Error: %a@!" 
+    ignore (eprintf "%a: Error: %a@!" 
               d_loc loc insert d);
     E.showContext ();
     nil
@@ -1134,7 +1163,7 @@ let errorLoc (loc: location) (fmt : ('a,unit,doc) format) : 'a =
 
 let warn (fmt : ('a,unit,doc) format) : 'a = 
   let f d =
-    ignore (eprintf "@!%t: Warning: %a@!" 
+    ignore (eprintf "%t: Warning: %a@!" 
               d_thisloc insert d);
     nil
   in
@@ -1144,7 +1173,7 @@ let warn (fmt : ('a,unit,doc) format) : 'a =
 let warnOpt (fmt : ('a,unit,doc) format) : 'a = 
   let f d =
     if !E.warnFlag then 
-      ignore (eprintf "@!%t: Warning: %a@!" 
+      ignore (eprintf "%t: Warning: %a@!" 
                 d_thisloc insert d);
     nil
   in
@@ -1152,7 +1181,7 @@ let warnOpt (fmt : ('a,unit,doc) format) : 'a =
 
 let warnContext (fmt : ('a,unit,doc) format) : 'a = 
   let f d =
-    ignore (eprintf "@!%t: Warning: %a@!" 
+    ignore (eprintf "%t: Warning: %a@!" 
               d_thisloc insert d);
     E.showContext ();
     nil
@@ -1162,7 +1191,7 @@ let warnContext (fmt : ('a,unit,doc) format) : 'a =
 let warnContextOpt (fmt : ('a,unit,doc) format) : 'a = 
   let f d =
     if !E.warnFlag then 
-      ignore (eprintf "@!%t: Warning: %a@!" 
+      ignore (eprintf "%t: Warning: %a@!" 
                 d_thisloc insert d);
     E.showContext ();
     nil
@@ -1171,22 +1200,14 @@ let warnContextOpt (fmt : ('a,unit,doc) format) : 'a =
 
 let warnLoc (loc: location) (fmt : ('a,unit,doc) format) : 'a = 
   let f d =
-    ignore (eprintf "@!%a: Warning: %a@!" 
+    ignore (eprintf "%a: Warning: %a@!" 
               d_loc loc insert d);
     E.showContext ();
     nil
   in
   Pretty.gprintf f fmt
 
-
-
-(* Construct an integer. Use only for values that fit on 31 bits.
-   For larger values, use kinteger *)
-let integer (i: int) = Const (CInt64(Int64.of_int i, IInt, None))
-            
-let zero      = integer 0
-let one       = integer 1
-let mone      = integer (-1)
+let zero      = Const(CInt64(Int64.zero, IInt, None))
 
 (** Given the character c in a (CChr c), sign-extend it to 32 bits.
   (This is the official way of interpreting character constants, according to
@@ -1202,14 +1223,6 @@ let charConstToInt (c: char) : constant =
   CInt64(value, IInt, None)
   
   
-let rec isInteger : exp -> int64 option = function
-  | Const(CInt64 (n,_,_)) -> Some n
-  | Const(CChr c) -> isInteger (Const (charConstToInt c))  (* sign-extend *) 
-  | Const(CEnum(v, s, ei)) -> isInteger v
-  | CastE(_, e) -> isInteger e
-  | _ -> None
-        
-
 (** Convert a 64-bit int to an OCaml int, or raise an exception if that
     can't be done. *)
 let i64_to_int (i: int64) : int = 
@@ -1217,8 +1230,10 @@ let i64_to_int (i: int64) : int =
   if i = Int64.of_int i' then i'
   else E.s (E.unimp "%a: Int constant too large: %Ld\n" d_loc !currentLoc i)
 
-
-let rec isZero (e: exp) : bool = isInteger e = Some Int64.zero
+let cilint_to_int (i: cilint) : int = 
+  try int_of_cilint i 
+  with _ -> E.s (E.unimp "%a: Int constant too large: %s\n" 
+		   d_loc !currentLoc (string_of_cilint i))
 
 let voidType = TVoid([])
 let intType = TInt(IInt,[])
@@ -1226,6 +1241,7 @@ let uintType = TInt(IUInt,[])
 let longType = TInt(ILong,[])
 let ulongType = TInt(IULong,[])
 let charType = TInt(IChar, [])
+let boolType = TInt(IBool, [])
 
 let charPtrType = TPtr(charType,[])
 let charConstPtrType = TPtr(TInt(IChar, [Attr("const", [])]),[])
@@ -1254,6 +1270,7 @@ let initCIL_called = ref false
 
 (** Returns true if and only if the given integer type is signed. *)
 let isSigned = function
+  | IBool
   | IUChar
   | IUShort
   | IUInt
@@ -1267,7 +1284,7 @@ let isSigned = function
   | ILongLong ->
       true
   | IChar ->
-      not !theMachine.M.char_is_unsigned
+      not !M.theMachine.M.char_is_unsigned
 
 let mkStmt (sk: stmtkind) : stmt = 
   { skind = sk;
@@ -1306,6 +1323,8 @@ let compactStmts (b: stmt list) : stmt list =
         else
           finishLast (compress s ils rest)
 
+    | {skind=Block b;labels = []} :: rest when b.battrs = [] ->
+        compress lastinstrstmt lastinstrs (b.bstmts@rest)
     | s :: rest -> 
         let res = s :: compress dummyStmt Clist.empty rest in
         finishLast res
@@ -1365,8 +1384,9 @@ let attributeHash: (string, attributeClass) H.t =
     [ "section"; "constructor"; "destructor"; "unused"; "used"; "weak"; 
       "no_instrument_function"; "alias"; "no_check_memory_usage";
       "exception"; "model"; (* "restrict"; *)
-      "aconst"; "__asm__" (* Gcc uses this to specifiy the name to be used in 
-                           * assembly for a global  *)];
+      "aconst"; "__asm__"; (* Gcc uses this to specifiy the name to be used in 
+                            * assembly for a global  *)
+      "atomic" ]; (* LOCKSMITH *)
 
   (* Now come the MSVC declspec attributes *)
   List.iter (fun a -> H.add table a (AttrName true))
@@ -1437,7 +1457,7 @@ let mkCompInfo
    comp.ckey <- !nextCompinfoKey;
    incr nextCompinfoKey;
    let flds = 
-       List.map (fun (fn, ft, fb, fa, fl) -> 
+       Util.list_map (fun (fn, ft, fb, fa, fl) -> 
           { fcomp = comp;
             ftype = ft;
             fname = fn;
@@ -1454,7 +1474,7 @@ let copyCompInfo (ci: compinfo) (n: string) : compinfo =
                      ckey = !nextCompinfoKey; } in
   incr nextCompinfoKey;
   (* Copy the fields and set the new pointers to parents *)
-  ci'.cfields <- List.map (fun f -> {f with fcomp = ci'}) ci'.cfields;
+  ci'.cfields <- Util.list_map (fun f -> {f with fcomp = ci'}) ci'.cfields;
   ci'
 
 (**** Utility functions ******)
@@ -1541,7 +1561,7 @@ let rec unrollTypeDeep (t: typ) : typ =
               (match args with 
                 None -> None
               | Some argl -> 
-                  Some (List.map (fun (an,at,aa) -> 
+                  Some (Util.list_map (fun (an,at,aa) -> 
                   (an, unrollTypeDeep at, aa)) argl)), 
               isva, 
               addAttributes al a')
@@ -1612,6 +1632,7 @@ let d_ikind () = function
     IChar -> text "char"
   | ISChar -> text "signed char"
   | IUChar -> text "unsigned char"
+  | IBool -> text "_Bool"
   | IInt -> text "int"
   | IUInt -> text "unsigned int"
   | IShort -> text "short"
@@ -1662,9 +1683,7 @@ let d_const () c =
       in
       (* Watch out here for negative integers that we should be printing as 
        * large positive ones *)
-      if i < Int64.zero 
-          && (match ik with 
-            IUInt | IULong | IULongLong | IUChar | IUShort -> true | _ -> false) then
+      if i < Int64.zero && (not (isSigned ik)) then
         let high = Int64.shift_right i 32 in
         if ik <> IULongLong && ik <> ILongLong && high = Int64.of_int (-1) then
           (* Print only the low order 32 bits *)
@@ -1792,7 +1811,7 @@ let separateStorageModifiers (al: attribute list) =
       (* Put back the declspec. Put it without the leading __ since these will 
        * be added later *)
       let stom' = 
-	List.map (fun (Attr(an, args)) -> 
+	Util.list_map (fun (Attr(an, args)) -> 
           Attr("declspec", [ACons(an, args)])) stom in
       stom', rest
 
@@ -1837,7 +1856,7 @@ let rec typeOf (e: exp) : typ =
 
   | Const(CReal (_, fk, _)) -> TFloat(fk, [])
 
-  | Const(CEnum(_, _, ei)) -> TEnum(ei, [])
+  | Const(CEnum(tag, _, ei)) -> typeOf tag
 
   | Lval(lv) -> typeOfLval lv
   | SizeOf _ | SizeOfE _ | SizeOfStr _ -> !typeOfSizeOf
@@ -1899,10 +1918,11 @@ exception SizeOfError of string * typ
 let bytesSizeOfInt (ik: ikind): int = 
   match ik with 
   | IChar | ISChar | IUChar -> 1
-  | IInt | IUInt -> !theMachine.M.sizeof_int
-  | IShort | IUShort -> !theMachine.M.sizeof_short
-  | ILong | IULong -> !theMachine.M.sizeof_long
-  | ILongLong | IULongLong -> !theMachine.M.sizeof_longlong
+  | IBool -> !M.theMachine.M.sizeof_bool
+  | IInt | IUInt -> !M.theMachine.M.sizeof_int
+  | IShort | IUShort -> !M.theMachine.M.sizeof_short
+  | ILong | IULong -> !M.theMachine.M.sizeof_long
+  | ILongLong | IULongLong -> !M.theMachine.M.sizeof_longlong
 
 let unsignedVersionOf (ik:ikind): ikind =
   match ik with
@@ -1913,93 +1933,170 @@ let unsignedVersionOf (ik:ikind): ikind =
   | ILongLong -> IULongLong
   | _ -> ik          
 
-(* Represents an integer as for a given kind. 
-   Returns a flag saying whether the value was changed
-   during truncation (because it was too large to fit in k). *)
-let truncateInteger64 (k: ikind) (i: int64) : int64 * bool = 
-  let nrBits = 8 * (bytesSizeOfInt k) in
-  let signed = isSigned k in
-  if nrBits = 64 then 
-    i, false
-  else begin
-    let i1 = Int64.shift_left i (64 - nrBits) in
-    let i2 = 
-      if signed then Int64.shift_right i1 (64 - nrBits) 
-      else Int64.shift_right_logical i1 (64 - nrBits)
-    in
-    let truncated =
-      if i2 = i then false
-      else
-        (* Examine the bits that we chopped off.  If they are all zero, then
-         * any difference between i2 and i is due to a simple sign-extension.
-         *   e.g. casting the constant 0x80000000 to int makes it
-         *        0xffffffff80000000.
-         * Suppress the truncation warning in this case.      *)
-        let chopped = Int64.shift_right i (64 - nrBits) in
-        chopped <> Int64.zero
-          (* matth: also suppress the warning if we only chop off 1s.
-             This is probably due to a negative number being cast to an 
-             unsigned value.  While potentially a bug, this is almost
-             always what the programmer intended. *)
-        && chopped <> Int64.minus_one
-    in
-    i2, truncated
+let signedVersionOf (ik:ikind): ikind =
+  match ik with
+  | IUChar | IChar -> ISChar
+  | IUShort -> IShort
+  | IUInt -> IInt
+  | IULong -> ILong
+  | IULongLong -> ILongLong
+  | _ -> ik
+
+(* Return the integer conversion rank of an integer kind *)
+let intRank (ik:ikind) : int = 
+  match ik with
+  | IBool -> 0
+  | IChar | ISChar | IUChar -> 1
+  | IShort | IUShort -> 2
+  | IInt | IUInt -> 3
+  | ILong | IULong -> 4
+  | ILongLong | IULongLong -> 5
+
+(* Return the common integer kind of the two integer arguments, as
+   defined in ISO C 6.3.1.8 ("Usual arithmetic conversions") *)
+let commonIntKind (ik1:ikind) (ik2:ikind) : ikind =
+  let r1 = intRank ik1 in
+  let r2 = intRank ik2 in
+  if (isSigned ik1) = (isSigned ik2) then begin
+    (* Both signed or both unsigned. *)
+    if r1 > r2 then ik1 else ik2
   end
+  else begin
+    let signedKind, unsignedKind, signedRank, unsignedRank = 
+      if isSigned ik1 then ik1, ik2, r1, r2 else ik2, ik1, r2, r1
+    in
+    (* The rules for signed + unsigned get hairy.
+       (unsigned short + long) is converted to signed long,
+       but (unsigned int + long) is converted to unsigned long.*)
+    if unsignedRank >= signedRank then unsignedKind
+    else if (bytesSizeOfInt signedKind) > (bytesSizeOfInt unsignedKind) then
+      signedKind
+    else 
+      unsignedVersionOf signedKind
+  end
+
+let intKindForSize (s:int) (unsigned:bool) : ikind =
+  if unsigned then 
+    (* Test the most common sizes first *)
+    if s = 1 then IUChar
+    else if s = !M.theMachine.M.sizeof_int then IUInt
+    else if s = !M.theMachine.M.sizeof_long then IULong
+    else if s = !M.theMachine.M.sizeof_short then IUShort
+    else if s = !M.theMachine.M.sizeof_longlong then IULongLong
+    else raise Not_found
+  else
+    (* Test the most common sizes first *)
+    if s = 1 then ISChar
+    else if s = !M.theMachine.M.sizeof_int then IInt
+    else if s = !M.theMachine.M.sizeof_long then ILong
+    else if s = !M.theMachine.M.sizeof_short then IShort
+    else if s = !M.theMachine.M.sizeof_longlong then ILongLong
+    else raise Not_found
+
+let floatKindForSize (s:int) = 
+  if s = !M.theMachine.M.sizeof_double then FDouble
+  else if s = !M.theMachine.M.sizeof_float then FFloat
+  else if s = !M.theMachine.M.sizeof_longdouble then FLongDouble
+  else raise Not_found
+
+(* Represents an integer as for a given kind.  Returns a flag saying
+   whether any "interesting" bits were lost during truncation. By
+   "interesting", we mean that the lost bits were not all-0 or all-1. *)
+let truncateCilint (k: ikind) (i: cilint) : cilint * truncation = 
+  (* Truncations to _Bool are special: they behave like "!= 0" 
+     ISO C99 6.3.1.2 *)
+  if k = IBool then
+    if is_zero_cilint i then
+      zero_cilint, NoTruncation
+    else
+      one_cilint, NoTruncation
+  else
+    let nrBits = 8 * (bytesSizeOfInt k) in
+    if isSigned k then
+      truncate_signed_cilint i nrBits
+    else
+      truncate_unsigned_cilint i nrBits
+
+let mkCilint (ik:ikind) (i:int64) : cilint = 
+  fst (truncateCilint ik (cilint_of_int64 i))
+
+(* Construct an integer constant with possible truncation *)
+let kintegerCilint (k: ikind) (i: cilint) : exp = 
+  let i', truncated = truncateCilint k i in
+  if truncated = BitTruncation && !warnTruncate then 
+    ignore (warnOpt "Truncating integer %s to %s" 
+              (string_of_cilint i) (string_of_cilint i'));
+  Const (CInt64(int64_of_cilint i', k,  None))
 
 (* Construct an integer constant with possible truncation *)
 let kinteger64 (k: ikind) (i: int64) : exp = 
-  let i', truncated = truncateInteger64 k i in
-  if truncated && !warnTruncate then 
-    ignore (warnOpt "Truncating integer %s to %s\n" 
-              (Int64.format "0x%x" i) (Int64.format "0x%x" i'));
-  Const (CInt64(i', k,  None))
+  kintegerCilint k (cilint_of_int64 i)
 
 (* Construct an integer of a given kind. *)
-let kinteger (k: ikind) (i: int) = kinteger64 k (Int64.of_int i)
+let kinteger (k: ikind) (i: int) = 
+  kintegerCilint k (cilint_of_int i)
 
-(* Convert 2 integer constants to integers with the same type, in preparation
-   for a binary operation.   See ISO C 6.3.1.8p1 *)
-let convertInts (i1:int64) (ik1:ikind) (i2:int64) (ik2:ikind)
-  : int64 * int64 * ikind =
-  if ik1 = ik2 then (* nothing to do *)
-    i1, i2, ik1
-  else begin
-    let rank : ikind -> int = function
-        (* these are just unique numbers representing the integer 
-           conversion rank. *)
-      | IChar | ISChar | IUChar -> 1
-      | IShort | IUShort -> 2
-      | IInt | IUInt -> 3
-      | ILong | IULong -> 4
-      | ILongLong | IULongLong -> 5
-    in
-    let r1 = rank ik1 in
-    let r2 = rank ik2 in
-    let ik' = 
-      if (isSigned ik1) = (isSigned ik2) then begin
-        (* Both signed or both unsigned. *)
-        if r1 > r2 then ik1 else ik2
-      end
-      else begin
-        let signedKind, unsignedKind, signedRank, unsignedRank = 
-          if isSigned ik1 then ik1, ik2, r1, r2 else ik2, ik1, r2, r1
-        in
-        (* The rules for signed + unsigned get hairy.
-           (unsigned short + long) is converted to signed long,
-           but (unsigned int + long) is converted to unsigned long.*)
-        if unsignedRank >= signedRank then unsignedKind
-        else if (bytesSizeOfInt signedKind) > (bytesSizeOfInt unsignedKind) then
-          signedKind
-        else 
-          unsignedVersionOf signedKind
-      end
-    in
-    let i1',_ = truncateInteger64 ik' i1 in
-    let i2',_ = truncateInteger64 ik' i2 in
-    i1', i2', ik'      
-  end
-
+(** Construct an integer of kind IInt. On targets where C's 'int' is 16-bits,
+    the integer may get truncated. *)
+let integer (i: int) = kinteger IInt i
+            
+let one       = integer 1
+let mone      = integer (-1)
      
+(* True if the integer fits within the kind's range *)
+let fitsInInt (k: ikind) (i: cilint) : bool = 
+  let _, truncated = truncateCilint k i in
+  truncated = NoTruncation
+
+(* Return the smallest kind that will hold the integer's value.  The
+   kind will be unsigned if the 2nd argument is true, signed
+   otherwise.  Note that if the value doesn't fit in any of the
+   available types, you will get ILongLong (2nd argument false) or
+   IULongLong (2nd argument true). *)
+let intKindForValue (i: cilint) (unsigned: bool) = 
+  if unsigned then
+    if fitsInInt IUChar i then IUChar
+    else if fitsInInt IUShort i then IUShort
+    else if fitsInInt IUInt i then IUInt
+    else if fitsInInt IULong i then IULong
+    else IULongLong
+  else
+    if fitsInInt ISChar i then ISChar
+    else if fitsInInt IShort i then IShort
+    else if fitsInInt IInt i then IInt
+    else if fitsInInt ILong i then ILong
+    else ILongLong
+
+(** If the given expression is an integer constant or a CastE'd
+    integer constant, return that constant's value as an ikint, int64 pair. 
+    Otherwise return None. *)
+let rec getInteger (e:exp) : cilint option = 
+  match e with
+  | Const(CInt64 (n, ik, _)) -> Some (mkCilint ik n)
+  | Const(CChr c) -> getInteger (Const (charConstToInt c))
+  | Const(CEnum(v, _, _)) -> getInteger v
+  | CastE(t, e) -> begin
+      (* Handle any truncation due to cast. We optimistically ignore 
+	 loss-of-precision due to floating-point casts. *)
+      let mkInt ik n = Some (fst (truncateCilint ik n)) in
+      match unrollType t, getInteger e with
+      | TInt (ik, _), Some n -> mkInt ik n
+      | TPtr _, Some n -> begin
+	  match !upointType with
+	    TInt (ik, _) -> mkInt ik n
+	  | _ -> raise (Failure "pointer size unknown")
+        end
+      | TEnum (ei, _), Some n -> mkInt ei.ekind n
+      | TFloat _, v -> v
+      | _, _ -> None
+    end
+  | _ -> None
+
+let isZero (e: exp) : bool = 
+  match getInteger e with
+  | Some n -> is_zero_cilint n
+  | _ -> false
+
 type offsetAcc = 
     { oaFirstFree: int;        (* The first free bit *)
       oaLastFieldStart: int;   (* Where the previous field started *)
@@ -2022,17 +2119,18 @@ let rec alignOf_int t =
   let alignOfType () =
     match t with
     | TInt((IChar|ISChar|IUChar), _) -> 1
-    | TInt((IShort|IUShort), _) -> !theMachine.M.alignof_short
-    | TInt((IInt|IUInt), _) -> !theMachine.M.alignof_int
-    | TInt((ILong|IULong), _) -> !theMachine.M.alignof_long
-    | TInt((ILongLong|IULongLong), _) -> !theMachine.M.alignof_longlong
-    | TEnum _ -> !theMachine.M.alignof_enum
-    | TFloat(FFloat, _) -> !theMachine.M.alignof_float 
-    | TFloat(FDouble, _) -> !theMachine.M.alignof_double
-    | TFloat(FLongDouble, _) -> !theMachine.M.alignof_longdouble
+    | TInt(IBool, _) -> !M.theMachine.M.alignof_bool
+    | TInt((IShort|IUShort), _) -> !M.theMachine.M.alignof_short
+    | TInt((IInt|IUInt), _) -> !M.theMachine.M.alignof_int
+    | TInt((ILong|IULong), _) -> !M.theMachine.M.alignof_long
+    | TInt((ILongLong|IULongLong), _) -> !M.theMachine.M.alignof_longlong
+    | TEnum(ei, _) -> alignOf_int (TInt(ei.ekind, []))
+    | TFloat(FFloat, _) -> !M.theMachine.M.alignof_float 
+    | TFloat(FDouble, _) -> !M.theMachine.M.alignof_double
+    | TFloat(FLongDouble, _) -> !M.theMachine.M.alignof_longdouble
     | TNamed (t, _) -> alignOf_int t.ttype
     | TArray (t, _, _) -> alignOf_int t
-    | TPtr _ | TBuiltin_va_list _ -> !theMachine.M.alignof_ptr
+    | TPtr _ | TBuiltin_va_list _ -> !M.theMachine.M.alignof_ptr
         
     (* For composite types get the maximum alignment of any field inside *)
     | TComp (c, _) ->
@@ -2054,7 +2152,7 @@ let rec alignOf_int t =
              if not !msvcMode && f.fbitfield = Some 0 then sofar else
                max sofar (alignOfField f)) 1 fields
           (* These are some error cases *)
-    | TFun _ when not !msvcMode -> !theMachine.M.alignof_fun
+    | TFun _ when not !msvcMode -> !M.theMachine.M.alignof_fun
         
     | TFun _ as t -> raise (SizeOfError ("function", t))
     | TVoid _ as t -> raise (SizeOfError ("void", t))
@@ -2064,12 +2162,12 @@ let rec alignOf_int t =
       (* no __aligned__ attribute, so get the default alignment *)
       alignOfType ()
   | _ when !ignoreAlignmentAttrs -> 
-      ignore (warn "ignoring recursive align attributes on %a\n" 
+      ignore (warn "ignoring recursive align attributes on %a" 
                 (!pd_type) t);
       alignOfType ()
   | (Attr(_, [a]) as at)::rest -> begin
       if rest <> [] then
-        ignore (warn "ignoring duplicate align attributes on %a\n" 
+        ignore (warn "ignoring duplicate align attributes on %a" 
                   (!pd_type) t);
       match intOfAttrparam a with
         Some n -> n
@@ -2082,9 +2180,9 @@ let rec alignOf_int t =
        (* aligned with no arg means a power of two at least as large as
           any alignment on the system.*)
        if rest <> [] then
-         ignore(warn "ignoring duplicate align attributes on %a\n" 
+         ignore(warn "ignoring duplicate align attributes on %a" 
                   (!pd_type) t);
-       !theMachine.M.alignof_aligned
+       !M.theMachine.M.alignof_aligned
   | at::_ ->
       ignore (warn "alignment attribute \"%a\" not understood on %a" 
                 (!pd_attr) at (!pd_type) t);
@@ -2287,12 +2385,12 @@ and bitsSizeOf t =
     E.s (E.error "You did not call Cil.initCIL before using the CIL library");
   match t with 
   | TInt (ik,_) -> 8 * (bytesSizeOfInt ik)
-  | TFloat(FDouble, _) -> 8 * !theMachine.M.sizeof_double
-  | TFloat(FLongDouble, _) -> 8 * !theMachine.M.sizeof_longdouble
-  | TFloat _ -> 8 * !theMachine.M.sizeof_float
-  | TEnum _ -> 8 * !theMachine.M.sizeof_enum
-  | TPtr _ -> 8 * !theMachine.M.sizeof_ptr
-  | TBuiltin_va_list _ -> 8 * !theMachine.M.sizeof_ptr
+  | TFloat(FDouble, _) -> 8 * !M.theMachine.M.sizeof_double
+  | TFloat(FLongDouble, _) -> 8 * !M.theMachine.M.sizeof_longdouble
+  | TFloat _ -> 8 * !M.theMachine.M.sizeof_float
+  | TEnum (ei, _) -> bitsSizeOf (TInt(ei.ekind, []))
+  | TPtr _ -> 8 * !M.theMachine.M.sizeof_ptr
+  | TBuiltin_va_list _ -> 8 * !M.theMachine.M.sizeof_ptr
   | TNamed (t, _) -> bitsSizeOf t.ttype
   | TComp (comp, _) when comp.cfields == [] -> begin
       (* Empty structs are allowed in msvc mode *)
@@ -2344,24 +2442,23 @@ and bitsSizeOf t =
 
   | TArray(bt, Some len, _) -> begin
       match constFold true len with 
-        Const(CInt64(l,_,_)) -> 
-          let sz = Int64.mul (Int64.of_int (bitsSizeOf bt)) l in
-          let sz' = i64_to_int sz in
+        Const(CInt64(l,lk,_)) -> 
+	  let sz = mul_cilint (mkCilint lk l) (cilint_of_int  (bitsSizeOf bt)) in
           (* Check for overflow.
              There are other places in these cil.ml that overflow can occur,
              but this multiplication is the most likely to be a problem. *)
-          if (Int64.of_int sz') <> sz then
+          if not (is_int_cilint sz) then
             raise (SizeOfError ("Array is so long that its size can't be "
                                   ^"represented with an OCaml int.", t))
           else
-            addTrailing sz' (8 * alignOf_int t)
+            addTrailing (int_of_cilint sz) (8 * alignOf_int t)
       | _ -> raise (SizeOfError ("array non-constant length", t))
   end
 
 
-  | TVoid _ -> 8 * !theMachine.M.sizeof_void
+  | TVoid _ -> 8 * !M.theMachine.M.sizeof_void
   | TFun _ when not !msvcMode -> (* On GCC the size of a function is defined *)
-      8 * !theMachine.M.sizeof_fun
+      8 * !M.theMachine.M.sizeof_fun
 
   | TArray (_, None, _) -> (* it seems that on GCC the size of such an 
                             * array is 0 *) 
@@ -2384,8 +2481,8 @@ and bitsOffset (baset: typ) (off: offset) : int * int =
       NoOffset -> start, width
     | Index(e, off) -> begin
         let ei = 
-          match isInteger e with
-            Some i64 -> i64_to_int i64
+          match getInteger e with
+            Some i -> cilint_to_int i
           | None -> raise (SizeOfError ("index not constant", baset))
         in
         let bt = 
@@ -2441,15 +2538,16 @@ and constFold (machdep: bool) (e: exp) : exp =
         let tk = 
           match unrollType tres with
             TInt(ik, _) -> ik
-          | TEnum _ -> IInt
+          | TEnum (ei, _) -> ei.ekind
           | _ -> raise Not_found (* probably a float *)
         in
         match constFold machdep e1 with
           Const(CInt64(i,ik,_)) -> begin
+	    let ic = mkCilint ik i in
             match unop with 
-              Neg -> kinteger64 tk (Int64.neg i)
-            | BNot -> kinteger64 tk (Int64.lognot i)
-            | LNot -> if i = Int64.zero then one else zero
+              Neg -> kintegerCilint tk (neg_cilint ic)
+            | BNot -> kintegerCilint tk (lognot_cilint ic)
+            | LNot -> if is_zero_cilint ic then one else zero
             end
         | e1c -> UnOp(unop, e1c, tres)
       with Not_found -> e
@@ -2471,7 +2569,7 @@ and constFold (machdep: bool) (e: exp) : exp =
        * type. I know that for strings this is not true *)
       match e with 
         Const (CStr _) when not !msvcMode -> 
-          kinteger !kindOfSizeOf !theMachine.M.alignof_str
+          kinteger !kindOfSizeOf !M.theMachine.M.alignof_str
             (* For an array, it is the alignment of the array ! *)
       | _ -> constFold machdep (AlignOf (typeOf e))
   end
@@ -2482,8 +2580,8 @@ and constFold (machdep: bool) (e: exp) : exp =
       try 
         let start, width = bitsOffset bt off in
         if start mod 8 <> 0 then 
-          E.s (error "Using offset of bitfield\n");
-        constFold machdep (CastE(it, (integer (start / 8))))
+          E.s (error "Using offset of bitfield");
+        constFold machdep (CastE(it, (kinteger !kindOfSizeOf (start / 8))))
       with SizeOfError _ -> e
   end
 
@@ -2491,12 +2589,12 @@ and constFold (machdep: bool) (e: exp) : exp =
   | CastE (t, e) -> begin
       match constFold machdep e, unrollType t with 
         (* Might truncate silently *)
-        Const(CInt64(i,k,_)), TInt(nk,a)
+      | Const(CInt64(i,k,_)), TInt(nk,a)
           (* It's okay to drop a cast to const.
              If the cast has any other attributes, leave the cast alone. *)
           when (dropAttributes ["const"] a) = [] -> 
-          let i', _ = truncateInteger64 nk i in
-          Const(CInt64(i', nk, None))
+          let i', _ = truncateCilint nk (mkCilint k i) in
+          Const(CInt64(int64_of_cilint i', nk, None))
       | e', _ -> CastE (t, e')
   end
   | Lval lv -> Lval (constFoldLval machdep lv)
@@ -2523,35 +2621,14 @@ and constFoldBinOp (machdep: bool) bop e1 e2 tres =
   let e2' = constFold machdep e2 in
   if isIntegralType tres then begin
     let newe = 
-      let rec mkInt = function
-          Const(CChr c) -> Const(charConstToInt c)
-        | Const(CEnum (v, s, ei)) -> mkInt v
-        | CastE(TInt (ik, ta), e) -> begin
-            match mkInt e with
-              Const(CInt64(i, _, _)) -> 
-                let i', _ = truncateInteger64 ik i in
-                Const(CInt64(i', ik, None))
-
-            | e' -> CastE(TInt(ik, ta), e')
-        end
-        | e -> e
-      in
       let tk = 
         match unrollType tres with
           TInt(ik, _) -> ik
-        | TEnum _ -> IInt
+        | TEnum (ei, _) -> ei.ekind
         | _ -> E.s (bug "constFoldBinOp")
       in
-      (* See if the result is unsigned *)
-      let isunsigned typ = not (isSigned typ) in
-      let ge (unsigned: bool) (i1: int64) (i2: int64) : bool = 
-        if unsigned then 
-          let l1 = Int64.shift_right_logical i1 1 in
-          let l2 = Int64.shift_right_logical i2 1 in (* Both positive now *)
-          (l1 > l2) || (l1 = l2 && 
-                        Int64.logand i1 Int64.one >= Int64.logand i2 Int64.one)
-        else i1 >= i2
-      in
+      let collapse0 () = kinteger tk 0 in
+      let collapse e = e (*mkCast e tres*) in
       let shiftInBounds i2 =
          (* We only try to fold shifts if the second arg is positive and
             less than the size of the type of the first argument.
@@ -2559,98 +2636,65 @@ and constFoldBinOp (machdep: bool) bop e1 e2 tres =
             compiler sort it out. *)
         if machdep then
           try
-            i2 >= Int64.zero && i2 < (Int64.of_int (bitsSizeOf (typeOf e1')))
+            compare_cilint i2 zero_cilint >= 0 && 
+	    compare_cilint i2 (cilint_of_int (bitsSizeOf (typeOf e1'))) < 0
           with SizeOfError _ -> false
         else false
       in
       (* Assume that the necessary promotions have been done *)
-      match bop, mkInt e1', mkInt e2' with
-      | PlusA, Const(CInt64(z,_,_)), e2'' when z = Int64.zero -> e2''
-      | PlusA, e1'', Const(CInt64(z,_,_)) when z = Int64.zero -> e1''
-      | PlusPI, e1'', Const(CInt64(z,_,_)) when z = Int64.zero -> e1''
-      | IndexPI, e1'', Const(CInt64(z,_,_)) when z = Int64.zero -> e1''
-      | MinusPI, e1'', Const(CInt64(z,_,_)) when z = Int64.zero -> e1''
-      | PlusA, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) when ik1 = ik2 -> 
-          kinteger64 tk (Int64.add i1 i2)
-      | MinusA, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) when ik1 = ik2 -> 
-          kinteger64 tk (Int64.sub i1 i2)
-      | Mult, Const(CInt64(i1,ik1,_)), Const(CInt64(i2,ik2,_)) when ik1 = ik2 -> 
-          kinteger64 tk (Int64.mul i1 i2)
-      | Mult, Const(CInt64(0L,_,_)), _ -> zero
-      | Mult, Const(CInt64(1L,_,_)), e2'' -> e2''
-      | Mult, _,    Const(CInt64(0L,_,_)) -> zero
-      | Mult, e1'', Const(CInt64(1L,_,_)) -> e1''
-      | Div, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) when ik1 = ik2 -> begin
-          try kinteger64 tk (Int64.div i1 i2)
+      match bop, getInteger e1', getInteger e2' with
+      | PlusA, Some i1, Some i2 -> kintegerCilint tk (add_cilint i1 i2)
+      | PlusA, Some z, _ when is_zero_cilint z -> collapse e2'
+      | PlusA, _, Some z when is_zero_cilint z -> collapse e1'
+      | MinusA, Some i1, Some i2 -> kintegerCilint tk (sub_cilint i1 i2)
+      | MinusA, _, Some z when is_zero_cilint z -> collapse e1'
+      | Mult, Some i1, Some i2 -> kintegerCilint tk (mul_cilint i1 i2)
+      | Mult, Some z, _ when is_zero_cilint z -> collapse0 ()
+      | Mult, _, Some z when is_zero_cilint z -> collapse0 ()
+      | Mult, Some o, _ when compare_cilint o one_cilint = 0 -> collapse e2' 
+      | Mult, _, Some o when compare_cilint o one_cilint = 0 -> collapse e1'
+      | Div, Some i1, Some i2 -> begin
+          try kintegerCilint tk (div0_cilint i1 i2)
           with Division_by_zero -> BinOp(bop, e1', e2', tres)
-      end
-      | Div, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_))
-        when bytesSizeOfInt ik1 = bytesSizeOfInt ik2 -> begin
-          try kinteger64 tk (Int64.div i1 i2)
-          with Division_by_zero -> BinOp(bop, e1', e2', tres)
-      end
-      | Div, e1'', Const(CInt64(1L,_,_)) -> e1''
-
-      | Mod, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) when ik1 = ik2 -> begin
-          try kinteger64 tk (Int64.rem i1 i2)
+	end
+      | Div, _, Some o when compare_cilint o one_cilint = 0 -> collapse e1'
+      | Mod, Some i1, Some i2 -> begin
+          try kintegerCilint tk (rem_cilint i1 i2)
           with Division_by_zero -> BinOp(bop, e1', e2', tres) 
-      end
-      | BAnd, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) when ik1 = ik2 -> 
-          kinteger64 tk (Int64.logand i1 i2)
-      | BAnd, Const(CInt64(0L,_,_)), _ -> zero
-      | BAnd, _, Const(CInt64(0L,_,_)) -> zero
-      | BOr, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) when ik1 = ik2 -> 
-          kinteger64 tk (Int64.logor i1 i2)
-      | BOr, _, _ when isZero e1' -> e2'
-      | BOr, _, _ when isZero e2' -> e1'
-      | BXor, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) when ik1 = ik2 -> 
-          kinteger64 tk (Int64.logxor i1 i2)
+	end
+      | Mod, _, Some o when compare_cilint o one_cilint = 0 -> collapse0 ()
 
-      | Shiftlt, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,_,_)) when shiftInBounds i2 -> 
-          kinteger64 tk (Int64.shift_left i1 (i64_to_int i2))
-      | Shiftlt, Const(CInt64(0L,_,_)), _ -> zero
-      | Shiftlt, e1'', Const(CInt64(0L,_,_)) -> e1''
+      | BAnd, Some i1, Some i2 -> kintegerCilint tk (logand_cilint i1 i2)
+      | BAnd, Some z, _ when is_zero_cilint z -> collapse0 ()
+      | BAnd, _, Some z when is_zero_cilint z -> collapse0 ()
+      | BOr, Some i1, Some i2 -> kintegerCilint tk (logor_cilint i1 i2)
+      | BOr, Some z, _ when is_zero_cilint z -> collapse e2' 
+      | BOr, _, Some z when is_zero_cilint z -> collapse e1'
+      | BXor, Some i1, Some i2 -> kintegerCilint tk (logxor_cilint i1 i2)
+      | BXor, Some z, _ when is_zero_cilint z -> collapse e2' 
+      | BXor, _, Some z when is_zero_cilint z -> collapse e1'
 
-      | Shiftrt, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,_,_)) when shiftInBounds i2 -> 
-          if isunsigned ik1 then 
-            kinteger64 tk (Int64.shift_right_logical i1 (i64_to_int i2))
-          else
-            kinteger64 tk (Int64.shift_right i1 (i64_to_int i2))
-      | Shiftrt, Const(CInt64(0L,_,_)), _ -> zero
-      | Shiftrt, e1'', Const(CInt64(0L,_,_)) -> e1''
+      | Shiftlt, Some i1, Some i2 when shiftInBounds i2 -> 
+          kintegerCilint tk (shift_left_cilint i1 (int_of_cilint i2))
+      | Shiftlt, Some z, _ when is_zero_cilint z -> collapse0 ()
+      | Shiftlt, _, Some z when is_zero_cilint z -> collapse e1'
+      | Shiftrt, Some i1, Some i2 when shiftInBounds i2 -> 
+          kintegerCilint tk (shift_right_cilint i1 (int_of_cilint i2))
+      | Shiftrt, Some z, _ when is_zero_cilint z -> collapse0 ()
+      | Shiftrt, _, Some z when is_zero_cilint z -> collapse e1'
 
-      | Eq, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) -> 
-          let i1', i2', _ = convertInts i1 ik1 i2 ik2 in
-          if i1' = i2' then one else zero
-      | Ne, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) -> 
-          let i1', i2', _ = convertInts i1 ik1 i2 ik2 in
-          if i1' <> i2' then one else zero
-      | Le, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) ->
-          let i1', i2', ik' = convertInts i1 ik1 i2 ik2 in
-          if ge (isunsigned ik') i2' i1' then one else zero
+      | Eq, Some i1, Some i2 -> if compare_cilint i1 i2 = 0 then one else zero
+      | Ne, Some i1, Some i2 -> if compare_cilint i1 i2 <> 0 then one else zero
+      | Le, Some i1, Some i2 -> if compare_cilint i1 i2 <= 0 then one else zero
+      | Ge, Some i1, Some i2 -> if compare_cilint i1 i2 >= 0 then one else zero
+      | Lt, Some i1, Some i2 -> if compare_cilint i1 i2 < 0 then one else zero
+      | Gt, Some i1, Some i2 -> if compare_cilint i1 i2 > 0 then one else zero
 
-      | Ge, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) ->
-          let i1', i2', ik' = convertInts i1 ik1 i2 ik2 in
-          if ge (isunsigned ik') i1' i2' then one else zero
+      | LAnd, Some i1, _ -> if is_zero_cilint i1 then collapse0 () else collapse e2'
+      | LAnd, _, Some i2 -> if is_zero_cilint i2 then collapse0 () else collapse e1'
+      | LOr, Some i1, _ -> if is_zero_cilint i1 then collapse e2' else one
+      | LOr, _, Some i2 -> if is_zero_cilint i2 then collapse e1' else one
 
-      | Lt, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) ->
-          let i1', i2', ik' = convertInts i1 ik1 i2 ik2 in
-          if i1' <> i2' && ge (isunsigned ik') i2' i1' then one else zero
-
-      | Gt, Const(CInt64(i1,ik1,_)),Const(CInt64(i2,ik2,_)) ->
-          let i1', i2', ik' = convertInts i1 ik1 i2 ik2 in
-          if i1 <> i2 && ge (isunsigned ik') i1' i2' then one else zero
-
-      (* We rely on the fact that LAnd/LOr appear in global initializers
-         and should not have side effects. *)
-      | LAnd, _, _ when isZero e1' || isZero e2' -> zero
-      | LAnd, _, _ when isInteger e1' <> None -> e2'  (* e1' is TRUE *)
-      | LAnd, _, _ when isInteger e2' <> None -> e1'  (* e2' is TRUE *)
-      | LOr, _, _ when isZero e1' -> e2'
-      | LOr, _, _ when isZero e2' -> e1'
-      | LOr, _, _ when isInteger e1' <> None || isInteger e2' <> None ->
-          (* One of e1' or e2' is a nonzero constant *)
-          one
       | _ -> BinOp(bop, e1', e2', tres)
     in
     if debugConstFold then 
@@ -2692,25 +2736,17 @@ let parseInt (str: string) : exp =
     else if (!msvcMode && hasSuffix "I64") then
       3, [ILongLong]
     else
-      0, if octalhex || true (* !!! This is against the ISO but it 
-        * is what GCC and MSVC do !!! *)
-      then [IInt; IUInt; ILong; IULong; ILongLong; IULongLong]
-      else [IInt; ILong; IUInt; ILongLong]
+      0, if octalhex then [IInt; IUInt; ILong; IULong; ILongLong; IULongLong]
+      else if not !c99Mode then [ IInt; ILong; IULong; ILongLong; IULongLong]
+      else [IInt; ILong; ILongLong]
   in
-  (* Convert to integer. To prevent overflow we do the arithmetic 
-  * on Int64 and we take care of overflow. We work only with 
-  * positive integers since the lexer takes care of the sign *)
-  let rec toInt (base: int64) (acc: int64) (idx: int) : int64 = 
+    (* Convert to integer. To prevent overflow we do the arithmetic on
+     * cilints. We work only with positive integers since the lexer
+     * takes care of the sign *)
+  let rec toInt (base: cilint) (acc: cilint) (idx: int) : cilint = 
     let doAcc (what: int) = 
-      let acc' = 
-        Int64.add (Int64.mul base acc)  (Int64.of_int what) in
-      if acc < Int64.zero || (* We clearly overflow since base >= 2 
-      * *)
-      (acc' > Int64.zero && acc' < acc) then 
-        E.s (unimp "Cannot represent on 64 bits the integer %s\n"
-               str)
-      else
-        toInt base acc' (idx + 1)
+      let acc' = add_cilint (mul_cilint base acc)  (cilint_of_int what) in
+      toInt base acc' (idx + 1)
     in 
     if idx >= l - suffixlen then begin
       acc
@@ -2730,34 +2766,21 @@ let parseInt (str: string) : exp =
     if octalhex then
       if l >= 2 && 
         (let c = String.get str 1 in c = 'x' || c = 'X') then
-          toInt (Int64.of_int 16) Int64.zero 2
+          toInt (cilint_of_int 16) zero_cilint 2
       else
-        toInt (Int64.of_int 8) Int64.zero 1
+        toInt (cilint_of_int 8) zero_cilint 1
     else
-      toInt (Int64.of_int 10) Int64.zero 0
+      toInt (cilint_of_int 10) zero_cilint 0
   in
   (* Construct an integer of the first kinds that fits. i must be 
    * POSITIVE  *)
   let res = 
     let rec loop = function
-        k::rest ->
-          let nrBits = 
-            let unsignedbits = 8 * (bytesSizeOfInt k) in
-            if isSigned k then
-              unsignedbits-1
-            else
-              unsignedbits
-          in
-          (* Will i fit in nrBits bits? *)
-          let bound : int64 = Int64.sub (Int64.shift_left 1L nrBits) 1L in
-          (* toInt has ensured that 0 <= i < 2^64.  
-             So if nrBits >= 64, i fits *)
-          if (nrBits >= 64) || (i <= bound) then
-            kinteger64 k i
-          else
-            loop rest
+        k::rest -> 
+	  if fitsInInt k i then kintegerCilint k i
+	  else loop rest
         | [] -> E.s (E.unimp "Cannot represent the integer %s\n" 
-                       (Int64.to_string i))
+                       (string_of_cilint i))
     in
     loop kinds 
     in
@@ -2803,11 +2826,6 @@ let invalidStmt = mkStmt (Instr [])
 let builtinFunctions : (string, typ * typ list * bool) H.t = 
   H.create 49
 
-(** Deprecated.  For compatibility with older programs, these are
-  aliases for {!Cil.builtinFunctions} *)
-let gccBuiltins = builtinFunctions
-let msvcBuiltins = builtinFunctions
-
 (* Initialize the builtin functions after the machine has been initialized. *)
 let initGccBuiltins () : unit =
   if not !initCIL_called then
@@ -2816,12 +2834,13 @@ let initGccBuiltins () : unit =
     E.s (bug "builtins already initialized.");
   let h = builtinFunctions in
   (* See if we have builtin_va_list *)
-  let hasbva = M.gccHas__builtin_va_list in
+  let hasbva = !M.theMachine.M.__builtin_va_list in
   let ulongLongType = TInt(IULongLong, []) in
   let floatType = TFloat(FFloat, []) in
   let longDoubleType = TFloat (FLongDouble, []) in
   let voidConstPtrType = TPtr(TVoid [Attr ("const", [])], []) in
-  let sizeType = !upointType in
+  let sizeType = !typeOfSizeOf in
+  let v4sfType = TFloat (FFloat,[Attr("__vector_size__", [AInt 16])]) in
 
   H.add h "__builtin___fprintf_chk" (intType, [ voidPtrType; intType; charConstPtrType ], true) (* first argument is really FILE*, not void*, but we don't want to build in the definition for FILE *);
   H.add h "__builtin___memcpy_chk" (voidPtrType, [ voidPtrType; voidConstPtrType; sizeType; sizeType ], false);
@@ -2909,6 +2928,9 @@ let initGccBuiltins () : unit =
   H.add h "__builtin_mempcpy" (voidPtrType, [ voidPtrType; voidConstPtrType; sizeType ], false);
   H.add h "__builtin_memset" (voidPtrType, 
                               [ voidPtrType; intType; intType ], false);
+  H.add h "__builtin_bcopy" (voidType, [ voidConstPtrType; voidPtrType; sizeType ], false);
+  H.add h "__builtin_bzero" (voidType, 
+                              [ voidPtrType; sizeType ], false);
 
   H.add h "__builtin_fmod" (doubleType, [ doubleType ], false);
   H.add h "__builtin_fmodf" (floatType, [ floatType ], false);
@@ -2978,6 +3000,7 @@ let initGccBuiltins () : unit =
   H.add h "__builtin_strchr" (charPtrType, [ charPtrType; intType ], false);
   H.add h "__builtin_strcmp" (intType, [ charConstPtrType; charConstPtrType ], false);
   H.add h "__builtin_strcpy" (charPtrType, [ charPtrType; charConstPtrType ], false);
+  H.add h "__builtin_strlen" (sizeType, [ charConstPtrType ], false);
   H.add h "__builtin_strcspn" (sizeType, [ charConstPtrType; charConstPtrType ], false);
   H.add h "__builtin_strncat" (charPtrType, [ charPtrType; charConstPtrType; sizeType ], false);
   H.add h "__builtin_strncmp" (intType, [ charConstPtrType; charConstPtrType; sizeType ], false);
@@ -2997,6 +3020,36 @@ let initGccBuiltins () : unit =
   H.add h "__builtin_tanhf" (floatType, [ floatType ], false);
   H.add h "__builtin_tanhl" (longDoubleType, [ longDoubleType ], false);
 
+  (* MMX Builtins *)
+  H.add h "__builtin_ia32_addps" (v4sfType, [v4sfType; v4sfType], false);
+  H.add h "__builtin_ia32_subps" (v4sfType, [v4sfType; v4sfType], false);
+  H.add h "__builtin_ia32_mulps" (v4sfType, [v4sfType; v4sfType], false);
+  H.add h "__builtin_ia32_unpckhps" (v4sfType, [v4sfType; v4sfType], false);
+  H.add h "__builtin_ia32_unpcklps" (v4sfType, [v4sfType; v4sfType], false);
+  H.add h "__builtin_ia32_maxps" (v4sfType, [v4sfType; v4sfType], false);
+
+  (* Atomic Builtins *)
+  (* These builtins are overloaded, hence the "magic" void type with
+     __overloaded__ attribute, used to suppress warnings in cabs2cil.ml.
+     For the same reason, we do not specify the type of the parameters. *)
+  H.add h "__sync_fetch_and_add" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_fetch_and_sub" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_fetch_and_or" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_fetch_and_and" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_fetch_and_xor" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_fetch_and_nand" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_add_and_fetch" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_sub_and_fetch" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_or_and_fetch" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_and_and_fetch" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_xor_and_fetch" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_nand_and_fetch" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_bool_compare_and_swap" (TInt (IBool, []), [ ], true);
+  H.add h "__sync_val_compare_and_swap" (TVoid[Attr("overloaded",[])], [ ],
+    true);
+  H.add h "__sync_synchronize" (voidType, [ ], true);
+  H.add h "__sync_lock_test_and_set" (TVoid[Attr("overloaded",[])], [ ], true);
+  H.add h "__sync_lock_release" (voidType, [ ], true);
 
   if hasbva then begin
     H.add h "__builtin_va_end" (voidType, [ TBuiltin_va_list [] ], false);
@@ -3015,6 +3068,12 @@ let initGccBuiltins () : unit =
 					     TBuiltin_va_list [] ],
                                 false);
   end;
+
+  H.add h "__builtin_apply_args" (voidPtrType, [ ], false);
+  let fnPtr = TPtr(TFun (voidType, None, false, []), []) in
+  H.add h "__builtin_apply" (voidPtrType, [fnPtr; voidPtrType; sizeType], false);
+  H.add h "__builtin_va_arg_pack" (intType, [ ], false);
+  H.add h "__builtin_va_arg_pack_len" (intType, [ ], false);
   ()
 
 (** Construct a hash with the builtins *)
@@ -3218,6 +3277,8 @@ class defaultCilPrinterClass : cilPrinter = object (self)
 
     | SizeOf (t) -> 
         text "sizeof(" ++ self#pType None () t ++ chr ')'
+    | SizeOfE (Lval (Var fv, NoOffset)) when fv.vname = "__builtin_va_arg_pack" && (not !printCilAsIs) -> 
+        text "__builtin_va_arg_pack()"
     | SizeOfE (e) ->  
         text "sizeof(" ++ self#pExp () e ++ chr ')'
 
@@ -3379,7 +3440,8 @@ class defaultCilPrinterClass : cilPrinter = object (self)
 
         | BinOp((PlusA|PlusPI|IndexPI|MinusA|MinusPP|MinusPI|BAnd|BOr|BXor|
           Mult|Div|Mod|Shiftlt|Shiftrt) as bop,
-                Lval(lv'),e,_) when Util.equals lv lv' ->
+                Lval(lv'),e,_) when Util.equals lv lv' 
+                && not !printCilAsIs ->
                   self#pLineDirective l
                     ++ self#pLval () lv
                     ++ text " " ++ d_binop () bop
@@ -3661,7 +3723,7 @@ class defaultCilPrinterClass : cilPrinter = object (self)
         match pickLabel !sref.labels with
           Some l -> text ("goto " ^ l ^ ";")
         | None -> 
-            ignore (error "Cannot find label for target of goto\n");
+            ignore (error "Cannot find label for target of goto");
             text "goto __invalid_label;"
     end
 
@@ -4484,8 +4546,9 @@ class plainCilPrinterClass =
       let d_plainconst () c = 
         match c with
           CInt64(i, ik, so) -> 
+	    let fmt = if isSigned ik then "%d" else "%x" in
             dprintf "Int64(%s,%a,%s)" 
-              (Int64.format "%d" i)
+              (Int64.format fmt i)
               d_ikind ik
               (match so with Some s -> s | _ -> "None")
         | CStr(s) -> 
@@ -4667,6 +4730,7 @@ let descriptiveCilPrinter: descriptiveCilPrinter =
   ((new descriptiveCilPrinterClass true) :> descriptiveCilPrinter)
 
 let dd_exp = descriptiveCilPrinter#pExp
+let dd_lval = descriptiveCilPrinter#pLval
 
 (* zra: this allows pretty printers not in cil.ml to
    be exposed to cilmain.ml *)
@@ -4736,8 +4800,8 @@ let makeLocalVar fdec ?(insert = true) name typ =
   if insert then fdec.slocals <- fdec.slocals @ [vi];
   vi
 
-let makeTempVar fdec ?(name = "__cil_tmp") ?(descr = nil) ?(descrpure = true)
-                typ : varinfo =
+let makeTempVar fdec ?(insert = true) ?(name = "__cil_tmp")
+                ?(descr = nil) ?(descrpure = true) typ : varinfo =
   let rec findUniqueName () : string=
     let n = name ^ (string_of_int (1 + fdec.smaxid)) in
     (* Is this check a performance problem?  We could bring the old
@@ -4751,7 +4815,7 @@ let makeTempVar fdec ?(name = "__cil_tmp") ?(descr = nil) ?(descrpure = true)
         n
   in
   let name = findUniqueName () in
-  let vi = makeLocalVar fdec name typ in
+  let vi = makeLocalVar fdec ~insert name typ in
   vi.vdescr <- descr;
   vi.vdescrpure <- descrpure;
   vi
@@ -4764,7 +4828,7 @@ let setFormals (f: fundec) (forms: varinfo list) =
     TFun(rt, _, isva, fa) -> 
       f.svar.vtype <- 
          TFun(rt, 
-              Some (List.map (fun a -> (a.vname, a.vtype, a.vattr)) forms), 
+              Some (Util.list_map (fun a -> (a.vname, a.vtype, a.vattr)) forms), 
               isva, fa)
   | _ -> E.s (E.bug "Set formals. %s does not have function type\n"
                 f.svar.vname)
@@ -4800,7 +4864,7 @@ let setFunctionTypeMakeFormals (f: fundec) (t: typ) =
       f.svar.vtype <- t; 
       f.sformals <- [];
       
-      f.sformals <- List.map (fun (n,t,a) -> makeLocal f n t) args;
+      f.sformals <- Util.list_map (fun (n,t,a) -> makeLocal f n t) args;
 
       setFunctionType f t
 
@@ -4952,22 +5016,14 @@ let removeOffsetLval ((b, off): lval) : lval * offset =
 (*** Define the visiting engine ****)
 (* visit all the nodes in a Cil expression *)
 let doVisit (vis: cilVisitor)
-            (startvisit: 'a -> 'a visitAction) 
+            (action: 'a visitAction)
             (children: cilVisitor -> 'a -> 'a) 
             (node: 'a) : 'a = 
-  let action = startvisit node in
   match action with
     SkipChildren -> node
   | ChangeTo node' -> node'
-  | _ -> (* DoChildren and ChangeDoChildrenPost *)
-      let nodepre = match action with
-        ChangeDoChildrenPost (node', _) -> node'
-      | _ -> node
-      in
-      let nodepost = children vis nodepre in
-      match action with
-        ChangeDoChildrenPost (_, f) -> f nodepost
-      | _ -> nodepost
+  | DoChildren -> children vis node
+  | ChangeDoChildrenPost(node', f) -> f (children vis node')
 
 (* mapNoCopy is like map but avoid copying the list if the function does not 
  * change the elements. *)
@@ -4989,27 +5045,20 @@ let rec mapNoCopyList (f: 'a -> 'a list) = function
 
 (* A visitor for lists *)
 let doVisitList  (vis: cilVisitor)
-                 (startvisit: 'a -> 'a list visitAction)
+                 (action: 'a list visitAction)
                  (children: cilVisitor -> 'a -> 'a)
                  (node: 'a) : 'a list = 
-  let action = startvisit node in
   match action with
     SkipChildren -> [node]
   | ChangeTo nodes' -> nodes'
-  | _ -> 
-      let nodespre = match action with
-        ChangeDoChildrenPost (nodespre, _) -> nodespre
-      | _ -> [node]
-      in
-      let nodespost = mapNoCopy (children vis) nodespre in
-      match action with
-        ChangeDoChildrenPost (_, f) -> f nodespost
-      | _ -> nodespost
+  | DoChildren -> [children vis node]
+  | ChangeDoChildrenPost(nodes', f) ->
+      f (mapNoCopy (fun n -> children vis n) nodes')
   
 let debugVisit = false
 
 let rec visitCilExpr (vis: cilVisitor) (e: exp) : exp = 
-  doVisit vis vis#vexpr childrenExp e
+  doVisit vis (vis#vexpr e) childrenExp e
 and childrenExp (vis: cilVisitor) (e: exp) : exp = 
   let vExp e = visitCilExpr vis e in
   let vTyp t = visitCilType vis t in
@@ -5082,17 +5131,17 @@ and visitCilInit (vis: cilVisitor) (forglob: varinfo)
         let initl' = if !hasChanged then List.rev !newinitl else initl in
         if t' != t || initl' != initl then CompoundInit (t', initl') else i
   in
-  doVisit vis (vis#vinit forglob atoff) childrenInit i
+  doVisit vis (vis#vinit forglob atoff i) childrenInit i
           
 and visitCilLval (vis: cilVisitor) (lv: lval) : lval =
-  doVisit vis vis#vlval childrenLval lv
+  doVisit vis (vis#vlval lv) childrenLval lv
 and childrenLval (vis: cilVisitor) (lv: lval) : lval =  
   (* and visit its subexpressions *)
   let vExp e = visitCilExpr vis e in
   let vOff off = visitCilOffset vis off in
   match lv with
     Var v, off ->
-      let v'   = doVisit vis vis#vvrbl (fun _ x -> x) v in
+      let v'   = doVisit vis (vis#vvrbl v) (fun _ x -> x) v in
       let off' = vOff off in
       if v' != v || off' != off then Var v', off' else lv
   | Mem e, off -> 
@@ -5101,7 +5150,7 @@ and childrenLval (vis: cilVisitor) (lv: lval) : lval =
       if e' != e || off' != off then Mem e', off' else lv
 
 and visitCilOffset (vis: cilVisitor) (off: offset) : offset =
-  doVisit vis vis#voffs childrenOffset off
+  doVisit vis (vis#voffs off) childrenOffset off
 and childrenOffset (vis: cilVisitor) (off: offset) : offset =
   let vOff off = visitCilOffset vis off in
   match off with
@@ -5121,20 +5170,20 @@ and childrenOffset (vis: cilVisitor) (off: offset) : offset =
  * initializers will never recursively contain offsets)
  *)
 and visitCilInitOffset (vis: cilVisitor) (off: offset) : offset =
-  doVisit vis vis#vinitoffs childrenOffset off
+  doVisit vis (vis#vinitoffs off) childrenOffset off
 
 and visitCilInstr (vis: cilVisitor) (i: instr) : instr list =
   let oldloc = !currentLoc in
   currentLoc := (get_instrLoc i);
   assertEmptyQueue vis;
-  let res = doVisitList vis vis#vinst childrenInstr i in
+  let res = doVisitList vis (vis#vinst i) childrenInstr i in
   currentLoc := oldloc;
   (* See if we have accumulated some instructions *)
   vis#unqueueInstr () @ res
 
 and childrenInstr (vis: cilVisitor) (i: instr) : instr =
-  let fExp = visitCilExpr vis in
-  let fLval = visitCilLval vis in
+  let fExp e = visitCilExpr vis e in
+  let fLval lv = visitCilLval vis lv in
   match i with
   | Set(lv,e,l) -> 
       let lv' = fLval lv in let e' = fExp e in
@@ -5165,7 +5214,7 @@ and visitCilStmt (vis: cilVisitor) (s: stmt) : stmt =
   currentLoc := (get_stmtLoc s.skind) ;
   assertEmptyQueue vis;
   let toPrepend : instr list ref = ref [] in (* childrenStmt may add to this *)
-  let res = doVisit vis vis#vstmt (childrenStmt toPrepend) s in
+  let res = doVisit vis (vis#vstmt s) (childrenStmt toPrepend) s in
   (* Now see if we have saved some instructions *)
   toPrepend := !toPrepend @ vis#unqueueInstr ();
   (match !toPrepend with 
@@ -5177,7 +5226,9 @@ and visitCilStmt (vis: cilVisitor) (s: stmt) : stmt =
   currentLoc := oldloc;
   res
   
-and childrenStmt (toPrepend: instr list ref) (vis:cilVisitor) (s:stmt): stmt =
+and childrenStmt (toPrepend: instr list ref) : cilVisitor -> stmt -> stmt =
+  (* this is a hack to avoid currying and reduce GC pressure *)
+  () ; fun vis s ->
   let fExp e = (visitCilExpr vis e) in
   let fBlock b = visitCilBlock vis b in
   let fInst i = visitCilInstr vis i in
@@ -5256,7 +5307,7 @@ and childrenStmt (toPrepend: instr list ref) (vis:cilVisitor) (s:stmt): stmt =
     
  
 and visitCilBlock (vis: cilVisitor) (b: block) : block = 
-  doVisit vis vis#vblock childrenBlock b
+  doVisit vis (vis#vblock b) childrenBlock b
 and childrenBlock (vis: cilVisitor) (b: block) : block = 
   let fStmt s = visitCilStmt vis s in
   let stmts' = mapNoCopy fStmt b.bstmts in
@@ -5264,7 +5315,7 @@ and childrenBlock (vis: cilVisitor) (b: block) : block =
 
 
 and visitCilType (vis : cilVisitor) (t : typ) : typ =
-  doVisit vis vis#vtype childrenType t
+  doVisit vis (vis#vtype t) childrenType t
 and childrenType (vis : cilVisitor) (t : typ) : typ =
   (* look for types referred to inside t's definition *)
   let fTyp t  = visitCilType vis t in
@@ -5273,16 +5324,16 @@ and childrenType (vis : cilVisitor) (t : typ) : typ =
     TPtr(t1, a) -> 
       let t1' = fTyp t1 in
       let a' = fAttr a in
-      if t1' != t || a' != a then TPtr(t1', a') else t
+      if t1' != t1 || a' != a then TPtr(t1', a') else t
   | TArray(t1, None, a) -> 
       let t1' = fTyp t1 in
       let a' = fAttr a in
-      if t1' != t || a' != a  then TArray(t1', None, a') else t
+      if t1' != t1 || a' != a  then TArray(t1', None, a') else t
   | TArray(t1, Some e, a) -> 
       let t1' = fTyp t1 in
       let e' = visitCilExpr vis e in
       let a' = fAttr a in
-      if t1' != t || e' != e  || a' != a then TArray(t1', Some e', a') else t
+      if t1' != t1 || e' != e  || a' != a then TArray(t1', Some e', a') else t
 
       (* DON'T recurse into the compinfo, this is done in visitCilGlobal.
 	 User can iterate over cinfo.cfields manually, if desired.*)
@@ -5320,7 +5371,7 @@ and childrenType (vis : cilVisitor) (t : typ) : typ =
 (* for declarations, we visit the types inside; but for uses, *)
 (* we just visit the varinfo node *)
 and visitCilVarDecl (vis : cilVisitor) (v : varinfo) : varinfo =
-  doVisit vis vis#vvdec childrenVarDecl v 
+  doVisit vis (vis#vvdec v) childrenVarDecl v
 and childrenVarDecl (vis : cilVisitor) (v : varinfo) : varinfo =
   v.vtype <- visitCilType vis v.vtype;
   v.vattr <- visitCilAttributes vis v.vattr;  
@@ -5328,7 +5379,7 @@ and childrenVarDecl (vis : cilVisitor) (v : varinfo) : varinfo =
 
 and visitCilAttributes (vis: cilVisitor) (al: attribute list) : attribute list=
    let al' = 
-     mapNoCopyList (doVisitList vis vis#vattr childrenAttribute) al in
+     mapNoCopyList (fun x -> doVisitList vis (vis#vattr x) childrenAttribute x) al in
    if al' != al then 
      (* Must re-sort *)
      addAttributes al' []
@@ -5343,7 +5394,7 @@ and childrenAttribute (vis: cilVisitor) (a: attribute) : attribute =
       
 
 and visitCilAttrParams (vis: cilVisitor) (a: attrparam) : attrparam =
-   doVisit vis vis#vattrparam childrenAttrparam a
+   doVisit vis (vis#vattrparam a) childrenAttrparam a
 and childrenAttrparam (vis: cilVisitor) (aa: attrparam) : attrparam = 
   let fTyp t  = visitCilType vis t in
   let fAttrP a = visitCilAttrParams vis a in
@@ -5398,7 +5449,7 @@ and childrenAttrparam (vis: cilVisitor) (aa: attrparam) : attrparam =
 let rec visitCilFunction (vis : cilVisitor) (f : fundec) : fundec =
   if debugVisit then ignore (E.log "Visiting function %s\n" f.svar.vname);
   assertEmptyQueue vis;
-  let f = doVisit vis vis#vfunc childrenFunction f in
+  let f = doVisit vis (vis#vfunc f) childrenFunction f in
 
   let toPrepend = vis#unqueueInstr () in
   if toPrepend <> [] then 
@@ -5406,11 +5457,12 @@ let rec visitCilFunction (vis : cilVisitor) (f : fundec) : fundec =
   f
 
 and childrenFunction (vis : cilVisitor) (f : fundec) : fundec =
+  let visitVarDecl vd = visitCilVarDecl vis vd in
   f.svar <- visitCilVarDecl vis f.svar; (* hit the function name *)
   (* visit local declarations *)
-  f.slocals <- mapNoCopy (visitCilVarDecl vis) f.slocals;
+  f.slocals <- mapNoCopy visitVarDecl f.slocals;
   (* visit the formals *)
-  let newformals = mapNoCopy (visitCilVarDecl vis) f.sformals in
+  let newformals = mapNoCopy visitVarDecl f.sformals in
   (* Make sure the type reflects the formals *)
   setFormals f newformals;
   (* Remember any new instructions that were generated while visiting
@@ -5427,7 +5479,7 @@ let rec visitCilGlobal (vis: cilVisitor) (g: global) : global list =
   let oldloc = !currentLoc in
   currentLoc := (get_globalLoc g) ;
   currentGlobal := g;
-  let res = doVisitList vis vis#vglob childrenGlobal g in
+  let res = doVisitList vis (vis#vglob g) childrenGlobal g in
   currentLoc := oldloc;
   res
 and childrenGlobal (vis: cilVisitor) (g: global) : global =
@@ -5641,7 +5693,7 @@ let getGlobInit ?(main_name="main") (fl: file) =
 (* Fold over all globals, including the global initializer *)
 let mapGlobals (fl: file) 
                (doone: global -> global) : unit = 
-  fl.globals <- List.map doone fl.globals;
+  fl.globals <- Util.list_map doone fl.globals;
   (match fl.globinit with
     None -> ()
   | Some g -> begin
@@ -5684,13 +5736,10 @@ exception NotAnAttrParam of exp
 let rec expToAttrParam (e: exp) : attrparam = 
   match e with 
     Const(CInt64(i,k,_)) ->
-      let i', trunc = truncateInteger64 k i in
-      if trunc then 
+      let i' = mkCilint k i in
+      if not (is_int_cilint i') then
         raise (NotAnAttrParam e);
-      let i2 = Int64.to_int i' in 
-      if i' <> Int64.of_int i2 then 
-        raise (NotAnAttrParam e);
-      AInt i2
+      AInt (int_of_cilint i')
   | Lval (Var v, NoOffset) -> ACons(v.vname, [])
   | SizeOf t -> ASizeOf t
   | SizeOfE e' -> ASizeOfE (expToAttrParam e')
@@ -5701,7 +5750,7 @@ let rec expToAttrParam (e: exp) : attrparam =
   | _ -> raise (NotAnAttrParam e)
 
 (******************** OPTIMIZATIONS *****)
-let rec peepHole1 (* Process one statement and possibly replace it *)
+let rec peepHole1 (* Process one instruction and possibly replace it *)
                   (doone: instr -> instr list option)
                   (* Scan a block and recurse inside nested blocks *)
                   (ss: stmt list) : unit = 
@@ -5735,7 +5784,7 @@ let rec peepHole1 (* Process one statement and possibly replace it *)
       | Return _ | Goto _ | Break _ | Continue _ -> ())
     ss
 
-let rec peepHole2  (* Process two statements and possibly replace them both *)
+let rec peepHole2  (* Process two instructions and possibly replace them both *)
                    (dotwo: instr * instr -> instr list option)
                    (ss: stmt list) : unit = 
   let rec doInstrList (il: instr list) : instr list = 
@@ -5829,7 +5878,7 @@ let rec typeSigWithAttrs ?(ignoreSign=false) doattr t =
       TSComp (comp.cstruct, comp.cname, doattr (addAttributes comp.cattr a))
   | TFun(rt,args,isva,a) -> 
       TSFun(typeSig rt, 
-            List.map (fun (_, atype, _) -> (typeSig atype)) (argsToList args),
+            Util.list_map (fun (_, atype, _) -> (typeSig atype)) (argsToList args),
             isva, doattr a)
   | TNamed(t, a) -> typeSigAddAttrs (doattr a) (typeSig t.ttype)
   | TBuiltin_va_list al -> TSBase (TBuiltin_va_list (doattr al))      
@@ -5877,7 +5926,10 @@ let mkAddrOf ((b, off) as lval) : exp =
   | _ -> ()); 
   match lval with
     Mem e, NoOffset -> e
-  | b, Index(z, NoOffset) when isZero z -> StartOf (b, NoOffset)(* array *)
+  (* Don't do this: 
+    | b, Index(z, NoOffset) when isZero z -> StartOf (b, NoOffset)
+    &a[0] is not the same as a, e.g. within typeof and sizeof.
+    Code must be able to handle the results without this anyway... *)
   | _ -> AddrOf lval
 
 
@@ -5934,14 +5986,14 @@ let rec isConstant = function
   | SizeOf _ | SizeOfE _ | SizeOfStr _ | AlignOf _ | AlignOfE _ -> true
   | CastE (_, e) -> isConstant e
   | AddrOf (Var vi, off) | StartOf (Var vi, off)
-        -> vi.vglob && isConstantOff off
+        -> vi.vglob && isConstantOffset off
   | AddrOf (Mem e, off) | StartOf(Mem e, off) 
-        -> isConstant e && isConstantOff off
+        -> isConstant e && isConstantOffset off
 
-and isConstantOff = function
+and isConstantOffset = function
     NoOffset -> true
-  | Field(fi, off) -> isConstantOff off
-  | Index(e, off) -> isConstant e && isConstantOff off
+  | Field(fi, off) -> isConstantOffset off
+  | Index(e, off) -> isConstant e && isConstantOffset off
 
 
 let getCompField (cinfo:compinfo) (fieldName:string) : fieldinfo =
@@ -5955,7 +6007,11 @@ let rec mkCastT ~(e: exp) ~(oldt: typ) ~(newt: typ) =
   end else begin
     (* Watch out for constants *)
     match newt, e with 
-      TInt(newik, []), Const(CInt64(i, _, _)) -> kinteger64 newik i
+      (* Casts to _Bool are special: they behave like "!= 0" ISO C99 6.3.1.2 *)
+      TInt(IBool, []), Const(CInt64(i, _, _)) -> 
+	let v = if i = Int64.zero then Int64.zero else Int64.one in
+	Const (CInt64(v, IBool,  None))
+    | TInt(newik, []), Const(CInt64(i, _, _)) -> kinteger64 newik i
     | _ -> CastE(newt,e)
   end
 
@@ -6207,7 +6263,7 @@ let uniqueVarNames (f: file) : unit =
                !currentLoc
             in
             if false && newname <> v.vname then (* Disable this warning *)
-              ignore (warn "uniqueVarNames: Changing the name of local %s in %s to %s (due to duplicate at %a)\n"
+              ignore (warn "uniqueVarNames: Changing the name of local %s in %s to %s (due to duplicate at %a)"
                         v.vname fdec.svar.vname newname d_loc oldloc);
             v.vname <- newname
           in
@@ -6262,7 +6318,7 @@ class copyFunctionVisitor (newname: string) = object (self)
             s.skind <- Goto (sr',l)
         | Switch (e, body, cases, l) -> 
             s.skind <- Switch (e, body, 
-                               List.map (fun cs -> findStmt cs.sid) cases, l)
+                               Util.list_map (fun cs -> findStmt cs.sid) cases, l)
         | _ -> ()
       in
       List.iter patchstmt !patches;
@@ -6412,37 +6468,41 @@ and succpred_stmt s fallthrough =
  *  (3) remove "default"
  *  (4) remove "continue"
  *)
-let is_case_label l = match l with
-  | Case _ | Default _ -> true
-  | _ -> false
+
+(* This alphaTable is used to prevent collision of label names when
+   transforming switch statements and loops. It uses a *unit*
+   alphaTableData ref because there isn't any information we need to
+   carry around. *)
+let labelAlphaTable : (string, unit A.alphaTableData ref) H.t =
+  H.create 11
+
+let freshLabel (base:string) =
+  fst (A.newAlphaName labelAlphaTable None base ())
 
 let switch_count = ref (-1) 
 let get_switch_count () = 
   switch_count := 1 + !switch_count ;
   !switch_count
 
-let switch_label = ref (-1)
-
 let rec xform_switch_stmt s break_dest cont_dest label_index = begin
-  s.labels <- List.map (fun lab -> match lab with
+  s.labels <- Util.list_map (fun lab -> match lab with
     Label _ -> lab
   | Case(e,l) ->
       let suffix =
-	match isInteger e with
-	| Some value ->
-	    if value < Int64.zero then
-	      "neg_" ^ Int64.to_string (Int64.neg value)
+	match getInteger e with
+	| Some value -> 
+	    if compare_cilint value zero_cilint < 0 then
+	      "neg_" ^ string_of_cilint (neg_cilint value)
 	    else
-	      Int64.to_string value
+	      string_of_cilint value
 	| None ->
-	    incr switch_label;
-	    "exp_" ^ string_of_int !switch_label
+	    "exp"
       in
       let str = Pretty.sprint !lineLength 
 	  (Pretty.dprintf "switch_%d_%s" label_index suffix) in 
-      (Label(str,l,false))
-  | Default(l) -> (Label(Printf.sprintf 
-                  "switch_%d_default" label_index,l,false))
+      (Label(freshLabel str,l,false))
+  | Default(l) -> (Label(freshLabel (Printf.sprintf 
+                  "switch_%d_default" label_index),l,false))
   ) s.labels ; 
   match s.skind with
   | Instr _ | Return _ | Goto _ -> ()
@@ -6484,7 +6544,7 @@ let rec xform_switch_stmt s break_dest cont_dest label_index = begin
       let i = get_switch_count () in 
       let break_stmt = mkStmt (Instr []) in
       break_stmt.labels <- 
-				[Label((Printf.sprintf "switch_%d_break" i),l,false)] ;
+				[Label(freshLabel (Printf.sprintf "switch_%d_break" i),l,false)] ;
       let break_block = mkBlock [ break_stmt ] in
       let body_block = b in 
       let body_if_stmtkind = (If(zero,body_block,break_block,l)) in
@@ -6529,10 +6589,10 @@ let rec xform_switch_stmt s break_dest cont_dest label_index = begin
           let i = get_switch_count () in 
           let break_stmt = mkStmt (Instr []) in
           break_stmt.labels <- 
-						[Label((Printf.sprintf "while_%d_break" i),l,false)] ;
+						[Label(freshLabel (Printf.sprintf "while_%d_break" i),l,false)] ;
           let cont_stmt = mkStmt (Instr []) in
           cont_stmt.labels <- 
-						[Label((Printf.sprintf "while_%d_continue" i),l,false)] ;
+						[Label(freshLabel (Printf.sprintf "while_%d_continue" i),l,false)] ;
           b.bstmts <- cont_stmt :: b.bstmts ;
           let this_stmt = mkStmt 
             (Loop(b,l,Some(cont_stmt),Some(break_stmt))) in 
@@ -6561,10 +6621,32 @@ end and xform_switch_block b break_dest cont_dest label_index =
       (warn "prepareCFG: %a@!" d_stmt stmt)) b.bstmts ;
     raise e
 
+(* Enter all the labels in a function into an alpha renaming table to
+   prevent duplicate labels when transforming loops and switch
+   statements. *)
+class registerLabelsVisitor : cilVisitor = object
+  inherit nopCilVisitor
+  method vstmt { labels = labels } = begin
+    List.iter
+      (function
+           Label (name,_,_) -> A.registerAlphaName labelAlphaTable None name ()
+         | _ -> ())
+      labels;
+    DoChildren
+  end
+  method vexpr _ = SkipChildren
+  method vtype _ = SkipChildren
+  method vinst _ = SkipChildren
+end
+
 (* prepare a function for computeCFGInfo by removing break, continue,
  * default and switch statements/labels and replacing them with Ifs and
  * Gotos. *)
 let prepareCFG (fd : fundec) : unit =
+  (* Labels are local to a function, so start with a clean slate by
+     clearing labelAlphaTable. Then register all labels. *)
+  H.clear labelAlphaTable;
+  ignore (visitCilFunction (new registerLabelsVisitor) fd);
   xform_switch_block fd.sbody 
       (fun () -> failwith "prepareCFG: break with no enclosing loop") 
       (fun () -> failwith "prepareCFG: continue with no enclosing loop") (-1)
@@ -6586,26 +6668,21 @@ let computeCFGInfo (f : fundec) (global_numbering : bool) : unit =
 let initCIL () = 
   if not !initCIL_called then begin 
     (* Set the machine *)
-    theMachine := if !msvcMode then M.msvc else M.gcc;
+    begin
+      match !envMachine with
+        Some machine -> M.theMachine := machine
+      | None -> M.theMachine := if !msvcMode then M.msvc else M.gcc
+    end;
     (* Pick type for string literals *)
-    stringLiteralType := if !theMachine.M.const_string_literals then
+    stringLiteralType := if !M.theMachine.M.const_string_literals then
       charConstPtrType
     else
       charPtrType;
     (* Find the right ikind given the size *)
-    let findIkindSz (unsigned: bool) (sz: int) : ikind = 
-      (* Test the most common sizes first *)
-      if sz = !theMachine.M.sizeof_int then 
-        if unsigned then IUInt else IInt 
-      else if sz = !theMachine.M.sizeof_long then 
-        if unsigned then IULong else ILong
-      else if sz = 1 then 
-        if unsigned then IUChar else IChar 
-      else if sz = !theMachine.M.sizeof_short then
-        if unsigned then IUShort else IShort
-      else if sz = !theMachine.M.sizeof_longlong then
-        if unsigned then IULongLong else ILongLong
-      else 
+    let findIkindSz (unsigned: bool) (sz: int) : ikind =
+      try
+	intKindForSize sz unsigned
+      with Not_found -> 
         E.s(E.unimp "initCIL: cannot find the right ikind for size %d\n" sz)
     in      
     (* Find the right ikind given the name *)
@@ -6621,14 +6698,14 @@ let initCIL () =
       else if name = "unsigned char" then IUChar
       else E.s(E.unimp "initCIL: cannot find the right ikind for type %s\n" name)
     in      
-    upointType := TInt(findIkindSz true !theMachine.M.sizeof_ptr, []);
-    kindOfSizeOf := findIkindName !theMachine.M.size_t;
+    upointType := TInt(findIkindSz true !M.theMachine.M.sizeof_ptr, []);
+    kindOfSizeOf := findIkindName !M.theMachine.M.size_t;
     typeOfSizeOf := TInt(!kindOfSizeOf, []);
-    wcharKind := findIkindName !theMachine.M.wchar_t;
+    wcharKind := findIkindName !M.theMachine.M.wchar_t;
     wcharType := TInt(!wcharKind, []);
-    char_is_unsigned := !theMachine.M.char_is_unsigned;
-    little_endian := !theMachine.M.little_endian;
-    underscore_name := !theMachine.M.underscore_name;
+    char_is_unsigned := !M.theMachine.M.char_is_unsigned;
+    little_endian := !M.theMachine.M.little_endian;
+    underscore_name := !M.theMachine.M.underscore_name;
 (*     nextGlobalVID := 1; *)
 (*     nextCompinfoKey := 1; *)
 
@@ -6771,4 +6848,100 @@ let d_formatarg () = function
 
   | FX _ -> dprintf "FX()"
 
+(* ------------------------------------------------------------------------- *)
+(*                            DEPRECATED FUNCTIONS                           *)
+(*                        These will eventually go away                      *)
+(* ------------------------------------------------------------------------- *)
+
+(** Deprecated (can't handle large 64-bit unsigned constants
+    correctly) - use getInteger instead. If the given expression
+    is a (possibly cast'ed) character or an integer constant, return
+    that integer.  Otherwise, return None. *)
+let rec isInteger : exp -> int64 option = function
+  | Const(CInt64 (n,_,_)) -> Some n
+  | Const(CChr c) -> isInteger (Const (charConstToInt c))  (* sign-extend *) 
+  | Const(CEnum(v, s, ei)) -> isInteger v
+  | CastE(_, e) -> isInteger e
+  | _ -> None
+        
+(** Deprecated.  For compatibility with older programs, these are
+  aliases for {!Cil.builtinFunctions} *)
+let gccBuiltins = builtinFunctions
+let msvcBuiltins = builtinFunctions
+
+(* Deprecated. Represents an integer as for a given kind. 
+   Returns a flag saying whether the value was changed
+   during truncation (because it was too large to fit in k). *)
+let truncateInteger64 (k: ikind) (i: int64) : int64 * bool = 
+  let nrBits = 8 * (bytesSizeOfInt k) in
+  let signed = isSigned k in
+  if nrBits = 64 then 
+    i, false
+  else begin
+    let i1 = Int64.shift_left i (64 - nrBits) in
+    let i2 = 
+      if signed then Int64.shift_right i1 (64 - nrBits) 
+      else Int64.shift_right_logical i1 (64 - nrBits)
+    in
+    let truncated =
+      if i2 = i then false
+      else
+        (* Examine the bits that we chopped off.  If they are all zero, then
+         * any difference between i2 and i is due to a simple sign-extension.
+         *   e.g. casting the constant 0x80000000 to int makes it
+         *        0xffffffff80000000.
+         * Suppress the truncation warning in this case.      *)
+        let chopped = Int64.shift_right i nrBits in
+        chopped <> Int64.zero
+          (* matth: also suppress the warning if we only chop off 1s.
+             This is probably due to a negative number being cast to an 
+             unsigned value.  While potentially a bug, this is almost
+             always what the programmer intended. *)
+        && chopped <> Int64.minus_one
+    in
+    i2, truncated
+  end
+
+(* Convert 2 integer constants to integers with the same type, in preparation
+   for a binary operation.   See ISO C 6.3.1.8p1 *)
+let convertInts (i1:int64) (ik1:ikind) (i2:int64) (ik2:ikind)
+  : int64 * int64 * ikind =
+  if ik1 = ik2 then (* nothing to do *)
+    i1, i2, ik1
+  else begin
+    let rank : ikind -> int = function
+        (* these are just unique numbers representing the integer 
+           conversion rank. *)
+      | IBool -> 0
+      | IChar | ISChar | IUChar -> 1
+      | IShort | IUShort -> 2
+      | IInt | IUInt -> 3
+      | ILong | IULong -> 4
+      | ILongLong | IULongLong -> 5
+    in
+    let r1 = rank ik1 in
+    let r2 = rank ik2 in
+    let ik' = 
+      if (isSigned ik1) = (isSigned ik2) then begin
+        (* Both signed or both unsigned. *)
+        if r1 > r2 then ik1 else ik2
+      end
+      else begin
+        let signedKind, unsignedKind, signedRank, unsignedRank = 
+          if isSigned ik1 then ik1, ik2, r1, r2 else ik2, ik1, r2, r1
+        in
+        (* The rules for signed + unsigned get hairy.
+           (unsigned short + long) is converted to signed long,
+           but (unsigned int + long) is converted to unsigned long.*)
+        if unsignedRank >= signedRank then unsignedKind
+        else if (bytesSizeOfInt signedKind) > (bytesSizeOfInt unsignedKind) then
+          signedKind
+        else 
+          unsignedVersionOf signedKind
+      end
+    in
+    let i1',_ = truncateInteger64 ik' i1 in
+    let i2',_ = truncateInteger64 ik' i2 in
+    i1', i2', ik'      
+  end
 

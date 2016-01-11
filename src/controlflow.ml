@@ -43,6 +43,7 @@ open Lockutil
 let debug = ref false
 let do_slice_phi = ref false
 let do_postorder = ref true
+let do_count_postorder = ref false
 
 let options = [
   "--debug-controlflow",
@@ -56,12 +57,17 @@ let options = [
   "--use-worklist",
      Arg.Clear(do_postorder),
      " Don't use postorder visit to fixpoint.  Instead, use a worklist to fixpoint for guarded-by.";
+
+  "--count-postorder",
+    Arg.Set(do_count_postorder),
+    " Print the number of postorder visits of the phi graph.";
 ]
 
 exception ControlFlowBug of string
 
 type phi = {
   phi_id : int;
+  phi_func : Cil.fundec option;
   phi_loc : Cil.location;
   phi_name : string;
   mutable phi_global : bool; (* true if it's global *)
@@ -104,19 +110,18 @@ type phi = {
 type phi_kind =
   | PhiVar
   | PhiForked
-  | PhiPack of phi (* only propagate the guarded by from this node to phi *)
+  | PhiPacked
   | PhiNewlock of LF.lock
   | PhiAcquire of LF.lock
   | PhiRelease of LF.lock
   | PhiDelete of LF.lock
 
-  | PhiSplitCall of LF.lock_effect * phi * Cil.location
+  | PhiSplitCall of LF.lock_effect * phi
       (* The phi that corresponds to calling a function.
        * Parameters:
        * 1. The lock effect of the function that is called
        * 2. The return phi (will always have kind PhiSplitReturn)
        *    that corresponds to this call phi
-       * 3. location of the function call (used for debugging output)
        *)
 
   | PhiSplitReturn of LF.lock_effect * phi
@@ -166,6 +171,7 @@ let all_phi : phi list ref = ref []
  *)
 let empty_phi : phi = {
   phi_id = 0;
+  phi_func = None;
   phi_loc = Cil.locUnknown;
   phi_name = "empty";
   phi_global = false;
@@ -231,6 +237,7 @@ let make_phi (s: string) : phi =
   incr phi_no;
   let p = {
     phi_id = !phi_no;
+    phi_func = (match !Cil.currentGlobal with Cil.GFun (f, _) -> Some f | _ -> None);
     phi_loc = !Cil.currentLoc;
     phi_name = s;
     phi_global = false;
@@ -252,6 +259,9 @@ let make_phi (s: string) : phi =
   } in
   all_phi := p::!all_phi;
   p
+
+let function_of_phi phi = phi.phi_func
+let location_of_phi phi = phi.phi_loc
 
 let starting_phis : phi list ref = ref []
 
@@ -483,12 +493,8 @@ let postorder_visit (f: phi -> unit) : unit =
         with Not_found -> PhiVar
       in
       let _ = match k with
-        | PhiSplitCall(_,phi_ret,_) ->
+        | PhiSplitCall(_,phi_ret) ->
             visit phi_ret
-        (*| PhiSplitReturn(_,p') ->
-            visit phi_ret
-        | PhiPack(p') ->
-            visit p'*)
         | _ -> ()
       in
       List.iter
@@ -545,7 +551,7 @@ module PostorderWorklist : PhiWorklist with type t = phi Heap.t =
     type t = phi Heap.t
     exception Empty
     let create () : t =
-      Heap.create 100 (*!phi_no*)
+      Heap.create 1000 (*!phi_no*)
 
     let clear = Heap.clear
     let push (p: phi) (worklist: phi Heap.t) : unit =
@@ -657,11 +663,11 @@ module BoolWorklist : PhiWorklist =
   end
 
 (* backwards worklist *)
-module BW = StackWorklist
+module BW = DoubleStackWorklist
 module BackwardsWorklist = BW
 
 (* forwards worklist *)
-module FW = QueueWorklist
+module FW = DoubleStackWorklist
 module ForwardsWorklist = FW
 
 (************************
@@ -885,9 +891,11 @@ module MakeBackwardsAnalysis =
       if !do_slice_phi then List.iter remove_irrelevant !all_phi;
       postorder_sort ();
       reset_graph ();
+      let postorder_visits = ref 0 in
       List.iter (fun p -> BW.push p worklist) start_list;
       let rec loop () : unit =
         if !do_postorder then begin
+          incr postorder_visits;
           if !debug then ignore (E.log "another iteration: %d / %d\n" (BW.length worklist) (!phi_no));
           BW.clear worklist;
           postorder_visit propagate_through;
@@ -898,9 +906,10 @@ module MakeBackwardsAnalysis =
           loop();
         end
       in
-      try
+      (try
         loop ();
-      with BW.Empty -> ();
+      with BW.Empty -> ());
+      if !do_postorder && !do_count_postorder then ignore(E.log "postorder visits: %d\n" !postorder_visits);
     end
           
   end

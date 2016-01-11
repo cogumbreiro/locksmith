@@ -26,7 +26,7 @@ install_data = @INSTALL_DATA@
 install_program = @INSTALL_PROGRAM@
 
 O = obj/
-CC = gcc
+#CC = gcc
 CFLAGS = @CFLAGS@ -g -Wall -Wno-char-subscripts -I. -Ddeletes= -Dtraditional= -Dsameregion= -Dparentptr= -Ilibcompat
 
 EXTRA_OBJS = 

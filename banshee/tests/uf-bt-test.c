@@ -34,8 +34,8 @@
 #include "ufind.h"
 #include "list.h"
 
-DECLARE_UFIND(elt,int);
-DEFINE_NONPTR_UFIND(elt,int);
+DECLARE_UFIND(elt, INT_PTR);
+DEFINE_NONPTR_UFIND(elt, INT_PTR);
 
 int main()
 {

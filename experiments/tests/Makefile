@@ -138,7 +138,7 @@ out/%.out: %.c
 		sed -e 's/#[0-9]*\\n//g' > $@; \
 	if test -f core || test 0 -ne `ls core.* 2>/dev/null|wc -l`; \
 	then \
-		echo -e "\\033[30G \\033[1;31m core dump \\033[0;39m"; \
+		/bin/echo -e "\\033[30G \\033[1;31m core dump \\033[0;39m"; \
 		echo " core dump" >> out/report.html; \
 		$(RM) core core.*; false; \
 	fi
@@ -152,7 +152,7 @@ out/%.out: %.c
 			ok/$(basename $<).dot.sorted out/$(basename $<).dot.sorted > /dev/null; \
 			then true; \
 			else \
-				echo -e "\\033[30G \\033[1;31m graphs differ \\033[0;39m"; \
+				/bin/echo -e "\\033[30G \\033[1;31m graphs differ \\033[0;39m"; \
 				echo " graphs differ" >> out/report.html; \
 				true; \
 		fi; \
@@ -160,11 +160,11 @@ out/%.out: %.c
 	if diff -Bb ok/$(basename $<).out $@ > /tmp/out$$ 2>&1; \
 		then $(RM) /tmp/out$$; true; \
 		else \
-			echo -e "\\033[30G \\033[1;31m output differs \\033[0;39m";  \
-			echo -e "\\033[30G \\033[1;31m old: " `grep "Possible data race" ok/$(basename $<).out | wc -l`"  new: " `grep "Possible data race" out/$(basename $<).out | wc -l`" \\033[0;39m"; \
-			echo -e " output differs <br>" >> out/report.html; \
+			/bin/echo -e "\\033[30G \\033[1;31m output differs \\033[0;39m";  \
+			/bin/echo -e "\\033[30G \\033[1;31m old: " `grep "Possible data race" ok/$(basename $<).out | wc -l`"  new: " `grep "Possible data race" out/$(basename $<).out | wc -l`" \\033[0;39m"; \
+			/bin/echo -e " output differs <br>" >> out/report.html; \
 			echo "old: " `grep "Possible data race" ok/$(basename $<).out | wc -l`"  new: " `grep "Possible data race" out/$(basename $<).out | wc -l`" <br> " >> out/report.html; \
 			mkdir -p diffs; mv /tmp/out$$ diffs/$(basename $<).diff; true; \
 	fi && \
-	echo -e "\\033[30G \\033[1;32m ok \\033[0;39m"; \
+	/bin/echo -e "\\033[30G \\033[1;32m ok \\033[0;39m"; \
 	echo "ok" >> out/report.html; \

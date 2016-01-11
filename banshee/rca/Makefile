@@ -43,7 +43,7 @@ TARGETS =  $(RCA).h $(RCA).c $(RCA).o rca_analyze.o
 
 TAGFILES = *.c *.h
 
-CC = gcc
+#CC = gcc
 
 ifdef DEBUG
 CFLAGS = -pg -g -I$(engine_dir) -I$(region_dir) -Ddeletes= -Dtraditional= \

@@ -42,6 +42,8 @@
  *
  *)
 
+open Cilint
+
 (** {b CIL API Documentation.}  An html version of this document 
  *  can be found at http://hal.cs.berkeley.edu/cil *)
 
@@ -49,8 +51,7 @@
  * set {!Cil.msvcMode}.  *)
 val initCIL: unit -> unit
 
-
-(** This are the CIL version numbers. A CIL version is a number of the form 
+(** These are the CIL version numbers. A CIL version is a number of the form 
  * M.m.r (major, minor and release) *)
 val cilVersion: string
 val cilVersionMajor: int
@@ -87,7 +88,7 @@ type file =
       mutable globinit: fundec option;  
       (** An optional global initializer function. This is a function where 
        * you can put stuff that must be executed before the program is 
-       * started. This function, is conceptually at the end of the file, 
+       * started. This function is conceptually at the end of the file, 
        * although it is not part of the globals list. Use {!Cil.getGlobInit} 
        * to create/get one. *)
       mutable globinitcalled: bool;     
@@ -275,6 +276,7 @@ and ikind =
     IChar       (** [char] *)
   | ISChar      (** [signed char] *)
   | IUChar      (** [unsigned char] *)
+  | IBool       (** [_Bool (C99)] *)
   | IInt        (** [int] *)
   | IUInt       (** [unsigned int] *)
   | IShort      (** [short] *)
@@ -422,6 +424,9 @@ and enuminfo = {
      * reference to this [enuminfo] using the [TEnum] type constructor. *)
     mutable ereferenced: bool;         
     (** True if used. Initially set to false*)
+    mutable ekind: ikind;
+    (** The integer kind used to represent this enum. Per ANSI-C, this
+      * should always be IInt, but gcc allows other integer kinds *)
 }
 
 (** {b Enumerations.} Information about an enumeration. This is shared by all 
@@ -504,7 +509,7 @@ and varinfo = {
 
     mutable vreferenced: bool;          
     (** True if this variable is ever referenced. This is computed by 
-     * [removeUnusedVars]. It is safe to just initialize this to False *)
+     * {!Rmtmps.removeUnusedTemps}. It is safe to just initialize this to False *)
 
     mutable vdescr: Pretty.doc;
     (** For most temporary variables, a description of what the var holds.
@@ -1252,14 +1257,6 @@ val invalidStmt: stmt
   * versions of CIL.*)
 val builtinFunctions : (string, typ * typ list * bool) Hashtbl.t
 
-(** @deprecated.  For compatibility with older programs, these are
-  aliases for {!Cil.builtinFunctions} *)
-val gccBuiltins: (string, typ * typ list * bool) Hashtbl.t
-
-(** @deprecated.  For compatibility with older programs, these are
-  aliases for {!Cil.builtinFunctions} *)
-val msvcBuiltins: (string, typ * typ list * bool) Hashtbl.t
-  
 (** This is used as the location of the prototypes of builtin functions. *)
 val builtinLoc: location
 
@@ -1502,7 +1499,7 @@ val setTypeSigAttrs: attributes -> typsig -> typsig
 val typeSigAttrs: typsig -> attributes
 
 (*********************************************************)
-(**  LVALUES *)
+(**  {b Lvalues} *)
 
 (** Make a varinfo. Use this (rarely) to make a raw varinfo. Use other 
  * functions to make locals ({!Cil.makeLocalVar} or {!Cil.makeFormalVar} or 
@@ -1523,12 +1520,20 @@ val makeFormalVar: fundec -> ?where:string -> string -> typ -> varinfo
     set insert=false.  *)
 val makeLocalVar: fundec -> ?insert:bool -> string -> typ -> varinfo
 
-(** Make a temporary variable and add it to a function's slocals. The name of 
-    the temporary variable will be generated based on the given name hint so 
-    that to avoid conflicts with other locals.  
-    Optionally, you can give the variable a description of its contents. *)
-val makeTempVar: fundec -> ?name: string -> ?descr:Pretty.doc ->
-                 ?descrpure:bool -> typ -> varinfo
+(** Make a temporary variable and add it to a function's slocals. CIL will
+    ensure that the name of the new variable is unique in this function, and
+    will generate this name by appending a number to the specified string
+    ("__cil_tmp" by default).
+
+    The variable will be added to the function's slocals unless you explicitly
+    set insert=false.  (Make sure you know what you are doing if you set
+    insert=false.)
+
+    Optionally, you can give the variable a description of its contents
+    that will be printed by descriptiveCilPrinter.
+*)
+val makeTempVar: fundec -> ?insert:bool -> ?name: string ->
+                 ?descr:Pretty.doc -> ?descrpure:bool -> typ -> varinfo
 
 
 (** Make a global variable. Your responsibility to make sure that the name 
@@ -1583,9 +1588,14 @@ val one: exp
 val mone: exp
 
 
+(** Construct an integer of a given kind, from a cilint. If needed it
+ * will truncate the integer to be within the representable range for
+ * the given kind. *)
+val kintegerCilint: ikind -> cilint -> exp
+
 (** Construct an integer of a given kind, using OCaml's int64 type. If needed 
-  * it will truncate the integer to be within the representable range for the 
-  * given kind. *)
+ * it will truncate the integer to be within the representable range for the 
+ * given kind. *)
 val kinteger64: ikind -> int64 -> exp
 
 (** Construct an integer of a given kind. Converts the integer to int64 and 
@@ -1594,21 +1604,29 @@ val kinteger64: ikind -> int64 -> exp
   * the Char or Short kinds *)
 val kinteger: ikind -> int -> exp
 
-(** Construct an integer of kind IInt. You can use this always since the 
-    OCaml integers are 31 bits and are guaranteed to fit in an IInt *)
+(** Construct an integer of kind IInt. On targets where C's 'int' is 16-bits,
+    the integer may get truncated. *)
 val integer: int -> exp
 
 
-(** True if the given expression is a (possibly cast'ed) 
-    character or an integer constant *)
-val isInteger: exp -> int64 option
+(** If the given expression is an integer constant or a CastE'd
+    integer constant, return that constant's value. 
+    Otherwise return None. *)
+val getInteger: exp -> cilint option
 
 (** Convert a 64-bit int to an OCaml int, or raise an exception if that
     can't be done. *)
 val i64_to_int: int64 -> int
 
+(** Convert a cilint int to an OCaml int, or raise an exception if that
+    can't be done. *)
+val cilint_to_int: cilint -> int
+
 (** True if the expression is a compile-time constant *)
 val isConstant: exp -> bool
+
+(** True if the given offset contains only field nanmes or constant indices. *)
+val isConstantOffset: offset -> bool
 
 (** True if the given expression is a (possibly cast'ed) integer or character 
     constant with value zero *)
@@ -1976,6 +1994,13 @@ val msvcMode: bool ref
  * their operands *)
 val useLogicalOperators: bool ref
 
+(** Set this to true to get old-style handling of gcc's extern inline C extension:
+   old-style: the extern inline definition is used until the actual definition is
+     seen (as long as optimization is enabled)
+   new-style: the extern inline definition is used only if there is no actual
+     definition (as long as optimization is enabled)
+   Note that CIL assumes that optimization is always enabled ;-) *)
+val oldstyleExternInline : bool ref
 
 (** A visitor that does constant folding. Pass as argument whether you want 
  * machine specific simplifications to be done, or not. *)
@@ -2003,7 +2028,7 @@ val print_CIL_Input: bool ref
 (** Whether to print the CIL as they are, without trying to be smart and 
   * print nicer code. Normally this is false, in which case the pretty 
   * printer will turn the while(1) loops of CIL into nicer loops, will not 
-  * print empty "else" blocks, etc. These is one case howewer in which if you 
+  * print empty "else" blocks, etc. There is one case howewer in which if you 
   * turn this on you will get code that does not compile: if you use varargs 
   * the __builtin_va_arg function will be printed in its internal form. *)
 val printCilAsIs: bool ref
@@ -2413,6 +2438,12 @@ val d_plaintype: unit -> typ -> Pretty.doc
 (** Pretty-print an expression while printing descriptions rather than names
   of temporaries. *)
 val dd_exp: unit -> exp -> Pretty.doc
+(** Pretty-print an lvalue on the left side of an assignment.
+    If there is an offset or memory dereference, temporaries will
+    be replaced by descriptions as in dd_exp.  If the lval is a temp var,
+    that var will not be replaced by a description; use "dd_exp () (Lval lv)"
+    if that's what you want. *)
+val dd_lval: unit -> lval -> Pretty.doc
 
 
 
@@ -2431,13 +2462,13 @@ val uniqueVarNames: file -> unit
 
 (** {b Optimization Passes} *)
 
-(** A peephole optimizer that processes two adjacent statements and possibly 
-    replaces them both. If some replacement happens, then the new statements 
+(** A peephole optimizer that processes two adjacent instructions and possibly 
+    replaces them both. If some replacement happens, then the new instructions
     are themselves subject to optimization *)
 val peepHole2: (instr * instr -> instr list option) -> stmt list -> unit
 
 (** Similar to [peepHole2] except that the optimization window consists of 
-    one statement, not two *)
+    one instruction, not two *)
 val peepHole1: (instr -> instr list option) -> stmt list -> unit
 
 (** {b Machine dependency} *)
@@ -2450,17 +2481,64 @@ val peepHole1: (instr -> instr list option) -> stmt list -> unit
  * explanation of the error *)        
 exception SizeOfError of string * typ
 
+(** Give the unsigned kind corresponding to any integer kind *)
+val unsignedVersionOf : ikind -> ikind
+
+(** Give the signed kind corresponding to any integer kind *)
+val signedVersionOf : ikind -> ikind
+
+(** Return the integer conversion rank of an integer kind *)
+val intRank : ikind -> int
+
+(** Return the common integer kind of the two integer arguments, as
+    defined in ISO C 6.3.1.8 ("Usual arithmetic conversions") *)
+val commonIntKind : ikind -> ikind -> ikind
+
+(** The signed integer kind for a given size (unsigned if second argument
+ * is true). Raises Not_found if no such kind exists *)
+val intKindForSize : int -> bool -> ikind
+
+(** The float kind for a given size. Raises Not_found
+ *  if no such kind exists *)
+val floatKindForSize : int-> fkind
+
+(** The size in bytes of the given int kind. *)
+val bytesSizeOfInt: ikind -> int 
+
 (** The size of a type, in bits. Trailing padding is added for structs and 
  * arrays. Raises {!Cil.SizeOfError} when it cannot compute the size. This 
  * function is architecture dependent, so you should only call this after you 
  * call {!Cil.initCIL}. Remember that on GCC sizeof(void) is 1! *)
 val bitsSizeOf: typ -> int
 
-val truncateInteger64: ikind -> int64 -> int64 * bool
+(** Represents an integer as for a given kind.  Returns a truncation
+ * flag saying that the value fit in the kind (NoTruncation), didn't
+ * fit but no "interesting" bits (all-0 or all-1) were lost
+ * (ValueTruncation) or that bits were lost (BitTruncation). Another 
+ * way to look at the ValueTruncation result is that if you had used
+ * the kind of opposite signedness (e.g. IUInt rather than IInt), you
+ * would gave got NoTruncation... *)
+val truncateCilint: ikind -> cilint -> cilint * truncation
 
-(** The size of a type, in bytes. Returns a constant expression or a "sizeof" 
- * expression if it cannot compute the size. This function is architecture 
- * dependent, so you should only call this after you call {!Cil.initCIL}.  *)
+(** True if the integer fits within the kind's range *)
+val fitsInInt: ikind -> cilint -> bool
+
+(** Return the smallest kind that will hold the integer's value.  The
+ * kind will be unsigned if the 2nd argument is true, signed
+ * otherwise.  Note that if the value doesn't fit in any of the
+ * available types, you will get ILongLong (2nd argument false) or
+ * IULongLong (2nd argument true). *)
+val intKindForValue: cilint -> bool -> ikind
+
+(** Construct a cilint from an integer kind and int64 value. Used for
+ * getting the actual constant value from a CInt64(n, ik, _)
+ * constant. *)
+val mkCilint : ikind -> int64 -> cilint
+
+(** The size of a type, in bytes. Returns a constant expression or a
+ * "sizeof" expression if it cannot compute the size. This function
+ * is architecture dependent, so you should only call this after you
+ * call {!Cil.initCIL}.  *)
 val sizeOf: typ -> exp
 
 (** The minimum alignment (in bytes) for a type. This function is 
@@ -2519,6 +2597,12 @@ val mapNoCopyList: ('a -> 'a list) -> 'a list -> 'a list
 (** sm: return true if the first is a prefix of the second string *)
 val startsWith: string -> string -> bool
 
+(** return true if the first is a suffix of the second string *)
+val endsWith: string -> string -> bool
+
+(** If string has leading and trailing __, strip them. *)
+val stripUnderscores: string -> string
+
 
 (** {b An Interpreter for constructing CIL constructs} *)
 
@@ -2560,3 +2644,34 @@ val d_formatarg: unit -> formatArg -> Pretty.doc
 
 (** Emit warnings when truncating integer constants (default true) *)
 val warnTruncate: bool ref
+
+(** Machine model specified via CIL_MACHINE environment variable *)
+val envMachine : Machdep.mach option ref
+
+(* ------------------------------------------------------------------------- *)
+(*                            DEPRECATED FUNCTIONS                           *)
+(*                        These will eventually go away                      *)
+(* ------------------------------------------------------------------------- *)
+
+(** @deprecated. Convert two int64/kind pairs to a common int64/int64/kind triple. *)
+val convertInts: int64 -> ikind -> int64 -> ikind -> int64 * int64 * ikind
+
+(** @deprecated. Can't handle large 64-bit unsigned constants
+    correctly - use getInteger instead. If the given expression
+    is a (possibly cast'ed) character or an integer constant, return
+    that integer.  Otherwise, return None. *)
+val isInteger: exp -> int64 option
+
+(** @deprecated. Use truncateCilint instead. Represents an integer as
+ * for a given kind.  Returns a flag saying whether the value was
+ * changed during truncation (because it was too large to fit in k). *)
+val truncateInteger64: ikind -> int64 -> int64 * bool
+
+(** @deprecated.  For compatibility with older programs, these are
+    aliases for {!Cil.builtinFunctions} *)
+val gccBuiltins: (string, typ * typ list * bool) Hashtbl.t
+
+(** @deprecated.  For compatibility with older programs, these are
+  aliases for {!Cil.builtinFunctions} *)
+val msvcBuiltins: (string, typ * typ list * bool) Hashtbl.t
+  

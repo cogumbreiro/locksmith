@@ -113,18 +113,19 @@ void write_extra_info(const char *filename, unsigned long num_regions)
 Updater *read_extra_info(const char *filename)
 {
   unsigned long num_extra_regions = 0, i = 0;
-  int next_id = 0;
-  FILE *f  = fopen(filename, "rb");
+  int next_id = 0, success;
+  FILE *f  = 0;
   Updater *result;
+  f = fopen(filename, "rb");
   assert(f);
 
-  fread((void *)&num_extra_regions, sizeof(unsigned long), 1, f);
+  success = fread((void *)&num_extra_regions, sizeof(unsigned long), 1, f);
 
   result = rarrayalloc(permanent,num_extra_regions + NUM_REGIONS, 
 		       Updater);
 
   for (i = NUM_REGIONS; i < NUM_REGIONS + num_extra_regions; i++) {
-    fread((void *)&next_id, sizeof(int), 1, f); 
+    success &= fread((void *)&next_id, sizeof(int), 1, f);
     if (next_id == UNKNOWN_ID) {
       assert(extra_update_fn);
       result[i] = extra_update_fn;
@@ -137,6 +138,8 @@ Updater *read_extra_info(const char *filename)
       result[i] = update_funptr_data(next_id);
     }
   }
+
+  assert(success);
 
   return result;
 }

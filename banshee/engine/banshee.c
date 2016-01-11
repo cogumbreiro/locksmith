@@ -259,20 +259,21 @@ bool banshee_rollback_info_serialize(FILE *f, void *obj)
   banshee_rollback_info info = (banshee_rollback_info)obj;
   assert(f);
 
-  fwrite((void *)&info->time, sizeof(int), 1, f);
-  fwrite((void *)&info->kind, sizeof(int), 1, f);
+  fwrite((void *)&info->time, sizeof(info->time), 1, f);
+  fwrite((void *)&info->kind, sizeof(info->kind), 1, f);
   return banshee_rollback_serialize_dispatch(f, info);
 }
 
 void *banshee_rollback_info_deserialize(FILE *f)
 {
-  int time;
-  sort_kind kind;
+  int time = 0, success;
+  sort_kind kind = 0;
   banshee_rollback_info result = NULL;
   assert(f);
 
-  fread((void *)&time, sizeof(int), 1, f);
-  fread((void *)&kind, sizeof(int), 1, f);
+  success = fread((void *)&time, sizeof(time), 1, f);
+  success &= fread((void *)&kind, sizeof(kind), 1, f);
+  assert(success);
 
   result = banshee_rollback_deserialize_dispatch(kind, f);
 			      
@@ -291,7 +292,7 @@ bool banshee_rollback_info_set_fields(void *obj)
 void engine_serialize(FILE *f)
 {
   assert(f);
-  fwrite((void *)&banshee_clock, sizeof(int), 1, f);
+  fwrite((void *)&banshee_clock, sizeof(banshee_clock), 1, f);
   fwrite((void *)&rb_stack, sizeof(banshee_rollback_stack), 1, f);
   
   serialize_banshee_object(rb_stack, list);
@@ -299,10 +300,12 @@ void engine_serialize(FILE *f)
 
 void engine_deserialize(FILE *f)
 {
+  int success;
   assert(f);
 
-  fread((void *)&banshee_clock, sizeof(int), 1, f);
-  fread((void *)&rb_stack, sizeof(banshee_rollback_stack), 1, f);
+  success = fread((void *)&banshee_clock, sizeof(banshee_clock), 1, f);
+  success &= fread((void *)&rb_stack, sizeof(banshee_rollback_stack), 1, f);
+  assert(success);
 }
 
 void engine_set_fields(void)
@@ -312,13 +315,15 @@ void engine_set_fields(void)
 
 void update_module_engine(translation t, FILE *f)
 {
-  fread((void *)&banshee_clock, sizeof(int), 1, f);
-  fread((void *)&rb_stack, sizeof(void *), 1, f);
+  int success;
+  success = fread((void *)&banshee_clock, sizeof(banshee_clock), 1, f);
+  success &= fread((void *)&rb_stack, sizeof(banshee_rollback_stack), 1, f);
+  assert(success);
   update_pointer(t, (void **)&rb_stack);
 }
 
 void write_module_engine(FILE *f)
 {
-  fwrite((void *)&banshee_clock, sizeof(int), 1, f);
+  fwrite((void *)&banshee_clock, sizeof(banshee_clock), 1, f);
   fwrite((void *)&rb_stack, sizeof(void *), 1, f);
 }

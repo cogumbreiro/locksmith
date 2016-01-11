@@ -95,6 +95,7 @@ let rec breakString (acc: doc) (str: string) : doc =
 let nil           = Nil
 let text s        = breakString nil s
 let num  i        = text (string_of_int i)
+let num64 i       = text (Int64.to_string i)
 let real f        = text (string_of_float f)
 let chr  c        = text (String.make 1 c) 
 let align         = Align
@@ -681,6 +682,7 @@ let gprintf (finish : doc -> 'b)
         let j = skip_args (succ i) in
         match fget j with
           '%' -> literal acc j 
+	| ',' -> collect acc (succ j)
         | 's' ->
             Obj.magic(fun s ->
               let str = 

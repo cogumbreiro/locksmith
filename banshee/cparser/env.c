@@ -45,7 +45,7 @@ static int env_compare(void *entry1, void *entry2)
 static unsigned long env_hash(void *entry)
 {
   struct entry *e = entry;
-  unsigned const char *name = e->name;
+  unsigned const char *name = (unsigned char *) e->name;
   unsigned long code = 0;
 
   if (!name) /* Special hash for unnamed functions. Use pointer address */

@@ -490,11 +490,11 @@ class setstsort_gen =
 		   Expr (e ^ "_print(arg1,temp);\n}"); ]
       in
       let base_statements = 
-	[ Expr ("fprintf(arg1,\"%s:%d\","
-		^"st_get_name((setst_var)arg2),setst_get_stamp(arg2));");
+	[ Expr ("fprintf(arg1,\"%s:%ld\","
+		^"st_get_name((setst_var)arg2), (long) setst_get_stamp(arg2));");
 	  Expr ("fprintf(arg1,\"0\");");
 	  Expr ("fprintf(arg1,\"1\");");
-	  Expr ("fprintf(arg1,setst_get_constant_name(arg2));") ] 
+	  Expr ("fprintf(arg1,\"%s\",setst_get_constant_name(arg2));") ] 
 	@ [union_statement] 
       in  
       let gen_proj_case c e' n =

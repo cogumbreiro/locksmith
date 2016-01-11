@@ -47,7 +47,7 @@ TARGETS =  andersen.o $(ANDERSEN).h $(ANDERSEN).c $(ANDERSEN).o \
 
 TAGFILES = *.c *.h
 
-CC = gcc
+#CC = gcc
 
 ifdef DEBUG
 CFLAGS = -Wall -pg -g -I$(engine_dir) -I$(region_dir) -Ddeletes=	\

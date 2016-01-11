@@ -37,4 +37,5 @@
 val generate_constraints : Cil.file -> unit
 val options : (string * Arg.spec * string) list
 val get_global_var_rhos : unit -> Labelflow.RhoSet.t
-val fun_to_chi : Labelflow.chi Lockutil.Strmap.t ref
+val atomic_functions : (Cil.fundec, Labelflow.chi) Hashtbl.t
+val locktypes : Cil.typ list ref

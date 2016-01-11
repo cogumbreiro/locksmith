@@ -58,7 +58,7 @@ external banshee_reaches_m_list : banshee_node -> banshee_node list = "banshee_r
 external banshee_reaches_pn_list : banshee_node -> banshee_node list = "banshee_reaches_pn_list"
 
 let do_dump_dyckcfl : bool ref = ref false
-let dump_dyckcfl_file : out_channel = open_out "graph.txt"
+let dump_dyckcfl_file : out_channel Lazy.t = lazy (open_out "graph.txt")
 let options = []
 (*
   "--dump-dyckcfl-trace",
@@ -71,7 +71,8 @@ type node = {
   nid : int;
   nnode: banshee_node;
   nname: string;
-  nloc: Cil.location;
+  nfunc: Cil.fundec option;
+  mutable nloc: Cil.location;
   mutable nglob: bool;
   nconcrete: bool;
 }
@@ -80,16 +81,6 @@ type edge =
   | SubEdge of node * node
   | OpenEdge of node * node * instantiation
   | CloseEdge of node * node * instantiation
-
-module Edge =
-  struct
-    type t = edge
-    let compare e1 e2 = Pervasives.compare e1 e2
-  end
-module EdgeSet = Set.Make(Edge)
-let edges : EdgeSet.t ref = ref EdgeSet.empty
-
-let hash n = n.nid (* change compare below in Node, HasedType if this changes *)
 
 module Node =
   struct
@@ -110,14 +101,6 @@ module Node =
   end
 module NodeSet = Set.Make(Node)
 module NodeHT = Hashtbl.Make(Node)
-
-let sub_edges : node NodeHT.t = NodeHT.create 100
-let open_edges : (node*int) NodeHT.t = NodeHT.create 100
-let close_edges : (node*int) NodeHT.t = NodeHT.create 100
-let find_all ht n =
-  try
-    NodeHT.find_all ht n
-  with Not_found -> []
 
 module BansheeNode =
   struct
@@ -140,7 +123,7 @@ let fresh_inst () : instantiation =
   assert (not !done_inst);
   incr next_inst; !next_inst
 let next_id = ref 1
-let make_node (n: string) (c: bool) (l: Cil.location) (tagged: bool) : node = begin
+let make_node (n: string) (c: bool) (f : Cil.fundec option) (l: Cil.location) (tagged: bool) : node = begin
   let nn = {
     nid = !next_id;
     nnode = if tagged
@@ -148,29 +131,31 @@ let make_node (n: string) (c: bool) (l: Cil.location) (tagged: bool) : node = be
             else make_untagged_banshee_node n;
     nname = n;
     nloc = l;
+    nfunc = f;
     nglob = false;
     nconcrete = c;
   } in
   incr next_id;
 (* if c then concretes := NodeSet.add nn !concretes; *)
   if !do_dump_dyckcfl then begin
-    Printf.fprintf dump_dyckcfl_file "c %d\n" nn.nid;
-    flush dump_dyckcfl_file;
+    Printf.fprintf (Lazy.force dump_dyckcfl_file) "c %d\n" nn.nid;
+    flush (Lazy.force dump_dyckcfl_file);
   end;
   BansheeNodeHT.add all_nodes nn.nnode nn;
   nn
 end
 
-let dotstring_of_node n = n.nname ^"#"^ (string_of_int (hash n)) ^ "\\n" ^ (Pretty.sprint 80 (Cil.d_loc () n.nloc))
+let update_node_location node loc = node.nloc <- loc; node
+
+let dotstring_of_node n = n.nname ^"#"^ (string_of_int (Node.hash n)) ^ "\\n" ^ (Pretty.sprint 80 (Cil.d_loc () n.nloc))
 let string_of_node n = n.nname ^ ":" ^ (Pretty.sprint 80 (Cil.d_loc () n.nloc))
-let is_concrete n = n.nconcrete (* NodeSet.mem n !concretes *)
-(* let globals = ref [] *)
+
+let is_concrete n = n.nconcrete
 let set_global n = begin
-(*  globals := n::!globals; *)
   n.nglob <- true;
   if !do_dump_dyckcfl then begin
-    Printf.fprintf dump_dyckcfl_file "g %d\n" n.nid;
-    flush dump_dyckcfl_file;
+    Printf.fprintf (Lazy.force dump_dyckcfl_file) "g %d\n" n.nid;
+    flush (Lazy.force dump_dyckcfl_file);
   end;
   banshee_set_global n.nnode;
 end
@@ -180,28 +165,18 @@ let total_nodes () : int = !next_id
 
 let reaches_m x y = begin
   if !do_dump_dyckcfl then begin
-    Printf.fprintf dump_dyckcfl_file "m %d %d\n" x.nid y.nid;
-    flush dump_dyckcfl_file;
+    Printf.fprintf (Lazy.force dump_dyckcfl_file) "m %d %d\n" x.nid y.nid;
+    flush (Lazy.force dump_dyckcfl_file);
   end;
   banshee_reaches_m x.nnode y.nnode
 end
 
 let reaches_pn x y = begin
   if !do_dump_dyckcfl then begin
-    Printf.fprintf dump_dyckcfl_file "p %d %d\n" x.nid y.nid;
-    flush dump_dyckcfl_file;
+    Printf.fprintf (Lazy.force dump_dyckcfl_file) "p %d %d\n" x.nid y.nid;
+    flush (Lazy.force dump_dyckcfl_file);
   end;
   banshee_reaches_pn x.nnode y.nnode
-end
-
-let make_open_edge x y i = begin
-  edges := EdgeSet.add (OpenEdge(x, y, i)) !edges;
-  if !do_dump_dyckcfl then begin
-    Printf.fprintf dump_dyckcfl_file "( %d %d %d\n" x.nid y.nid i;
-    flush dump_dyckcfl_file;
-  end;
-  NodeHT.add open_edges x (y,i);
-  banshee_make_open_edge x.nnode y.nnode i;
 end
 
 (* usually called after typing *)
@@ -210,15 +185,6 @@ let done_adding () : unit =
   assert (not !done_inst);
   done_inst := true;
   ()
-(*
-  List.iter
-    (fun n ->
-      for i = 1 to !next_inst do
-        make_open_edge n n i
-      done
-    )
-    !globals
-    *)
 
 
 (* Given a node n and a find function mapping nodes to targets,
@@ -231,8 +197,8 @@ let get_all_that_reach_m (n: node)
                          (set : 'b)
                          : 'b =
   if !do_dump_dyckcfl then begin
-    Printf.fprintf dump_dyckcfl_file "M %d\n" n.nid;
-    flush dump_dyckcfl_file;
+    Printf.fprintf (Lazy.force dump_dyckcfl_file) "M %d\n" n.nid;
+    flush (Lazy.force dump_dyckcfl_file);
   end;
   let nl = banshee_reaches_m_list n.nnode in
   List.fold_left
@@ -251,8 +217,8 @@ let get_all_that_reach_pn (n: node)
                           (set : 'b)
                           : 'b =
   if !do_dump_dyckcfl then begin
-    Printf.fprintf dump_dyckcfl_file "P %d\n" n.nid;
-    flush dump_dyckcfl_file;
+    Printf.fprintf (Lazy.force dump_dyckcfl_file) "P %d\n" n.nid;
+    flush (Lazy.force dump_dyckcfl_file);
   end;
   let nl = banshee_reaches_pn_list n.nnode in
   List.fold_left
@@ -265,95 +231,28 @@ let get_all_that_reach_pn (n: node)
     )
     set nl
 
+let make_open_edge x y i = begin
+  if !do_dump_dyckcfl then begin
+    Printf.fprintf (Lazy.force dump_dyckcfl_file) "( %d %d %d\n" x.nid y.nid i;
+    flush (Lazy.force dump_dyckcfl_file);
+  end;
+  banshee_make_open_edge x.nnode y.nnode i;
+end
 
 let make_close_edge x y i = begin
-  edges := EdgeSet.add (CloseEdge(x, y, i)) !edges;
   if !do_dump_dyckcfl then begin
-    Printf.fprintf dump_dyckcfl_file ") %d %d %d\n" x.nid y.nid i;
-    flush dump_dyckcfl_file;
+    Printf.fprintf (Lazy.force dump_dyckcfl_file) ") %d %d %d\n" x.nid y.nid i;
+    flush (Lazy.force dump_dyckcfl_file);
   end;
-  NodeHT.add close_edges x (y,i);
   banshee_make_close_edge x.nnode y.nnode i;
 end
 
-let make_inst_edge n1 n2 p i =
-  if p then make_close_edge n1 n2 i
-  else make_open_edge n2 n1 i
-
 let make_sub_edge x y = begin
-  edges := EdgeSet.add (SubEdge(x, y)) !edges;
   if !do_dump_dyckcfl then begin
-    Printf.fprintf dump_dyckcfl_file "s %d %d\n" x.nid y.nid;
-    flush dump_dyckcfl_file;
+    Printf.fprintf (Lazy.force dump_dyckcfl_file) "s %d %d\n" x.nid y.nid;
+    flush (Lazy.force dump_dyckcfl_file);
   end;
-  NodeHT.add sub_edges x y;
   banshee_make_sub_edge x.nnode y.nnode;
-end
-
-let shortest_path n1 n2 =
-  let visited = NodeHT.create 10000 in
-  let q : (node * edge list) Queue.t = Queue.create() in
-  let rec bfs () =
-    if Queue.is_empty q then raise Not_found;
-    let n,path = Queue.pop q in
-    if Node.equal n n2 then List.rev path
-    else if NodeHT.mem visited n then bfs()
-    else (
-      NodeHT.add visited n ();
-      List.iter
-        (fun n' ->
-          if not (NodeHT.mem visited n') then
-            Queue.push (n', SubEdge(n,n')::path) q)
-        (find_all sub_edges n);
-      List.iter
-        (fun (n',i) ->
-          if not (NodeHT.mem visited n') then
-            Queue.push (n', OpenEdge(n,n',i)::path) q)
-        (find_all open_edges n);
-      List.iter
-        (fun (n',i) ->
-          if not (NodeHT.mem visited n') then
-          Queue.push (n', CloseEdge(n,n',i)::path) q)
-        (find_all close_edges n);
-      bfs()
-    )
-  in
-  Queue.push (n1,[]) q;
-  bfs ()
-
-let print_graph outf : NodeSet.t = begin
-  let ns = ref NodeSet.empty in
-  let dotstring_of_edge (e: edge) : string =
-    match e with
-    | SubEdge(n1, n2) ->
-        ns := NodeSet.add n1 (NodeSet.add n2 !ns);
-        ("\"" ^ (dotstring_of_node n1)
-        ^ "\" -> \"" ^ (dotstring_of_node n2) ^ "\";\n")
-    | OpenEdge(n1, n2, i) ->
-        ns := NodeSet.add n1 (NodeSet.add n2 !ns);
-        ("\"" ^ (dotstring_of_node n1)
-        ^ "\" -> \"" ^ (dotstring_of_node n2)
-        ^ "\" [label=\"(" ^ (string_of_int i) ^ "\"];\n")
-    | CloseEdge(n1, n2, i) ->
-        ns := NodeSet.add n1 (NodeSet.add n2 !ns);
-        ("\"" ^ (dotstring_of_node n1)
-        ^ "\" -> \"" ^ (dotstring_of_node n2)
-        ^ "\" [label=\")" ^ (string_of_int i) ^ "\"];\n")
-  in
-
-  EdgeSet.iter 
-    (fun e -> Printf.fprintf outf "%s" (dotstring_of_edge e))
-    !edges;
-
-  NodeSet.iter
-    (fun n ->
-      if n.nconcrete then
-        Printf.fprintf outf "\"%s\" [shape=\"box\"];\n" (dotstring_of_node n);
-      if n.nglob then
-        Printf.fprintf outf "\"%s\" [peripheries=2]\n" (dotstring_of_node n);
-    )
-    !ns;
-  !ns
 end
 
 let _ = bansheeInit true

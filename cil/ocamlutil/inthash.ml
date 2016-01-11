@@ -1,5 +1,5 @@
 (** A hash table specialized on integer keys *)
-type key = int
+type key = int (* LOCKSMITH *)
 type 'a t =
   { mutable size: int;                        (* number of elements *)
     mutable data: 'a bucketlist array } (* the buckets *)

@@ -394,10 +394,10 @@ bool check_assignment(type lhstype, type rhstype, expression rhs,
 		{
 		  /* If this type won't generate any warnings, use it.  */
 		  if ((type_function(ttr) && type_function(ttl))
-		      ? ((!type_const(ttl) | type_const(ttr))
-			 & (!type_volatile(ttl) | type_volatile(ttr)))
-		      : ((type_const(ttl) | !type_const(ttr))
-			 & (type_volatile(ttl) | !type_volatile(ttr))))
+		      ? (((!type_const(ttl)) | type_const(ttr))
+			 & ((!type_volatile(ttl)) | type_volatile(ttr)))
+		      : (((type_const(ttl)) | (!type_const(ttr)))
+			 & (type_volatile(ttl) | (!type_volatile(ttr)))))
 		    break;
 
 		  /* Keep looking for a better type, but remember this one.  */

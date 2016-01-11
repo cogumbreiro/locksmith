@@ -49,7 +49,7 @@ TARGETS =  $(DYCKCFL).o mr_$(DYCKCFL).o $(DYCKCFL)_terms.h $(DYCKCFL)_spec.o $(D
 
 TAGFILES = $(wildcard *.c) $(wildcard *.h)
 
-CC = gcc
+#CC = gcc
 
 ifdef DEBUG
 CFLAGS = -I$(engine_dir) -I$(region_dir) -Ddeletes= -Dtraditional= \
@@ -67,10 +67,10 @@ endif
 
 all: $(TARGETS) 
 
-mr_$(DYCKCFL).o: 
+mr_$(DYCKCFL).o: mr_$(DYCKCFL).c mr_$(DYCKCFL).h
 	$(CC) -c $(CFLAGS) -DNONSPEC mr_$(DYCKCFL).c
 
-$(DYCKCFL).o:
+$(DYCKCFL).o: $(DYCKCFL).c $(DYCKCFL).h
 	$(CC) -c $(CFLAGS) -DNONSPEC $(DYCKCFL).c
 
 $(DYCKCFL)_terms.h: $(DYCKCFL)_terms.bsp

@@ -35,215 +35,233 @@
  *
  *)
 module E = Errormsg
-open Lockutil
 open Cil
+open Pretty
 open Labelflow
+open Lockutil
 module Lprof = Lockprofile
+module VS = Usedef.VS
+module LT = Locktype
+
+module StringSet = Set.Make(String)
 
 (*****************************************************************************)
 
 let debug = ref false
-let do_lockpick = ref false
-
-(* subversion will substitute this *)
-let version = "$Rev: 1533 $"
-
-let print_version () =
-  output_string stdout ("Lockpick build #"^version)
-
-let compute_dominates_graph (shared: rhoSet) (atomic_list: rhoSet list)
-    : rhoSet RhoHT.t =
-  let dominates_hash = RhoHT.create (RhoSet.cardinal shared) in
-  let does_not_dominate r r' =
-    if !debug then ignore(E.log "%a does not dominate %a\n" d_rho r d_rho r');
-    let tmp = RhoHT.find dominates_hash r in
-    RhoHT.replace dominates_hash r (RhoSet.remove r' tmp)
-  in
-  RhoSet.iter
-    (fun r ->
-      ignore(E.log "init %a\n" d_rho r);
-      RhoHT.replace dominates_hash r shared)
-    shared;
-  List.iter
-    (fun atomic ->
-      let notdom = RhoSet.diff shared atomic in
-      RhoSet.iter
-        (fun r -> RhoSet.iter (fun r' -> does_not_dominate r' r) notdom)
-        atomic)
-    atomic_list;
-  dominates_hash
-
-let dump_dominates_graph (g: rhoSet RhoHT.t) : unit =
-  RhoHT.iter
-    (fun r d ->
-      RhoSet.iter
-        (fun r' -> ignore(E.log "%a dominates %a\n" d_rho r d_rho r'))
-        d
-    ) g
-
-let dump_solution (s: rho RhoHT.t) : unit =
-  RhoHT.iter
-    (fun r r' ->
-      ignore(E.log "%a is protected by %a\n" d_rho r d_rho r');
-    )
-    s
-
-let list_atomic_chi (shared: rhoSet) : rhoSet list =
-  List.map
-    (fun x -> let r,w = solve_chi_m x in
-      let result = concrete_rhoset (RhoSet.inter (RhoSet.union r w) shared) in
-      if !debug then ignore(E.log "chi: %a has effect: %a\n" d_chi x d_rhoset result);
-      result
-    )
-    !all_atomic_chi
+let pthread_h_name = ref "/usr/include/pthread.h"
 
 let options =
   [
-    "--dolockpick",
-      Arg.Set(do_lockpick),
-      " Run the Lockpick algorithm for locking of atomic sections.";
-
     "--debug-lockpick",
       Arg.Set(debug),
       " Print lockpick profiling information after each phase.";
+
+    "--pthread-h",
+      Arg.String(fun s -> pthread_h_name := s),
+      " Specify where pthread.h is.";
   ]
 
-(* Joonghoon Lee 631 begin *)
+module LockRewriter = struct
+  let lock_function : varinfo option ref = ref None
+  let unlock_function : varinfo option ref = ref None
+  let init_function : varinfo option ref = ref None
+  let lock_type : typ option ref = ref None
 
-(* first, find all atomics *)
-let function_list = ref []
-class findAtomicsVisitor : cilVisitor =
-object (self)
-    inherit nopCilVisitor
-    method vinst (ins: instr) : instr list visitAction =
-        (match ins with
-        Call(_, Lval (Var (v:varinfo), NoOffset), args, loc) -> ()
-        | _-> ());
-        DoChildren
-    method vfunc fd =
-        function_list := fd.svar::!function_list;
-        DoChildren
+  let init file = begin
+    lock_function := Some (find_function_var file "pthread_mutex_lock");
+    unlock_function := Some (find_function_var file "pthread_mutex_unlock");
+    init_function := Some (find_function_var file "pthread_mutex_init");
+    lock_type := Some (find_type file "pthread_mutex_t");
+  end
+
+  let changeLockType lt ifun = begin
+      init_function := ifun;
+      lock_type := lt;
+  end
+
+  let make_wrapper (f: fundec) (locks: VS.t) : fundec = begin
+    (* make an empty function *)
+    let f_new = Cil.emptyFunction (f.svar.vname ^ "__atomic") in
+    (* declare its argument names and types *)
+    Cil.setFunctionTypeMakeFormals f_new f.svar.vtype;
+    (* create a new local variable with type equal to the return type *)
+    let ret_type = get_return_type f.svar.vtype in
+    let arguments: exp list = List.map (fun v -> Lval(Cil.var v)) f_new.sformals in
+    let ret_lval, ret_stmt = 
+      if isVoidType ret_type then (
+        None, Cil.mkStmt (Return(None, Cil.locUnknown))
+      ) else (
+        let tmp_var: varinfo = Cil.makeTempVar f_new ~name:"result" ret_type in
+        let ret_val: lval = (Cil.var tmp_var) in
+        Some ret_val, Cil.mkStmt (Return (Some (Lval ret_val), Cil.locUnknown))
+      )
+    in
+    let i = Call(ret_lval, Lval(Cil.var f.svar), arguments, Cil.locUnknown) in
+    let lock = var (getSome !lock_function) in
+    let unlock = var (getSome !unlock_function) in
+    let acq, rel = VS.fold
+      (fun l (acq, rel) -> 
+        let acql = Call(None, Lval(lock), [Cil.mkAddrOf (Cil.var l)], Cil.locUnknown) in
+        let rell = Call(None, Lval(unlock), [Cil.mkAddrOf (Cil.var l)], Cil.locUnknown) in
+        (acql::acq, rell::rel)
+      )
+      locks
+      ([], [])
+    in
+    let instr_list: instr list = acq @ [i] @ (List.rev rel) in
+    let stmt = Cil.mkStmt (Instr instr_list) in
+    f_new.sbody.bstmts <- f_new.sbody.bstmts @ [stmt; ret_stmt];
+    f_new
+  end
+
+  (* get a file, a fundec of an atomic function in that file (along with it's
+   * chi effect) and make it atomic
+   *)
+  let make_atomic_function (f: file) (rho_to_lock: varinfo RhoHT.t) (fd: fundec) (rs: RhoSet.t) : unit = begin
+    if !debug then (
+      ignore(E.log " %s : { " fd.svar.vname;
+	let lockStrs = RhoSet.fold 
+	  (fun r acc ->
+	     let s = Pretty.sprint 800 (d_lval () (Cil.var (RhoHT.find rho_to_lock r))) in 
+	       StringSet.add s acc) 
+	  rs StringSet.empty in 
+	  StringSet.iter (fun s -> ignore(E.log "%s " s)) lockStrs;
+	  ignore(E.log "}\n"))
+    );
+    let locks = RhoSet.fold (fun r acc -> VS.add (RhoHT.find rho_to_lock r) acc) rs VS.empty in
+    let mw = make_wrapper fd locks in
+    change_var f fd.svar mw.svar;
+    add_after f fd mw;
+  end
+
+  let generate_locks file shared_atomic solution used = begin
+    (* Create a Hash Table mapping rho to varinfos of locks *)
+    let rho_to_lock = RhoHT.create (RhoSet.cardinal shared_atomic) in
+    (* Create a fresh lock for each rho in 'used', and add it at the end of the file *)
+    let lock_count = ref 0 in
+    RhoSet.iter
+      (fun r ->
+          let lock = Cil.makeGlobalVar ("__lockpick__lock__"^(string_of_int !lock_count)) (getSome !lock_type) in
+          file.globals <- file.globals @ [GVar(lock,{init = None},Cil.locUnknown)];
+          assert (not (RhoHT.mem rho_to_lock r));
+          RhoHT.add rho_to_lock r lock;
+          incr lock_count;
+       )
+      used;
+    (* add the rest to the HT *)
+    RhoSet.iter
+      (fun r ->
+          let rl = RhoHT.find solution r in
+          RhoHT.replace rho_to_lock r (RhoHT.find rho_to_lock rl))
+      shared_atomic;
+    (* print *)
+    if !debug then
+      (ignore(E.log "all locks:");
+      RhoSet.iter (fun r -> ignore(E.log "%a " d_lval (Cil.var (RhoHT.find rho_to_lock r)))) used;
+      ignore(E.log("\n")));
+    (* Initialize all locks in the global init function *)
+    let globInitFun = Cil.getGlobInit file in
+    let init = var (getSome !init_function) in
+    let initInstrs = RhoSet.fold 
+      (fun r instrs -> 
+	let l = RhoHT.find rho_to_lock r in
+	let c = Call(None, Lval(init), [Cil.mkAddrOf (Cil.var l);Cil.zero], Cil.locUnknown) in
+	c::instrs
+      ) 
+      used []
+    in
+    let stmt = Cil.mkStmt (Instr initInstrs) in
+    globInitFun.sbody.bstmts <- globInitFun.sbody.bstmts @ [stmt];
+    rho_to_lock
+  end
 end
-(* Joonghoon Lee 631 end *)
+
+let solve_atomic_chi (atomic_functions: (Cil.fundec, chi) Hashtbl.t)
+                     (shared: RhoSet.t) : (Cil.fundec, RhoSet.t) Hashtbl.t =
+  let h = Hashtbl.create (Hashtbl.length atomic_functions) in
+  Hashtbl.iter
+    (fun fd x -> let r,w = solve_chi_pn x in
+      let result = concrete_rhoset (RhoSet.inter (RhoSet.union r w) shared) in
+      if !debug then ignore(E.log "chi: %a has effect: %a\n" d_chi x d_rhoset result);
+      Hashtbl.add h fd result
+    )
+    atomic_functions;
+  h
+
+(* Infer locking needed to enforce the atomic functions in the file, but don't
+take into account the shared data that only exists in the ignore_function list.
+Return a Hashtbl from Cil.fundec to a set of locks. *)
+let infer_locks (f:file) (lock_type) (init_fun) (ignore_functions: (Cil.fundec,unit) Hashtbl.t) =
+  Locktype.generate_constraints f;
+  Labelflow.done_adding ();
+  Shared.solve (Locktype.get_global_var_rhos ());
+
+  let shared = concrete_rhoset !Shared.all_shared_rho in
+  let atomic_functions = solve_atomic_chi LT.atomic_functions shared in
+  let good_atomic = Hashtbl.copy atomic_functions in
+  Hashtbl.iter (fun fd _ -> Hashtbl.remove good_atomic fd) ignore_functions;
+  let shared_atomic = Hashtbl.fold (fun _ -> RhoSet.union) good_atomic RhoSet.empty
+  in
+  let solution = Lockalloc.solve atomic_functions shared_atomic in
+  let used = RhoHT.fold (fun _ -> RhoSet.add) solution RhoSet.empty in
+  if !debug then (
+    ignore(E.log "atomic sections    : %d\n" (Hashtbl.length atomic_functions));
+    ignore(E.log "shared locations   : %d\n" (RhoSet.cardinal shared));
+    ignore(E.log "shared atomic loc. : %d\n" (RhoSet.cardinal shared_atomic));
+    ignore(E.log "used locks         : %d\n" (RhoSet.cardinal used));
+  );
+  LockRewriter.init f;
+  LockRewriter.changeLockType lock_type init_fun;
+
+  let rho_to_lock = LockRewriter.generate_locks f shared_atomic solution used in
+  let fun_to_locks = Hashtbl.create 1 in
+  Hashtbl.iter (fun fd rs ->
+    let locks = RhoSet.fold (fun r acc -> 
+      if RhoHT.mem rho_to_lock r then VS.add (RhoHT.find rho_to_lock r) acc else acc)
+      rs VS.empty 
+    in Hashtbl.add fun_to_locks fd locks)
+    atomic_functions;
+  fun_to_locks
 
 
 let doit (f: file) : unit = begin
+  Rmtmps.removeUnusedTemps f;
+  Rmalias.removeAliasAttr f;
+  Locktype.generate_constraints f;
+  Labelflow.done_adding ();
+  Shared.solve (Locktype.get_global_var_rhos ());
+
   let shared = concrete_rhoset !Shared.all_shared_rho in
-  let atomic_list = list_atomic_chi shared in
-  let shared_atomic = List.fold_left
-    (fun rs d -> RhoSet.union rs d) RhoSet.empty atomic_list
+  let atomic_functions = solve_atomic_chi LT.atomic_functions shared in
+  let shared_atomic =
+    Hashtbl.fold (fun _ -> RhoSet.union) atomic_functions RhoSet.empty
   in
-  let dom = compute_dominates_graph shared_atomic atomic_list in
+  let solution = Lockalloc.solve atomic_functions shared_atomic in
+  let used = RhoHT.fold (fun _ -> RhoSet.add) solution RhoSet.empty in
+
   if !debug then (
-    ignore(E.log "dominates:\n");
-    dump_dominates_graph dom;
+    Lockalloc.dump_solution solution;
+    ignore(E.log "atomic sections    : %d\n" (Hashtbl.length atomic_functions));
+    ignore(E.log "shared locations   : %d\n" (RhoSet.cardinal shared));
+    ignore(E.log "shared atomic loc. : %d\n" (RhoSet.cardinal shared_atomic));
+    ignore(E.log "used locks         : %d\n" (RhoSet.cardinal used));
   );
 
-  (* algorithm 2 in the paper: *)
-  let solution = RhoHT.create (RhoSet.cardinal shared_atomic) in
-  RhoSet.iter (fun r -> RhoHT.replace solution r r) shared_atomic;
-  RhoHT.iter
-    (fun r dominated -> 
-      RhoSet.iter
-        (fun r' ->
-          let s = RhoHT.find solution r in
-          RhoHT.replace solution r' s;
-          RhoHT.replace dom r' RhoSet.empty;
-        )
-        dominated
-    )
-    dom;
-  if !debug then (
-    ignore(E.log "dominates:\n");
-    dump_solution solution;
-  );
-
-  let used = RhoHT.fold
-    (fun _ r d -> RhoSet.add r d)
-    solution
-    RhoSet.empty
-  in
-  ignore(E.log "atomic sections    : %d\n" (List.length atomic_list));
-  ignore(E.log "shared locations   : %d\n" (RhoSet.cardinal shared));
-  ignore(E.log "shared atomic loc. : %d\n" (RhoSet.cardinal shared_atomic));
-  ignore(E.log "used locks         : %d\n" (RhoSet.cardinal used));
-
-(* Joonghoon Lee 631 begin *)
-  (* find all locks that need to be acquired:
-   create a fresh lock id for each rho in 'used'
-   and a mapping from rho->lock *)
-
-  (* Create a Hash Table mapping rho's to locks(ints) *)
-  let rho_to_lock = RhoHT.create (RhoSet.cardinal shared_atomic) in
-  (* and a counter for locks *)
-  let lock_count = ref 0 in
-  (*ignore(E.log "-----%s\n" (Int32.to_string (Int32.of_int !lock_count)));*)
-  (* First, create a fresh lock name for each rho in 'used' *)
-  RhoSet.iter
-    (fun r ->
-        lock_count := !lock_count + 1;
-        RhoHT.replace rho_to_lock r !lock_count
-     )
-    used;
-  (* Complete RH by making constructing for all rho->(rho->)lock *)
-  RhoSet.iter
-    (fun r ->
-        let rl = RhoHT.find solution r in
-        RhoHT.replace rho_to_lock r (RhoHT.find rho_to_lock rl))
-    shared_atomic;
-  (* print *)
-  if !debug then
-    (print_string "all locks:";
-    RhoHT.iter (fun r l -> print_int l) rho_to_lock;
-    print_string "\n");
-
-   (*for all f : Functions
-   1. get the chi of 'f'
-   2. get all the rhos in that chi
-   3. look up these rhos in the solution to
-      find the corresponding set of rhos(that protect)
-      these will map to there lock (created above)
-   here: look up all the rhos in this function's chi, and get a list
-   of locks to acquire.
-   for each lock in locks: *)
-
-    (let lpvisitor = new findAtomicsVisitor in
-        visitCilFileSameGlobals lpvisitor f);
-
-    if (RhoSet.cardinal shared_atomic)=0 then ()
-    else
-    ignore(E.log "\n");
-    ignore(E.log "***************  Flux Constraint suggestions  **************\n");
-    Strmap.iter
-        (fun vname x -> let r,w = solve_chi_m x in
-          let result = concrete_rhoset (RhoSet.inter (RhoSet.union r w) shared) in
-          if !debug then ignore(E.log "chi:%a has effect:%a\n" d_chi x d_rhoset result);
-          let cur_rho_list = ref [] in
-          (RhoSet.iter
-            (fun r ->
-                (* put these into set and remove redundancy *)
-                let lck = (RhoHT.find rho_to_lock r) in
-                if (List.exists (fun n -> n=lck) !cur_rho_list)=false then
-                    cur_rho_list := (RhoHT.find rho_to_lock r)::!cur_rho_list;
-                result;())
-            result);
-          (* ignore(E.log "locks: "); *)
-          let output_string = ref [] in
-
-          if !cur_rho_list <> [] then
-          (
-              cur_rho_list := (List.fast_sort (fun a b -> a-b) !cur_rho_list);
-              ignore(E.log "<%s> needs the following constraint(s).\n" vname);
-              ignore(E.log " - %s : { " vname);
-              ignore(E.log "%d " (List.hd (!cur_rho_list)));
-              (List.iter
-               (fun n ->
-                    ignore(E.log ",%d " n))
-                    (List.tl !cur_rho_list));
-              ignore(E.log "}\n")
-          );
-        )
-        !Locktype.fun_to_chi
-(* Joonghoon Lee 631 end *)
-
+  preprocessAndMergeWith f !pthread_h_name;
+  LockRewriter.init f;
+  let rho_to_lock = LockRewriter.generate_locks f shared_atomic solution used in
+  Hashtbl.iter
+    (LockRewriter.make_atomic_function f rho_to_lock)
+    atomic_functions;
+  Rmtmps.removeUnusedTemps f;
 end
+
+
+let feature : featureDescr = {
+  fd_name = "lockpick";
+  fd_enabled = ref false;
+  fd_description = "lockpick";
+  fd_extraopt = options;
+  fd_doit = doit;
+  fd_post_check = true;
+}

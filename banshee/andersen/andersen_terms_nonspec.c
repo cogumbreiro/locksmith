@@ -427,8 +427,10 @@ void andersen_terms_region_serialize(FILE *f)
 
 void andersen_terms_region_deserialize(translation t, FILE *f)
 {
-  fread((void *)&ref_c,sizeof(constructor),1,f);
-  fread((void *)&lam_c, sizeof(constructor),1,f);
+  int success;
+  success = fread((void *)&ref_c,sizeof(constructor),1,f);
+  success &= fread((void *)&lam_c, sizeof(constructor),1,f);
+  assert(success);
   update_pointer(t, (void **)&ref_c);
   update_pointer(t, (void **)&lam_c);
   update_module_nonspec(t, f);

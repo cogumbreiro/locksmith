@@ -1462,13 +1462,15 @@ bool setif_rollback_serialize(FILE *f, banshee_rollback_info i)
 
 banshee_rollback_info setif_rollback_deserialize(FILE *f)
 {
+  int success;
   setif_rollback_info info = ralloc(setif_rollback_info_region, 
 				    struct setif_rollback_info_);
   assert(f);
 
 /*   fread((void *)&info->added_edges, sizeof(hash_table), 1, f); */
 /*   fread((void *)&info->added_ub_projs, sizeof(hash_table), 1, f); */
-  fread(&info->added_edges, 2 *sizeof(hash_table), 1, f);
+  success = fread(&info->added_edges, 2 *sizeof(hash_table), 1, f);
+  assert(success);
 
   return (banshee_rollback_info) info;
 }
@@ -1528,22 +1530,26 @@ bool setif_constant_serialize(FILE *f, gen_e e)
 
 void *setif_union_deserialize(FILE *f)
 {
+  int success;
   setif_union_ expr = ralloc(setif_term_region, struct setif_union_);
   
 /*   fread((void *)&expr->st, sizeof(stamp), 1, f); */
 /*   fread((void *)&expr->exprs, sizeof(gen_e_list), 1, f); */
 /*   fread((void *)&expr->proj_cache, sizeof(gen_e_list), 1, f); */
-  fread(&expr->st, sizeof(stamp) + 2 *sizeof(gen_e_list), 1, f);
+  success = fread(&expr->st, sizeof(stamp) + 2 *sizeof(gen_e_list), 1, f);
+  assert(success);
 
   return expr;
 }
 
 void *setif_inter_deserialize(FILE *f)
 {
+  int success;
   setif_inter_ expr = ralloc(setif_term_region, struct setif_inter_);
 /*   fread((void *)&expr->st, sizeof(stamp), 1, f); */
 /*   fread((void *)&expr->exprs, sizeof(gen_e_list), 1, f); */
-  fread(&expr->st, sizeof(stamp) + sizeof(gen_e_list), 1, f);
+  success = fread(&expr->st, sizeof(stamp) + sizeof(gen_e_list), 1, f);
+  assert(success);
 
 
   return expr;
@@ -1551,9 +1557,11 @@ void *setif_inter_deserialize(FILE *f)
 
 void *setif_constant_deserialize(FILE *f)
 {
+  int success;
   setif_constant_ c = ralloc(setif_term_region, struct setif_constant_);
 
-  fread((void *)&c->st, sizeof(stamp), 1, f);
+  success = fread((void *)&c->st, sizeof(stamp), 1, f);
+  assert(success);
   c->name = string_data_deserialize(f);
 
   return c;
@@ -1584,8 +1592,7 @@ void setif_serialize(FILE *f)
 
   fwrite((void *)&flag_eliminate_cycles, sizeof(bool), 1, f);
   fwrite((void *)&flag_merge_projections, sizeof(bool), 1, f);
-  fwrite((void *)&setif_current_rollback_info,
-	 sizeof(setif_rollback_info), 1, f);
+  fwrite((void *)&setif_current_rollback_info, sizeof(setif_rollback_info), 1, f);
   fwrite((void *)&setif_hash, sizeof(term_hash), 1, f);
 
   serialize_banshee_object(setif_current_rollback_info, banshee_rollback_info);
@@ -1594,14 +1601,15 @@ void setif_serialize(FILE *f)
 
 void setif_deserialize(FILE *f)
 {
+  int success;
   assert(f);
   
   lazy_invalidate_tlb_cache();
-  fread((void *)&flag_eliminate_cycles, sizeof(bool), 1, f);
-  fread((void *)&flag_merge_projections, sizeof(bool), 1, f);
-  fread((void *)&setif_current_rollback_info,
-	 sizeof(setif_rollback_info), 1, f);
-  fread((void *)&setif_hash, sizeof(term_hash), 1, f);
+  success = fread((void *)&flag_eliminate_cycles, sizeof(bool), 1, f);
+  success &= fread((void *)&flag_merge_projections, sizeof(bool), 1, f);
+  success &= fread((void *)&setif_current_rollback_info, sizeof(setif_rollback_info), 1, f);
+  success &= fread((void *)&setif_hash, sizeof(term_hash), 1, f);
+  assert(success);
 }
 
 void setif_set_fields(void)
@@ -1612,21 +1620,21 @@ void setif_set_fields(void)
 
 void write_module_setif(FILE *f)
 {
-  fwrite((void *)&setif_current_rollback_info,
-	 sizeof(setif_rollback_info), 1, f);
+  fwrite((void *)&setif_current_rollback_info, sizeof(setif_rollback_info), 1, f);
   fwrite((void *)&setif_hash, sizeof(term_hash), 1, f);
-  fwrite((void *)&zero, sizeof(void *), 1, f);
-  fwrite((void *)&one, sizeof(void *), 1, f);
+  fwrite((void *)&zero, sizeof(zero), 1, f);
+  fwrite((void *)&one, sizeof(one), 1, f);
   return;
 }
 
 void update_module_setif(translation t, FILE *f)
 {
-  fread((void *)&setif_current_rollback_info,
-	 sizeof(setif_rollback_info), 1, f);
-  fread((void *)&setif_hash, sizeof(term_hash), 1, f);
-  fread((void *)&zero, sizeof(void *), 1, f);
-  fread((void *)&one, sizeof(void *), 1, f);
+  int success;
+  success = fread((void *)&setif_current_rollback_info, sizeof(setif_rollback_info), 1, f);
+  success &= fread((void *)&setif_hash, sizeof(term_hash), 1, f);
+  success &= fread((void *)&zero, sizeof(zero), 1, f);
+  success &= fread((void *)&one, sizeof(one), 1, f);
+  assert(success);
 
   update_pointer(t, (void **)&setif_current_rollback_info);
   update_pointer(t, (void **)&setif_hash);
@@ -1649,10 +1657,12 @@ bool added_ub_proj_info_serialize(FILE *f, void *obj)
 
 void *added_ub_proj_info_deserialize(FILE *f)
 {
+  int success;
   added_ub_proj_info info = ralloc(added_ub_proj_info_region, 
 				   struct added_ub_proj_info_);
 
-  fread(info, sizeof(struct added_ub_proj_info_), 1, f);
+  success = fread(info, sizeof(struct added_ub_proj_info_), 1, f);
+  assert(success);
 
   return info;
 }

@@ -45,12 +45,12 @@ type phi
 type phi_kind =
   | PhiVar
   | PhiForked
-  | PhiPack of phi
+  | PhiPacked
   | PhiNewlock of Labelflow.lock
   | PhiAcquire of Labelflow.lock
   | PhiRelease of Labelflow.lock
   | PhiDelete of Labelflow.lock
-  | PhiSplitCall of Labelflow.lock_effect * phi * Cil.location
+  | PhiSplitCall of Labelflow.lock_effect * phi
   | PhiSplitReturn of Labelflow.lock_effect * phi
 
 val set_phi_kind : phi -> phi_kind -> unit
@@ -80,6 +80,10 @@ val empty_phi : phi
 (* creates a fresh phi node, corresponding to !currentLoc program point,
  *)
 val make_phi : string -> phi
+
+(* info *)
+val function_of_phi : phi -> Cil.fundec option
+val location_of_phi : phi -> Cil.location
 
 val starting_phis : phi list ref
 (*val phi_calls : phi -> phi -> phi -> Labelflow.effect -> unit*)

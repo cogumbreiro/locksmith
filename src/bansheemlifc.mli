@@ -34,34 +34,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *)
+val options : (string * Arg.spec * string) list
+
 type node
 type instantiation
 
 module InstHT : Hashtbl.S with type key = instantiation
-
-type edge =
-  | SubEdge of node * node
-  | OpenEdge of node * node * instantiation
-  | CloseEdge of node * node * instantiation
-
-val options : (string * Arg.spec * string) list
-
-module Node : Set.OrderedType with type t = node
+module Node : Lockutil.HashedOrderedType with type t = node
 module NodeSet : Set.S with type elt = node
 module NodeHT : Hashtbl.S with type key = node
 
-val make_node : string -> bool -> Cil.location -> bool -> node
+val make_node : string -> bool -> Cil.fundec option -> Cil.location -> bool -> node
+val update_node_location : node -> Cil.location -> node
 val string_of_node : node -> string
 val dotstring_of_node : node -> string
 val fresh_inst : unit -> instantiation
-val make_inst_edge : node -> node -> bool -> instantiation -> unit
+val make_open_edge : node -> node -> instantiation -> unit
+val make_close_edge : node -> node -> instantiation -> unit
 val make_sub_edge : node -> node -> unit
 val set_global : node -> unit
 val is_global : node -> bool
-(*val reaches_pn : node -> node -> bool*)
 val reaches_m : node -> node -> bool
-val print_graph : out_channel -> NodeSet.t
-val hash : node -> int
 val is_concrete : node -> bool
 val string_of_inst : instantiation -> string
 val total_nodes : unit -> int
@@ -75,4 +68,3 @@ val get_all_that_reach_pn : node -> (node -> 'a) ->
  * flow edges & nodes can still be added
  *)
 val done_adding : unit -> unit
-val shortest_path : node -> node -> edge list

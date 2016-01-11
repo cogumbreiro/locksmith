@@ -44,7 +44,7 @@ TARGETS = steensgaard.o steensgaard_notag.o $(STEENSGAARD).h $(STEENSGAARD).c $(
 
 TAGFILES = *.c *.h
 
-CC = gcc
+#CC = gcc
 
 ifdef DEBUG
 CFLAGS = -Wall -pg -g -I$(engine_dir) -I$(region_dir) -Ddeletes=	\

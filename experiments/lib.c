@@ -302,11 +302,6 @@ void free(void * ptr) {
 
 int socket(int domain, int type, int protocol) { return 0; }
 
-void *memset(void *s, int c, size_t n) {
-  ((char*)s)[0] = 0;
-  return s;
-}
-
 int putchar(int c) {return 0;}
 
 int fflush(FILE *stream) {
@@ -420,4 +415,5 @@ int isdigit(int c) {
 int ftw(const char *dir, int (*fn)(const char *file, const struct stat
 				   *sb, int flag), int nopenfd) {
   fn("", 0, 0);
+  return 0;
 }

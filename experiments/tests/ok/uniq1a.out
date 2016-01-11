@@ -9,24 +9,10 @@ shared: &j:uniq1a.c:4
 Warning: Possible data race: &k:uniq1a.c:10 is not protected!
  references:
   dereference of m:uniq1a.c:11 at uniq1a.c:17
-    &k:uniq1a.c:10 => m:uniq1a.c:11 
-  locks acquired:
-    <empty>
-  in: FORK at uniq1a.c:26 
-             
-
-  dereference of m:uniq1a.c:11 at uniq1a.c:17
-    &k:uniq1a.c:10 => m:uniq1a.c:11 
-  locks acquired:
-    <empty>
-  in: FORK at uniq1a.c:25 
-             
-
-  dereference of m:uniq1a.c:11 at uniq1a.c:17
-    &k:uniq1a.c:10 => m:uniq1a.c:11 
+    &k:uniq1a.c:10 => m:uniq1a.c:11
   locks acquired:
     <empty>
   in: main at uniq1a.c:21 
-             
+
 
 *************************** DONE ***************************

@@ -102,8 +102,24 @@ struct page *single_pages;
 /* free pages (not including those in single_pages) */
 struct page *unused_pages;
 
+region* __rcregionmap[RMAXMAP];
+
+static region* get_or_alloc_regionmap(pageid map, pageid page)
+{
+  while(page >= RMAXPAGE) {
+    map++;
+    page -= RMAXPAGE;
+  }
+  if(__rcregionmap[map] == 0)
+    __rcregionmap[map] = malloc(RMAXPAGE * sizeof(region));
+  assert(__rcregionmap[map]);
+  return &__rcregionmap[map][page];
+    
+}
+
 static void init_pages(void)
 {
+  bzero(__rcregionmap, sizeof(__rcregionmap));
   pages_byaddress.next_address = &pages_byaddress;
   pages_byaddress.prev_address = &pages_byaddress;
 }
@@ -256,7 +272,7 @@ struct page *region_get_mem(size_t s)
 
   /* Don't get less than K * RPAGESIZE extra memory (K * RPAGESIZE
      is the minimum useful size for something on unused_pages) */
-  if (s + K * RPAGESIZE < MINIMUM_MEM_REQUEST) 
+  if ((unsigned long)s + (unsigned long) K * RPAGESIZE < (unsigned long) MINIMUM_MEM_REQUEST) 
     request_bytes = MINIMUM_MEM_REQUEST;
   else
     request_bytes = s;
@@ -286,32 +302,39 @@ struct page *region_get_mem(size_t s)
 /* Page to region map management */
 /* ----------------------------- */
 
-region __rcregionmap[MAXPAGE];
-
-
-static void set_page_region(pageid pagenb, region r)
+static void set_page_region(pageid mapnb, pageid pagenb, region r)
 {
-  __rcregionmap[pagenb] = r;
+  region *rp = get_or_alloc_regionmap(mapnb, pagenb);
+  assert(rp);
+  *rp = r;
 }
 
-#define page_region(pagenb) (__rcregionmap[(pagenb)])
+#define page_region(mapnb, pagenb) (*(get_or_alloc_regionmap((mapnb),(pagenb))))
 
 void set_region(struct page *p, int npages, region r)
 {
   pageid pnb = PAGENB(p);
+  pageid mnb = MAPNB(p);
 
   while (npages-- > 0) 
-    set_page_region(pnb++, r);
+    set_page_region(mnb, pnb++, r);
 }
 
 /* Mark the memory range from 'from' (inclusive) to 'to' (exclusive)
    as belonging to region with id 'rid' */
 void set_region_range(void *from, void *to, region r)
 {
-  pageid first = PAGENB(from), last = PAGENB((pageid)to - 1);
+  pageid firstp = PAGENB((pageid)from),
+         firstm = MAPNB((pageid)from),
+         lastp = PAGENB((pageid)to - 1),
+         lastm = MAPNB((pageid)to - 1);
 
-  while (first <= last)
-    set_page_region(first++, r);
+  while (firstm < lastm || firstp <= lastp)
+    if(firstp >= RMAXPAGE) {
+      firstm++;
+      firstp -= RMAXPAGE;
+    }
+    set_page_region(firstm, firstp++, r);
 }
 
 /* Multi-page allocation management */
@@ -323,10 +346,11 @@ struct page *alloc_split(struct page *split, int n, struct page *next)
 #ifndef NMEMDEBUG
   /* These pages had better be free */
   pageid i, pnb = PAGENB(split);
+  pageid mnb = MAPNB(split);
 
   assert(split->pagecount >= n);
   for (i = pnb; i < pnb + split->pagecount; i++)
-    assert(page_region(i) == FREEPAGE);
+    assert(page_region(mnb, i) == FREEPAGE);
 #endif
   if (split->pagecount > n)
     {
@@ -356,12 +380,12 @@ struct page *alloc_split(struct page *split, int n, struct page *next)
 struct page *alloc_new(int n, struct page *next)
 /* Assumes freepages_lock held */
 {
-  struct page *newp = region_get_mem(n << RPAGELOG);
+  struct page *newp = region_get_mem((INT_PTR)n << RPAGELOG);
 
   if (!newp)
     {
       if (nomem_h)
-	nomem_h();
+      nomem_h();
       abort();
     }
   assert(!((long)newp & (RPAGESIZE - 1)));
@@ -437,11 +461,12 @@ void free_pages(region r, struct page *p)
 {
 #ifndef NMEMDEBUG
   pageid i, pnb = PAGENB(p);
+  pageid mnb = MAPNB(p);
 
   for (i = pnb; i < pnb + p->pagecount; i++)
     {
-      assert(page_region(i) == r);
-      set_page_region(i, FREEPAGE);
+      assert(page_region(mnb,i) == r);
+      set_page_region(mnb, i, FREEPAGE);
     }
 #endif
 
@@ -554,7 +579,7 @@ void free_single_page(region r, struct page *p)
 {
 #ifndef NMEMDEBUG
   ASSERT_INUSE(p, r);
-  set_page_region(PAGENB(p), FREEPAGE);
+  set_page_region(MAPNB(p), PAGENB(p), FREEPAGE);
 #endif
 
   /* Don't keep too many single pages (a small fraction of total

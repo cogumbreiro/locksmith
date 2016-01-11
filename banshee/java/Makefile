@@ -27,7 +27,7 @@
 
 OS:=$(shell uname)
 
-CC = gcc
+#CC = gcc
 
 #ifeq ($(OS), Darwin)
 #	jni_dir = /System/Library/Frameworks/JavaVM.framework/Headers 

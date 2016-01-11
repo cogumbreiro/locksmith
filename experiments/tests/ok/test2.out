@@ -20,42 +20,25 @@ Warning: Possible data race: &i:test2.c:36 is not protected!
     &i:test2.c:36 => cast:test2.c:32 at dostuff test2.c:39
   locks acquired:
     <empty>
-  in: FORK at test2.c:40 
-             
-
-  dereference of cast:test2.c:32 at test2.c:32
-    &i:test2.c:36 => cast:test2.c:32 at dostuff test2.c:39
-  locks acquired:
-    <empty>
-  in: FORK at test2.c:39 
-             
-
-  dereference of cast:test2.c:32 at test2.c:32
-    &i:test2.c:36 => cast:test2.c:32 at dostuff test2.c:39
-  locks acquired:
-    <empty>
   in: main at test2.c:35 
-             
 
   dereference of &i:test2.c:36 at test2.c:41
     &i:test2.c:36
   locks acquired:
     <empty>
   in: main at test2.c:35 
-             
 
   dereference of &i:test2.c:36 at test2.c:42
     &i:test2.c:36
   locks acquired:
     <empty>
   in: main at test2.c:35 
-             
 
   dereference of &i:test2.c:36 at test2.c:44
     &i:test2.c:36
   locks acquired:
     <empty>
   in: main at test2.c:35 
-             
+
 
 *************************** DONE ***************************

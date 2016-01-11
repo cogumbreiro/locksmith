@@ -2,7 +2,9 @@
    used *)
 
 open Cil
+open Cilint
 open Pretty
+open Expcompare
 
 module E = Errormsg
 module RD = Reachingdefs
@@ -17,6 +19,7 @@ module IS = Set.Make(
   end)
 
 let debug = RD.debug
+
 
 let doTime = ref false
 
@@ -61,7 +64,7 @@ class usedDefsCollectorClass = object(self)
 				vi.vname sid (RD.IOS.cardinal ios));
 	RD.IOS.iter (function
 	    Some(i) -> 
-	      if !debug then ignore(E.log "DCE: def %d used: %a\n" i d_plainexp e);
+	      if !debug then ignore(E.log "DCE: def %d used: %a\n" i d_exp e);
 	      usedDefsSet := IS.add i (!usedDefsSet)
 	  | None -> ()) ios
       else if !debug then ignore(E.log "DCE: vid %d:%s not in stm:%d iosh at %a\n"
@@ -201,6 +204,7 @@ let el_has_volatile =
     b || (exp_has_volatile e)) false
  (***************************************************)
 
+(*
 let rec compareExp (e1: exp) (e2: exp) : bool =
 (*   log "CompareExp %a and %a.\n" d_plainexp e1 d_plainexp e2; *)
   e1 == e2 ||
@@ -211,8 +215,8 @@ let rec compareExp (e1: exp) (e2: exp) : bool =
   | BinOp(bop1, l1, r1, _), BinOp(bop2, l2, r2, _) -> 
       bop1 = bop2 && compareExp l1 l2 && compareExp r1 r2
   | _ -> begin
-      match isInteger (constFold true e1), isInteger (constFold true e2) with
-        Some i1, Some i2 -> i1 = i2
+      match getInteger (constFold true e1), getInteger (constFold true e2) with
+        Some i1, Some i2 -> compare_cilint i1 i2 = 0
       | _ -> false
     end
 
@@ -254,6 +258,7 @@ let rec stripNopCasts (e:exp): exp =
       
 let compareExpStripCasts (e1: exp) (e2: exp) : bool =
   compareExp (stripNopCasts e1) (stripNopCasts e2)
+*)
 
 let removedCount = ref 0
 (* Filter out instructions whose definition ids are not
@@ -287,6 +292,7 @@ class uselessInstrElim : cilVisitor = object(self)
 	end else begin
 	  (* true if there is something in defuses not in instruses or when
 	   * something from defuses is in instruses and is also used somewhere else *)
+	  if UD.VS.exists (fun vi -> vi.vglob) instruses then true else
 	  let instruses = viSetToDefIdSet iosh instruses in
 	  IS.fold (fun i' b -> 
 	    if not(IS.mem i' instruses) then begin

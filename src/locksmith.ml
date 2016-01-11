@@ -46,7 +46,7 @@ let do_cfgraph_out = ref false
 let listphase = ref false
 
 (* subversion will substitute this *)
-let version = "$Rev: 3151 $"
+let version = "$Rev: 5624 $"
 
 let print_version () =
   output_string stdout ("LockSmith build #"^version)
@@ -86,18 +86,19 @@ let feature : featureDescr = {
     @ Controlflow.options
     @ Bansheemlifc.options
     @ Labelflow.options
-    @ Lockpick.options
     @ Lprof.options
     ;
   fd_doit =
   (function (f: file) -> begin
+    Rmtmps.removeUnusedTemps f;
+    Rmalias.removeAliasAttr f;
     ignore(E.log
       "\n************************* STARTING *************************\n\n");
     ignore (Sys.signal Sys.sigusr1 (Sys.Signal_handle (fun (i: int) -> Lprof.endtime "killed"; exit 1)));
     Lprof.endtime "start";
     if !listphase then ignore(E.log "phase-begin(typing)\n");
     Locktype.generate_constraints f;
-    Labelflow.done_adding_instantiations ();
+    Labelflow.done_adding ();
     Lprof.endtime "typing";
     if !listphase then ignore(E.log "phase-end(typing)\n");
 
@@ -119,56 +120,40 @@ let feature : featureDescr = {
     Shared.solve (Locktype.get_global_var_rhos ());
     Lprof.endtime "shared";
     if !listphase then ignore(E.log "phase-end(shared)\n");
-    if !Lockpick.do_lockpick then Lockpick.doit f
-    else begin
 
-      if !listphase then ignore(E.log "phase-begin(linearity)\n");
-      (*if !do_graph_out then begin
-        Dotpretty.init_file "su.dot";
-        Semiunification.print_graph !Dotpretty.outf;
-        Dotpretty.close_file ();
-      end;
-      *)
-      Semiunification.solve ();
-      Lprof.endtime "linearity";
-      (*
-      if !do_graph_out then begin
-        Dotpretty.init_file "sus.dot";
-        Semiunification.print_graph !Dotpretty.outf;
-        Dotpretty.close_file ();
-      end;
-      *)
-      if !listphase then ignore(E.log "phase-end(linearity)\n");
+    if !listphase then ignore(E.log "phase-begin(linearity)\n");
+    Semiunification.solve ();
+    Lprof.endtime "linearity";
+    if !listphase then ignore(E.log "phase-end(linearity)\n");
 
-      if !listphase then ignore(E.log "phase-begin(lock-state)\n");
-      Lockstate.solve ();
-      Lprof.endtime "lock-state";
-      if !listphase then ignore(E.log "phase-end(lock-state)\n");
+    if !listphase then ignore(E.log "phase-begin(lock-state)\n");
+    Lockstate.solve ();
+    Lprof.endtime "lock-state";
+    if !listphase then ignore(E.log "phase-end(lock-state)\n");
 
-      if !listphase then ignore(E.log "phase-begin(guarded-by)\n");
-      Correlation.solve ();
-      Lprof.endtime "guarded-by";
-      if !listphase then ignore(E.log "phase-end(guarded-by)\n");
+    if !listphase then ignore(E.log "phase-begin(guarded-by)\n");
+    Correlation.solve ();
+    Lprof.endtime "guarded-by";
+    if !listphase then ignore(E.log "phase-end(guarded-by)\n");
 
-      if !listphase then ignore(E.log "phase-begin(escapes)\n");
-      Semiunification.check ();
-      Lprof.endtime "escapes";
-      if !listphase then ignore(E.log "phase-end(escapes)\n");
+    if !listphase then ignore(E.log "phase-begin(escapes)\n");
+    Semiunification.check ();
+    Lprof.endtime "escapes";
+    if !listphase then ignore(E.log "phase-end(escapes)\n");
 
-
-      if !listphase then ignore(E.log "phase-begin(races)\n");
-      Correlation.check_races ();
-      Lprof.endtime "races";
-      if !do_graph_out then begin
-        Dotpretty.init_file "graph.dot" "solved constraints";
-        Labelflow.print_graph !Dotpretty.outf;
-        Semiunification.print_graph !Dotpretty.outf;
-        Lockstate.print_graph !Dotpretty.outf;
-        Dotpretty.close_file ();
-      end;
-      if !listphase then ignore(E.log "phase-end(races)\n");
+    if !listphase then ignore(E.log "phase-begin(races)\n");
+    Correlation.check_races ();
+    Lprof.endtime "races";
+    if !do_graph_out then begin
+      Dotpretty.init_file "graph.dot" "solved constraints";
+      Labelflow.print_graph !Dotpretty.outf;
+      Semiunification.print_graph !Dotpretty.outf;
+      Lockstate.print_graph !Dotpretty.outf;
+      Dotpretty.close_file ();
     end;
+    if !listphase then ignore(E.log "phase-end(races)\n");
 
+    (*Labelflow.dump_all_chi ();*)
     Lprof.print_stats();
     ignore(E.log
       "*************************** DONE ***************************\n\n");

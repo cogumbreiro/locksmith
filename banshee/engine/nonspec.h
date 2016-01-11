@@ -309,7 +309,7 @@ char *expr_constant_name(gen_e e);
 
 /* Get the internal id for e. Again, only use this if you know what
    you're doing.  */
-int expr_stamp(gen_e e);
+INT_PTR expr_stamp(gen_e e);
 
 /* Ask what the sort of e is */
 sort_kind expr_sort(gen_e e);

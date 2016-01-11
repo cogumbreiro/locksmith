@@ -270,7 +270,6 @@ bool funptr_data_serialize(FILE *f, void *obj)
   assert(obj);
 
   success = hash_table_lookup(fn_ptr_table,(hash_key)obj, (hash_data*)&id);
-  
   success &= fwrite((void *)&id, sizeof(int), 1, f);
 
   if (!success) {
@@ -283,9 +282,11 @@ bool funptr_data_serialize(FILE *f, void *obj)
 void *funptr_data_deserialize(FILE *f)
 {
   int id = 0;
+  int success;
   assert(f);
 
-  fread((void *)&id, sizeof(int), 1, f);
+  success = fread((void *)&id, sizeof(int), 1, f);
+  assert(success);
 
   return fn_ptr_array[id];
 }
@@ -302,9 +303,9 @@ bool funptr_data_set_fields(void *obj)
 
 bool string_data_serialize(FILE *f, void *obj)
 {
-  int length = strlen((char *)obj);
+  int length = (int) strlen((char *)obj);
   /* write the string length */
-  fwrite((void *)&length, sizeof(long), 1, f);
+  fwrite((void *)&length, sizeof(int), 1, f);
   fwrite((void *)obj, sizeof(char),strlen((char *)obj), f);
 
   return TRUE;
@@ -312,12 +313,13 @@ bool string_data_serialize(FILE *f, void *obj)
 
 void *string_data_deserialize(FILE *f)
 {
-  long length;
+  int length = 0, success;
   char buf[512];
 
-  fread((void *)&length, sizeof(long), 1, f);
+  success = fread((void *)&length, sizeof(int), 1, f);
   assert(length < 512);
-  fread((void *)buf, sizeof(char), length, f);
+  success &= (fread((void *)buf, sizeof(char), length, f) == length);
+  assert(success);
   buf[length] = '\0';
   
   return (void *)strdup(buf);

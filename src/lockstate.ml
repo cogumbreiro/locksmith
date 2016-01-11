@@ -79,11 +79,12 @@ let print_phi_kind (outf: out_channel) phi : bool =
   match k with
     PhiVar -> false
   | PhiForked -> false
-  | PhiPack p ->
+  | PhiPacked -> false
+  (*| PhiPack p ->
       Printf.fprintf
         outf "\"%s\" -> \"%s\" [label=\"pack\", style=\"dotted\"];\n"
         (dotstring_of_phi phi) (dotstring_of_phi p);
-      true
+      true*)
   | PhiNewlock l ->
       Printf.fprintf
         outf "\"%s\" -> \"%s\" [label=\"new\", style=\"dotted\"];\n"
@@ -104,7 +105,7 @@ let print_phi_kind (outf: out_channel) phi : bool =
         outf "\"%s\" -> \"%s\" [label=\"del\", style=\"dotted\"];\n"
         (dotstring_of_phi phi) (LF.dotstring_of_lock l);
       true
-  | PhiSplitCall (e,p, _) ->
+  | PhiSplitCall (e,p) ->
       Printf.fprintf
         outf "\"%s\" -> \"%s\" [label=\"call(%s)\", style=\"dotted\"];\n"
         (dotstring_of_phi phi)
@@ -134,7 +135,7 @@ module LockStateTransfer =
       match k with
       | PhiVar -> Some acq
       | PhiForked -> Some LockSet.empty
-      | PhiPack _ -> None (*assert false*) (* nothing flows here *)
+      | PhiPacked -> None (*assert false*) (* nothing flows here *)
       | PhiNewlock l ->
           (*let ls = LF.get_lock_p2set l in*)
           Some acq
@@ -149,7 +150,7 @@ module LockStateTransfer =
           if not (LockSet.is_empty (LockSet.inter ls acq)) then
             ignore(E.log "deleting acquired lock %a\n" LF.d_lock l);
           Some (LockSet.diff acq ls)
-      | PhiSplitCall (e,p',_) ->
+      | PhiSplitCall (e,p') ->
           let acqin, acqout = LF.split_lockset acq e in
           set_split_state p' acqout;
           FW.push p' worklist;

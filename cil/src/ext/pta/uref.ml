@@ -70,11 +70,11 @@ let unify f (p,q) =
 	  if (p' == q') then
 	    p' := Ecr(x (),pr)
 	  else if pr == qr then
-	    (p' := Link q'; q' := Ecr(x (),qr+1))
+            (p' := Link q'; q' := Ecr(x (),qr+1))
 	  else if pr < qr then
-	    (p' := Link q'; q' := Ecr(x (),qr))
+            (p' := Link q'; q' := Ecr(x (),qr))
 	  else (* pr > qr *)
-	    (q' := Link p'; p' := Ecr(x (),pr))
+            (q' := Link p'; p' := Ecr(x (),pr))
       | _ -> raise Bad_find
 	  
 let union (p,q) = 

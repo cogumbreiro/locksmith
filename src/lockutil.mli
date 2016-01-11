@@ -47,3 +47,33 @@ module type HashedOrderedType =
   
 val isSome : 'a option -> bool
 val getSome : 'a option -> 'a
+
+(* Get the return type of a function type.
+ * The argument must be Cil.typ of kind TFun.
+ *)
+val get_return_type : Cil.typ -> Cil.typ
+
+(* find the (first) typedef for type "name" in file f *)
+val find_type : Cil.file -> string -> Cil.typ
+
+(* find the (first) declaration of variable "name" in file f *)
+val find_function_var : Cil.file -> string -> Cil.varinfo
+
+(* find the function definition of variable "name" in file f, throws Not_found on error *)
+val find_function_fundec : Cil.file -> string -> Cil.fundec
+
+(* Adds a declaration of function f_new right AFTER the first occurence
+ * (declaration or definition) of function f_old.  Also, the body of the
+ * function f_new is added at the end of the file.
+ *)
+val add_after : Cil.file -> Cil.fundec -> Cil.fundec -> unit
+
+(* Changes all call sites of function f_old, to rather call function f_new
+ * instead.  f_new and f_old must have the same signature.
+ *)
+val change_var : Cil.file -> Cil.varinfo -> Cil.varinfo -> unit
+
+(* take a cil file, and a string pointing to a file, preprocess it and merge
+ * with the first.  Merging modifies the first argument.
+ *) 
+val preprocessAndMergeWith : Cil.file -> string -> unit

@@ -79,7 +79,7 @@ void list_clear(struct list *a);
 struct list *list_reverse(struct list *a);
 struct list *list_from_array(region r,void **data, int length);
 void **array_from_list(region r,struct list *a);
-int list_stamp(struct list *a);
+INT_PTR list_stamp(struct list *a);
 
 #define DECLARE_OPAQUE_LIST(name,type) \
 typedef struct list_scanner name ## _scanner; \
@@ -118,7 +118,7 @@ bool name ## _empty(name a); \
 void name ## _clear(name a); \
 bool name ## _member(name a, type data); \
 name name ## _reverse(name a); \
-int name ## _stamp(name a); \
+INT_PTR name ## _stamp(name a); \
 name name ## _from_array(region r,type data[], int length); \
 type *name ##_array_from_list(region r, name a);
 
@@ -227,7 +227,7 @@ name name ## _from_array(region r,type data[], int length) \
 {\
  return (name)list_from_array(r,(void **)data,length); \
 }\
-int name ## _stamp(name a) \
+INT_PTR name ## _stamp(name a) \
 {\
   return list_stamp((struct list*)a);\
 }\
@@ -341,7 +341,7 @@ name name ## _from_array(region r,type data[], int length) \
 {\
  return (name)list_from_array(r,(void **)data,length); \
 }\
-int name ## _stamp(name a) \
+INT_PTR name ## _stamp(name a) \
 {\
   return list_stamp((struct list*)a);\
 }\
@@ -455,7 +455,7 @@ name name ## _from_array(region r,type data[], int length) \
 {\
  return (name)list_from_array(r,(void **)data,length); \
 }\
-int name ## _stamp(name a) \
+INT_PTR name ## _stamp(name a) \
 {\
   return list_stamp((struct list*)a);\
 }\

@@ -11,29 +11,7 @@ Warning: Possible data race: alloc.data:ds5.c:38 is protected by non-linear or c
   non linear concrete new___0->lock:ds5.c:40
  references:
   dereference of *cur.data:ds5.c:12 at ds5.c:19
-    alloc.data:ds5.c:38 => *cur.data:ds5.c:12 
-  locks acquired:
-    *cur.lock:ds5.c:12
-    *new.lock:ds5.c:31
-    *new___0.lock:ds5.c:38
-    non linear concrete new->lock:ds5.c:34
-    non linear concrete new___0->lock:ds5.c:40
-  in: FORK at ds5.c:44 
-             
-
-  dereference of *cur.data:ds5.c:12 at ds5.c:19
-    alloc.data:ds5.c:38 => *cur.data:ds5.c:12 
-  locks acquired:
-    *cur.lock:ds5.c:12
-    *new.lock:ds5.c:31
-    *new___0.lock:ds5.c:38
-    non linear concrete new->lock:ds5.c:34
-    non linear concrete new___0->lock:ds5.c:40
-  in: FORK at ds5.c:43 
-             
-
-  dereference of *cur.data:ds5.c:12 at ds5.c:19
-    alloc.data:ds5.c:38 => *cur.data:ds5.c:12 
+    alloc.data:ds5.c:38 => *cur.data:ds5.c:12
   locks acquired:
     *cur.lock:ds5.c:12
     *new.lock:ds5.c:31
@@ -41,7 +19,7 @@ Warning: Possible data race: alloc.data:ds5.c:38 is protected by non-linear or c
     non linear concrete new->lock:ds5.c:34
     non linear concrete new___0->lock:ds5.c:40
   in: main at ds5.c:26 
-             
+
 
 
 Warning: Possible data race: alloc.data:ds5.c:32 is protected by non-linear or concrete lock(s):
@@ -52,29 +30,7 @@ Warning: Possible data race: alloc.data:ds5.c:32 is protected by non-linear or c
   non linear concrete new___0->lock:ds5.c:40
  references:
   dereference of *cur.data:ds5.c:12 at ds5.c:19
-    alloc.data:ds5.c:32 => *cur.data:ds5.c:12 
-  locks acquired:
-    *cur.lock:ds5.c:12
-    *new.lock:ds5.c:31
-    *new___0.lock:ds5.c:38
-    non linear concrete new->lock:ds5.c:34
-    non linear concrete new___0->lock:ds5.c:40
-  in: FORK at ds5.c:44 
-             
-
-  dereference of *cur.data:ds5.c:12 at ds5.c:19
-    alloc.data:ds5.c:32 => *cur.data:ds5.c:12 
-  locks acquired:
-    *cur.lock:ds5.c:12
-    *new.lock:ds5.c:31
-    *new___0.lock:ds5.c:38
-    non linear concrete new->lock:ds5.c:34
-    non linear concrete new___0->lock:ds5.c:40
-  in: FORK at ds5.c:43 
-             
-
-  dereference of *cur.data:ds5.c:12 at ds5.c:19
-    alloc.data:ds5.c:32 => *cur.data:ds5.c:12 
+    alloc.data:ds5.c:32 => *cur.data:ds5.c:12
   locks acquired:
     *cur.lock:ds5.c:12
     *new.lock:ds5.c:31
@@ -82,6 +38,6 @@ Warning: Possible data race: alloc.data:ds5.c:32 is protected by non-linear or c
     non linear concrete new->lock:ds5.c:34
     non linear concrete new___0->lock:ds5.c:40
   in: main at ds5.c:26 
-             
+
 
 *************************** DONE ***************************

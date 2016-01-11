@@ -8,36 +8,19 @@ shared: &g:voidptr4.c:3
 
 Warning: Possible data race: alloc.v:voidptr4.c:46 is not protected!
  references:
-  dereference of *w.v:voidptr4.c:26 at voidptr4.c:41
-    alloc.v:voidptr4.c:46 => b.v:voidptr4.c:46 
-                          => *w.v:voidptr4.c:26 at dostuff3 voidptr4.c:51
-  locks acquired:
-    <empty>
-  in: FORK at voidptr4.c:51 
-             
-
   dereference of *w.v:voidptr4.c:26 at voidptr4.c:32
-    alloc.v:voidptr4.c:46 => b.v:voidptr4.c:46 
-                          => *w.v:voidptr4.c:26 at dostuff3 voidptr4.c:51
-  locks acquired:
-    <empty>
-  in: FORK at voidptr4.c:50 
-             
-
-  dereference of *w.v:voidptr4.c:26 at voidptr4.c:32
-    alloc.v:voidptr4.c:46 => b.v:voidptr4.c:46 
+    alloc.v:voidptr4.c:46 => b.v:voidptr4.c:46
                           => *w.v:voidptr4.c:26 at dostuff3 voidptr4.c:51
   locks acquired:
     <empty>
   in: main at voidptr4.c:44 
-             
 
   dereference of *w.v:voidptr4.c:26 at voidptr4.c:41
-    alloc.v:voidptr4.c:46 => b.v:voidptr4.c:46 
+    alloc.v:voidptr4.c:46 => b.v:voidptr4.c:46
                           => *w.v:voidptr4.c:26 at dostuff3 voidptr4.c:51
   locks acquired:
     <empty>
   in: main at voidptr4.c:44 
-             
+
 
 *************************** DONE ***************************

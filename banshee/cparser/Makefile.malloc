@@ -17,7 +17,7 @@
 # Boston, MA 02111-1307, USA.
 
 O = mobj/
-CC = gcc
+#CC = gcc
 CFLAGS = -g -Wall -Wno-char-subscripts -I. -Ddeletes= -Dtraditional= -Dsameregion=  -Dparentptr= -DUSEMALLOC -O3 $(ARCH_FLAGS) $(EXTRACFLAGS) -Itests/rc/original
 
 EXTRA_OBJS =  

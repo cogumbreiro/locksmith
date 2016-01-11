@@ -238,7 +238,7 @@ bool setif_var_serialize(FILE *f, void *obj)
   /* No need to serialize the type, since it must be VAR_TYPE */
   
   /* Serialize the sv_elt's id */
-  fwrite(&var->elt, sizeof(void *), 1, f);
+  fwrite(&var->elt, sizeof(var->elt), 1, f);
 
   /* Mark the uf element for serialization */
   serialize_banshee_object(var->elt, uf_element);
@@ -248,13 +248,15 @@ bool setif_var_serialize(FILE *f, void *obj)
 
 void *setif_var_deserialize(FILE *f)
 {
+  int success;
   setif_var var;
   assert(f);
 
   var = ralloc(setif_var_region, struct setif_var_);
 
   var->type = VAR_TYPE;
-  fread(&var->elt, sizeof(void *), 1, f);
+  success = fread(&var->elt, sizeof(var->elt), 1, f);
+  assert(success);
 
   return var;
 }
@@ -299,17 +301,18 @@ bool sv_info_serialize(FILE *f, void *obj)
 
 void *sv_info_deserialize(FILE *f)
 {
+  int success;
   sv_info info = ralloc(sv_info_region, struct sv_info_);
   assert(f);
   assert(permanent);
 
-  /* fread((void *)&info->st, sizeof(stamp), 1, f); */
+/*   fread((void *)&info->st, sizeof(stamp), 1, f); */
 /*   fread((void *)&info->lbs, sizeof(bounds), 1, f); */
 /*   fread((void *)&info->ubs, sizeof(bounds), 1, f); */
 /*   fread((void *)&info->ub_projs, sizeof(gen_e_list), 1, f); */
 /*   fread((void *)&info->component, sizeof(uf_element), 1, f); */
-  fread(&info->st, sizeof(stamp) + sizeof(bounds) *2 + sizeof(gen_e_list) + 
-	sizeof(uf_element), 1, f);
+  success = fread(&info->st, sizeof(stamp) + sizeof(bounds) *2 + sizeof(gen_e_list) + sizeof(uf_element), 1, f);
+  assert(success);
 
   info->name = string_data_deserialize(f);
 

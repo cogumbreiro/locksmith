@@ -34,8 +34,8 @@ This state file consists of a sequence of page_state records, one for
 each page in the order they appear in the page data file.
 */
 struct page_state {
-  int first_page;             /* is this the first page of the region? */
-  int last_page;              /* is this the last page of the region? */
+  INT_PTR first_page;             /* is this the first page of the region? */
+  INT_PTR last_page;              /* is this the last page of the region? */
   enum allocator_kinds akind; /* normal or atomic page? A holdover
 				 from RC, the allocator provides
 				 faster routines for data without
@@ -91,11 +91,11 @@ file (see description of page_state).
      
     The size of the page in bytes. 
 */
-void serialize_pages(struct page_list *pgs, int data, int state, int first_page, int last_page, enum allocator_kinds akind, enum page_kinds pkind, int size, struct allocator *a) {
+void serialize_pages(struct page_list *pgs, int data, int state, INT_PTR first_page, INT_PTR last_page, enum allocator_kinds akind, enum page_kinds pkind, int size, struct allocator *a) {
   struct page_state ps;
   int numbytes;
 #ifndef NMEMDEBUG
-  unsigned int used = 0, total = 0;
+  INT_PTR used = 0, total = 0;
 #endif
   for (; pgs != NULL; pgs = pgs->next) {
     ps.old_address = pgs->pg;
@@ -107,13 +107,13 @@ void serialize_pages(struct page_list *pgs, int data, int state, int first_page,
     ps.size = size  * ((pkind == BIG) ? pgs->pg->pagecount : 1);
 
 #ifndef NMEMDEBUG
-   used += ((unsigned int) pgs->pg->available) - ((unsigned int) pgs->pg);
+   used += ((INT_PTR) pgs->pg->available) - ((INT_PTR) pgs->pg);
    total += ps.size;
    fprintf(stderr,
 	   "\t\tWriting page: address %x\tsize %d\tuses %d bytes.\n",
-	   (unsigned int) ps.old_address,
+	   (INT_PTR) ps.old_address,
 	   ps.size,
-	   ((unsigned int) pgs->pg->available) - ((unsigned int) pgs->pg));
+	   ((INT_PTR) pgs->pg->available) - ((INT_PTR) pgs->pg));
 #endif
     numbytes = write(data, pgs->pg, ps.size);
     if (numbytes != ps.size) {
@@ -128,7 +128,7 @@ void serialize_pages(struct page_list *pgs, int data, int state, int first_page,
   }
 #ifndef NMEMDEBUG
   if (total != 0)
-    fprintf(stderr,"\tPage list of size %d bytes uses %d bytes = %0.2f\n", total, used, (float) used / (float) total);
+    fprintf(stderr,"\tPage list of size %ld bytes uses %ld bytes = %0.2f\n", (long) total, (long) used, (float) used / (float) total);
 #endif
 }
 
@@ -179,10 +179,10 @@ requires that pages be aligned at addresses where the last RPAGELOG bits are 0's
 */
 inline void *translate_pointer(translation map, void *old_address) {
 #ifndef NMEMDEBUG 
-  if (old_address && (*(map->map + (((unsigned int) old_address) >> RPAGELOG)) == 0)) 
-    fprintf(stderr,"Warning: The pointer %x has no translation.\n", (unsigned int) old_address);
+  if (old_address && (*(map->map + (((INT_PTR) old_address) >> RPAGELOG)) == 0)) 
+    fprintf(stderr,"Warning: The pointer %lx has no translation.\n", (long)(INT_PTR) old_address);
 #endif
-  return (*(map->map + (((unsigned int) old_address) >> RPAGELOG))) + (((unsigned int) old_address) & (((unsigned int) 0xFFFFFFFF) >> (32 - RPAGELOG)));
+  return (*(map->map + (((INT_PTR) old_address) >> RPAGELOG))) + (((INT_PTR) old_address) & (((INT_PTR) 0xFFFFFFFF) >> (32 - RPAGELOG)));
 }
 
 void update_pointer(translation map, void **location) {
@@ -254,17 +254,17 @@ void allocate_regions(int state, translation map) {
 
     set_region(newpage,num_pages,r);	  
     /* Now we record the address of the new page(s) as the translation of the address of the old page(s). */
-    if (((((unsigned int) ps.old_address) >> RPAGELOG) << RPAGELOG) != (unsigned int) ps.old_address) {
+    if (((((INT_PTR) ps.old_address) >> RPAGELOG) << RPAGELOG) != (INT_PTR) ps.old_address) {
       fprintf(stderr,"Pages are not aligned properly!\n");
       exit(1);
     }
     /*
-    *(map->map + (((unsigned int) ps.old_address) >> RPAGELOG)) = 
+    *(map->map + (((INT_PTR) ps.old_address) >> RPAGELOG)) = 
       (void *) newpage;
     */
     for(; num_pages > 0; ) {
       num_pages--;
-      *(map->map + ((((unsigned int) ps.old_address) + (num_pages * RPAGESIZE)) >> RPAGELOG)) = 
+      *(map->map + ((((INT_PTR) ps.old_address) + (num_pages * RPAGESIZE)) >> RPAGELOG)) = 
 	(void *) (((char *) newpage) + (num_pages * RPAGESIZE));
      }
 
@@ -354,10 +354,10 @@ void deserialize_pages(int data, int state, translation map, Updater *update) {
 #ifndef NMEMDEBUG
     fprintf(stderr,
 	    "\t\tDeserializing page: \told address %x\tnew address %x\tsize %d\tused %d\n",
-	    (unsigned int) ps.old_address,
-	    (unsigned int) newp,
+	    (INT_PTR) ps.old_address,
+	    (INT_PTR) newp,
 	    ps.size,
-	    ((unsigned int) newp->available) - ((unsigned int) ps.old_address));
+	    ((INT_PTR) newp->available) - ((INT_PTR) ps.old_address));
 #endif
 
     /* 

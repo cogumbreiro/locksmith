@@ -11,7 +11,8 @@ simple01.c:10: Warning: simple01.c:10: Probably using char* where void* is best 
      (Er_reannot-outsimple01.c:10,
       Ew_reannot-outsimple01.c:10,
       Es_dummy:-1,
-     )}
+     ),
+     X-Xr_Xsimple01.c:10}
  ((void)*^{dostuff.return:simple01.c:10},
   out at simple01.c:10)*^{&dostuff:simple01.c:4} flows to int*^{i:simple01.c:9}.  Losing precision.
 
@@ -26,7 +27,8 @@ simple01.c:10: Warning: subtyping incompatible types:
     (Er_reannot-outsimple01.c:10,
      Ew_reannot-outsimple01.c:10,
      Es_dummy:-1,
-    )}
+    ),
+    X-Xr_Xsimple01.c:10}
 ((void)*^{dostuff.return:simple01.c:10},
  out at simple01.c:10)
 int
@@ -42,7 +44,8 @@ int
     (Er_reannot-outsimple01.c:10,
      Ew_reannot-outsimple01.c:10,
      Es_dummy:-1,
-    )}
+    ),
+    X-Xr_Xsimple01.c:10}
 ((void)*^{dostuff.return:simple01.c:10},
  out at simple01.c:10)
 shared: <empty>

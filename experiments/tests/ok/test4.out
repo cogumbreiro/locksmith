@@ -16,27 +16,18 @@ shared: &i:test4.c:24
 
 Warning: Possible data race: &i:test4.c:24 is not protected!
  references:
-  dereference of i:test4.c:35 at test4.c:38
-    &i:test4.c:24 => cast:test4.c:35 at dostuff test4.c:28
-                  => i:test4.c:35 
-  locks acquired:
-    <empty>
-  in: FORK at test4.c:28 
-             
-
   dereference of &i:test4.c:24 at test4.c:27
     &i:test4.c:24
   locks acquired:
     <empty>
   in: main at test4.c:23 
-             
 
   dereference of i:test4.c:35 at test4.c:38
     &i:test4.c:24 => cast:test4.c:35 at dostuff test4.c:28
-                  => i:test4.c:35 
+                  => i:test4.c:35
   locks acquired:
     <empty>
   in: main at test4.c:23 
-             
+
 
 *************************** DONE ***************************

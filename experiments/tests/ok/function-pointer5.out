@@ -1,56 +1,17 @@
 ************************* STARTING *************************
 
-shared: &i:function-pointer5.c:6
+shared: &i:function-pointer5.c:22
 
-Warning: Possible data race: &i:function-pointer5.c:6 is not protected!
+Warning: Possible data race: &i:function-pointer5.c:22 is not protected!
  references:
-  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
-    &i:function-pointer5.c:6
+  dereference of &i:function-pointer5.c:22 at function-pointer5.c:26
+    &i:function-pointer5.c:22
   locks acquired:
     <empty>
-  in: FORK at function-pointer5.c:18 
-             
+  in: main at function-pointer5.c:32  -> function-pointer5.c:35
+  in: main at function-pointer5.c:32  -> function-pointer5.c:35 -> function-pointer5.c:27
+  in: main at function-pointer5.c:32 
+  in: main at function-pointer5.c:32  -> function-pointer5.c:27
 
-  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
-    &i:function-pointer5.c:6
-  locks acquired:
-    <empty>
-  in: FORK at function-pointer5.c:18  -> function-pointer5.c:11
-             
-
-  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
-    &i:function-pointer5.c:6
-  locks acquired:
-    <empty>
-  in: main at function-pointer5.c:16 
-             
-
-  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
-    &i:function-pointer5.c:6
-  locks acquired:
-    <empty>
-  in: main at function-pointer5.c:16  -> function-pointer5.c:19
-             
-
-  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
-    &i:function-pointer5.c:6
-  locks acquired:
-    <empty>
-  in: main at function-pointer5.c:16  -> function-pointer5.c:11
-             
-
-  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
-    &i:function-pointer5.c:6
-  locks acquired:
-    <empty>
-  in: main at function-pointer5.c:16  -> function-pointer5.c:19
-                          
-
-  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
-    &i:function-pointer5.c:6
-  locks acquired:
-    <empty>
-  in: main at function-pointer5.c:16  -> function-pointer5.c:19 -> function-pointer5.c:11
-             
 
 *************************** DONE ***************************

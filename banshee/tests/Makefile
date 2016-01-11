@@ -40,10 +40,10 @@ REGION_LIB = $(region_dir)/libregions.a
 NSENGINE_LIB = $(engine_dir)/libnsengine.a
 ENGINE_LIB = $(engine_dir)/libengine.a
 
-CC = gcc
+#CC = gcc
 
 CFLAGS = -I$(engine_dir) -I$(region_dir) -Ddeletes= -Dtraditional= \
-         -Dsameregion= -Dparentptr= -Wall 
+         -Dsameregion= -Dparentptr= -Wall -Werror -g
 
 ifdef DEBUG
 CFLAGS := -g -pg ${CFLAGS}

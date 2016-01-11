@@ -164,6 +164,7 @@ bool term_var_serialize(FILE *f, void *obj)
 
 void *term_var_deserialize(FILE *f)
 {
+  int success = 1;
   term_var var = NULL;
 
   assert(f);
@@ -171,10 +172,11 @@ void *term_var_deserialize(FILE *f)
   
   var = ralloc(term_var_region, struct term_var_);
 
-  fread((void *)&var->st, sizeof(stamp), 1, f);
-  fread((void *)&var->pending, sizeof(bounds), 1, f);
+  success &= fread((void *)&var->st, sizeof(stamp), 1, f);
+  success &= fread((void *)&var->pending, sizeof(bounds), 1, f);
   var->name = (char *)string_data_deserialize(f);
-  fread((void *)&var->elt, sizeof(tv_elt), 1, f);
+  success &= fread((void *)&var->elt, sizeof(tv_elt), 1, f);
+  assert(success);
   
   return var;
 }

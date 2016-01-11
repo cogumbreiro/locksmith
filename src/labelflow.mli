@@ -34,12 +34,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *)
-type node
-type lock
-type rho
-type effect
-type chi
-type lock_effect
+type node (* all kinds of labels *)
+type lock (* lock label. can be concrete, or variable. variables have
+           * a solution, a set of labels that flow there.
+           *)
+type rho  (* location label.  can be concrete. *)
+type effect (* continuation effect label, cannot be concrete.
+             * solution includes a pair of rhosets, the read and write
+             * effects
+             *)
+type chi (* scoped effect label.  cannot be concrete.  is exactly like
+          * a continuation effect label, except it doesn't refer to
+          * the continuation, but to "standard" effects
+          *)
+type lock_effect (* lock effect label, cannot be concrete.  its
+                  * solution is all the locks that are touched in a
+                  * function (annotates function type)
+                  *)
 type instantiation
 
 val options : (string * Arg.spec * string) list
@@ -54,11 +65,12 @@ module Effect : Set.OrderedType with type t = effect
 module EffectSet : Set.S with type elt = effect
 module EffectMap : Map.S with type key = effect
 
-type rhoSet = RhoSet.t
-type lockSet = LockSet.t
-type effectSet = EffectSet.t
+(* sets of labels, per kind of label *)
+type rhoSet = RhoSet.t  (* set of rho labels *)
+type lockSet = LockSet.t (* set of lock labels *)
+type effectSet = EffectSet.t (* set of effect labels *)
 
-(*module Rhomap : Map.S with type key = rho*)
+(* various hashtables *)
 module LockHT : Hashtbl.S with type key = lock
 module RhoHT : Hashtbl.S with type key = rho
 module Rho : Hashtbl.HashedType with type t = rho
@@ -72,7 +84,7 @@ module InstHT : Hashtbl.S with type key = instantiation
 (* call this after adding all instantiations needed.  It fills the self-loops
  * for globals.  Other nodes/constraints can still be added.
  *)
-val done_adding_instantiations : unit -> unit
+val done_adding : unit -> unit
 
 (* instantiations *)
 
@@ -95,6 +107,10 @@ val get_stats: unit -> string
  * corresponds to a malloc() or "&" memory allocation
  *)
 val make_rho : Labelname.label_name -> bool -> rho
+val update_rho_location : rho -> Cil.location -> rho
+
+(* how many rhos have been created *)
+val count_rho : unit -> int
 
 (* mark r as global *)
 val set_global_rho : rho -> unit
@@ -157,14 +173,14 @@ val clone_lock : lock -> instantiation -> lock
 (* mark a lock as non-linear *)
 val set_nonlinear : lock -> unit
 
+(* checks to see if a lock label is linear.
+ * Safe to use after linearity phase is done.
+ *)
 val is_nonlinear : lock -> bool
 
 
 (* normal effects *)
-
 val make_chi : string -> chi
-val set_atomic_chi : chi -> unit
-val all_atomic_chi : chi list ref
 val add_to_read_chi : rho -> chi -> unit
 val set_global_chi : chi -> unit
 val chi_flows : chi -> chi -> unit
@@ -172,6 +188,7 @@ val inst_chi : chi -> chi -> bool -> instantiation -> unit
 val solve_chi_m : chi -> (rhoSet * rhoSet)
 val solve_chi_pn : chi -> (rhoSet * rhoSet)
 val add_to_write_chi : rho -> chi -> unit
+val dump_all_chi : unit -> unit
 
 (* effects *)
 
@@ -198,6 +215,13 @@ val set_global_effect : effect -> effectSet -> unit
  * e2 corresponds to a program point BEFORE e1. (effects go backwards)
  *)
 val effect_flows : effect -> effect -> unit
+
+(* create a subset edge from chi to effect.  includes all read and
+ * write effects in chi into the solution of the continuation effect
+ * used in typing function call, to match the type rule in the
+ * contextual effects paper 
+ *)
+val chi_in_effect : chi -> effect -> unit
 
 (* instantiation effect eabs to einst with polarity "polarity" at
  * instantiation site i
@@ -246,8 +270,6 @@ val get_lock_p2set : lock -> lockSet
 (* return a set of rhos that the argument might point to *)
 val get_rho_p2set_m : rho -> rhoSet
 val get_rho_p2set_pn : rho -> rhoSet
-
-val lock_reaches_matched : lock -> lock -> bool
 
 (* close a set with respect to "flows to" *)
 val close_rhoset_m : rhoSet -> rhoSet
@@ -301,6 +323,7 @@ val is_pack : instantiation -> bool
 val inst_iter : (instantiation -> unit) -> unit
 
 val concrete_rho_iter : (rho -> unit) -> unit
+val all_concrete_rho : rhoSet ref
 
 (* call to assert all non-linear locks are marked so *)
 val close_nonlinear : unit -> unit

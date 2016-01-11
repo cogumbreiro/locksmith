@@ -31,7 +31,7 @@ static double proc_frequency(void)
 #endif
 
 #if defined(i386) && defined(linux)
-#include <linux/config.h>
+//#include <linux/config.h>
 
 #ifdef CONFIG_X86_TSC
 #include <asm/msr.h>
@@ -143,8 +143,7 @@ static void memusage(void)
   int i;
 
   for (i = 0; i < sizerec_n; i++)
-    printf("%s:%d %lu\n", allocs[i].file, allocs[i].line,
-	   allocs[i].bytes);
+    printf("%s:%d %lu\n", allocs[i].file, allocs[i].line, allocs[i].bytes);
 #endif
 }
 

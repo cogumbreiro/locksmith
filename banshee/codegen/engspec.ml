@@ -57,16 +57,15 @@ class virtual fixed_sort_gen =
     method virtual get_name : string
     method virtual gen_sort_ops : Cgen.file -> Cgen.header -> exprid -> unit
     method gen_con_ops (_ :Cgen.file) (_:Cgen.header) ((_,b): exprid * databody) = 
-	begin
-      match b with 
-      |	[] -> ()
-      |	_ ->
-	(raise (Fixed_sort (this#error this#get_name)); ())
-    end
-	method virtual init : exprid -> Cgen.statement list
+      begin
+        match b with 
+        | [] -> ()
+        | _ -> raise (Fixed_sort (this#error this#get_name))
+      end
+    method virtual init : exprid -> Cgen.statement list
     method virtual reset : exprid -> Cgen.statement list
   end
-	        
+        
 type dataspec = (exprid * sort_gen * databody) list
 type engspec = strid * sigid * dataspec list
       

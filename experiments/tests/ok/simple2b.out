@@ -12,21 +12,7 @@ Warning: Possible data race: &non_protected:simple2b.c:14 is not protected!
     &non_protected:simple2b.c:14
   locks acquired:
     <empty>
-  in: FORK at simple2b.c:10 
-             
-
-  dereference of &non_protected:simple2b.c:14 at simple2b.c:16
-    &non_protected:simple2b.c:14
-  locks acquired:
-    <empty>
-  in: FORK at simple2b.c:9 
-             
-
-  dereference of &non_protected:simple2b.c:14 at simple2b.c:16
-    &non_protected:simple2b.c:14
-  locks acquired:
-    <empty>
   in: main at simple2b.c:6 
-             
+
 
 *************************** DONE ***************************

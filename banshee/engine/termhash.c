@@ -163,7 +163,7 @@ static gen_e walk(term_bucket b, stamp stamps[], int len)
   scan_term_bucket(b,cur)
     {
       if (len == cur->entry->length 
-	  && (memcmp(stamps, cur->entry->stamps, sizeof(int)*len) == 0) )
+	  && (memcmp(stamps, cur->entry->stamps, sizeof(stamp)*len) == 0) )
 	return cur->entry->e;
     }
   return NULL;
@@ -291,11 +291,11 @@ bool term_hash_serialize(FILE *f, void *obj)
   assert(f);
   assert(obj);
 
-  fwrite((void *)&h->inserts, sizeof(int), 1, f);
+  fwrite((void *)&h->inserts, sizeof(h->inserts), 1, f);
 
   for (i = 0; i < h->capacity; i++) {
     scan_term_bucket(h->term_buckets[i], cur) {
-      fwrite((void *)&cur->entry->length, sizeof(int), 1, f);
+      fwrite((void *)&cur->entry->length, sizeof(cur->entry->length), 1, f);
       fwrite((void *)cur->entry->stamps, sizeof(stamp), cur->entry->length, f);
       fwrite((void *)&cur->entry->e, sizeof(gen_e), 1, f);
       serialize_banshee_object(cur->entry->e, gen_e);
@@ -306,24 +306,26 @@ bool term_hash_serialize(FILE *f, void *obj)
 
 void *term_hash_deserialize(FILE *f)
 {
-  int inserts,i;
+  int inserts = 0, i;
+  int success;
   term_hash result = make_term_hash(permanent);
 
-  fread((void *)&inserts, sizeof(int), 1, f);
+  success = fread((void *)&inserts, sizeof(inserts), 1, f);
 
   for (i = 0; i < inserts; i++) {
-    int length;
-    fread((void *)&length, sizeof(int), 1, f);
+    int length = 0;
+    success &= fread((void *)&length, sizeof(length), 1, f);
     {
       gen_e e;
       stamp sig[length];
-      fread((void *)sig, sizeof(stamp), length, f);
-      fread((void *)&e, sizeof(gen_e), 1, f);
+      success &= (fread((void *)sig, sizeof(stamp), length, f) == length);
+      success &= fread((void *)&e, sizeof(gen_e), 1, f);
       term_hash_insert(result, e, sig, length);
     }
   }
 
   assert (result->inserts == inserts);
+  assert(success);
 
   return result;
 }
