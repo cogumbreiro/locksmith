@@ -1,40 +1,3 @@
-(*
- *
- * Copyright (c) 2004-2007, 
- *  George C. Necula    <necula@cs.berkeley.edu>
- *  Scott McPeak        <smcpeak@cs.berkeley.edu>
- *  Wes Weimer          <weimer@cs.berkeley.edu>
- *  (some changes for locksmith) Polyvios Pratikakis <polyvios@cs.umd.edu>
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *
- * 1. Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution.
- *
- * 3. The names of the contributors may not be used to endorse or promote
- * products derived from this software without specific prior written
- * permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *)
 
 module IH = Inthash
 module E = Errormsg
@@ -42,13 +5,28 @@ module E = Errormsg
 open Cil
 open Pretty
 
-(** A framework for data flow analysis for CIL code *)
+(** A framework for data flow analysis for CIL code.  Before using 
+    this framework, you must initialize the Control-flow Graph for your
+    program, e.g using {!Cfg.computeFileCFG} *)
 
 type 't action = 
-    Default (* The default action *)
-  | Done of 't (* Do not do the default action. Use this result *)
-  | Post of ('t -> 't) (* The default action, followed by the given 
+    Default (** The default action *)
+  | Done of 't (** Do not do the default action. Use this result *)
+  | Post of ('t -> 't) (** The default action, followed by the given 
                         * transformer *)
+
+type 't stmtaction = 
+    SDefault   (** The default action *)
+  | SDone      (** Do not visit this statement or its successors *)
+  | SUse of 't (** Visit the instructions and successors of this statement
+                  as usual, but use the specified state instead of the 
+                  one that was passed to doStmt *)
+
+(* For if statements *)
+type 't guardaction = 
+    GDefault      (** The default state *) 
+  | GUse of 't    (** Use this data for the branch *)
+  | GUnreachable  (** The branch will never be taken. *)
 
 
 (******************************************************************
@@ -58,7 +36,7 @@ type 't action =
  ********************************************************************)
 
 module type ForwardsTransfer = sig
-  val name: string (* For debugging purposes, the name of the analysis *)
+  val name: string (** For debugging purposes, the name of the analysis *)
 
   val debug: bool ref (** Whether to turn on debugging *)
 
@@ -91,12 +69,19 @@ module type ForwardsTransfer = sig
    * {!Cil.currentLoc} is set before calling this. The default action is to 
    * continue with the state unchanged. *)
 
-
-  val doStmt: Cil.stmt -> t -> unit action
+  val doStmt: Cil.stmt -> t -> t stmtaction
   (** The (forwards) transfer function for a statement. The {!Cil.currentLoc} 
-   * is set before calling this. The default action is to continue with the 
-   * successors of this block, but only for the ... statements. For other 
-   * kinds of branches you must handle it, and return {!Jvmflow.Done}. *)
+   * is set before calling this. The default action is to do the instructions
+   * in this statement, if applicable, and continue with the successors. *)
+
+  val doGuard: Cil.exp -> t -> t guardaction
+  (** Generate the successor to an If statement assuming the given expression
+    * is nonzero.  Analyses that don't need guard information can return 
+    * GDefault; this is equivalent to returning GUse of the input.
+    * A return value of GUnreachable indicates that this half of the branch
+    * will not be taken and should not be explored.  This will be called
+    * twice per If, once for "then" and once for "else".  
+    *)
 
   val filterStmt: Cil.stmt -> bool
   (** Whether to put this statement in the worklist. This is called when a 
@@ -117,6 +102,9 @@ module ForwardsDataFlow =
     (** We call this function when we have encountered a statement, with some 
      * state. *)
     let reachedStatement (s: stmt) (d: T.t) : unit = 
+      let loc = get_stmtLoc s.skind in
+      if loc != locUnknown then 
+        currentLoc := get_stmtLoc s.skind;
       (** see if we know about it already *)
       E.pushContext (fun _ -> dprintf "Reached statement %d with %a" 
           s.sid T.pretty d);
@@ -125,11 +113,9 @@ module ForwardsDataFlow =
           let old = IH.find T.stmtStartData s.sid in 
           match T.combinePredecessors s ~old:old d with 
             None -> (* We are done here *)
-              if !T.debug then begin
-                ignore (E.log
-                "FF(%s): reached stmt %d with %a\n  implies the old state %a\n"
+              if !T.debug then 
+                ignore (E.log "FF(%s): reached stmt %d with %a\n  implies the old state %a\n"
                           T.name s.sid T.pretty d T.pretty old);
-              end;
               None
           | Some d' -> begin
               (* We have changed the data *) 
@@ -156,10 +142,46 @@ module ForwardsDataFlow =
                             worklist) then 
             Queue.add s worklist
 
+
+    (** Get the two successors of an If statement *)
+    let ifSuccs (s:stmt) : stmt * stmt = 
+      let fstStmt blk = match blk.bstmts with
+          [] -> Cil.dummyStmt
+        | fst::_ -> fst
+      in
+      match s.skind with
+        If(e, b1, b2, _) ->
+          let thenSucc = fstStmt b1 in
+          let elseSucc = fstStmt b2 in
+          let oneFallthrough () = 
+            let fallthrough = 
+              List.filter 
+                (fun s' -> thenSucc != s' && elseSucc != s')
+                s.succs
+            in
+            match fallthrough with
+              [] -> E.s (bug "Bad CFG: missing fallthrough for If.")
+            | [s'] -> s'
+            | _ ->  E.s (bug "Bad CFG: multiple fallthrough for If.")
+          in
+          (* If thenSucc or elseSucc is Cil.dummyStmt, it's an empty block.
+             So the successor is the statement after the if *)
+          let stmtOrFallthrough s' =
+            if s' == Cil.dummyStmt then
+              oneFallthrough ()
+            else 
+              s'
+          in
+          (stmtOrFallthrough thenSucc,
+           stmtOrFallthrough elseSucc)
+            
+      | _-> E.s (bug "ifSuccs on a non-If Statement.")
+
     (** Process a statement *)
     let processStmt (s: stmt) : unit = 
+      currentLoc := get_stmtLoc s.skind;
       if !T.debug then 
-        ignore (E.log "FF(%s).stmt %a\n" T.name d_stmt s);
+        ignore (E.log "FF(%s).stmt %d at %t\n" T.name s.sid d_thisloc);
 
       (* It must be the case that the block has some data *)
       let init: T.t = 
@@ -169,10 +191,14 @@ module ForwardsDataFlow =
       in
 
       (** See what the custom says *)
-      currentLoc := get_stmtLoc s.skind;
       match T.doStmt s init with 
-        Done init' -> init'
-      | (Default | Post _) as act -> begin
+        SDone  -> ()
+      | (SDefault | SUse _) as act -> begin
+          let curr = match act with
+              SDefault -> init
+            | SUse d -> d
+            | SDone -> E.s (bug "SDone")
+          in
           (* Do the instructions in order *)
           let handleInstruction (s: T.t) (i: instr) : T.t = 
             currentLoc := get_instrLoc i;
@@ -192,21 +218,45 @@ module ForwardsDataFlow =
             match s.skind with 
               Instr il -> 
                 (* Handle instructions starting with the first one *)
-                List.fold_left handleInstruction init il
+                List.fold_left handleInstruction curr il
 
             | Goto _ | Break _ | Continue _ | If _ 
             | TryExcept _ | TryFinally _ 
-            | Switch _ | Loop _ | Return _ | Block _ -> init
+            | Switch _ | Loop _ | Return _ | Block _ -> curr
           in
           currentLoc := get_stmtLoc s.skind;
                 
+          (* Handle If guards *)
+          let succsToReach = match s.skind with
+              If (e, _, _, _) -> begin
+                let not_e = UnOp(LNot, e, intType) in
+                let thenGuard = T.doGuard e after in
+                let elseGuard = T.doGuard not_e after in
+                if thenGuard = GDefault && elseGuard = GDefault then
+                  (* this is the common case *)
+                  s.succs
+                else begin
+                  let doBranch succ guard =
+                    match guard with
+                      GDefault -> reachedStatement succ after
+                    | GUse d ->  reachedStatement succ d
+                    | GUnreachable -> 
+                        if !T.debug then 
+                          ignore (E.log "FF(%s): Not exploring branch to %d\n" 
+                                    T.name succ.sid);
+
+                        ()
+                  in
+                  let thenSucc, elseSucc = ifSuccs s  in
+                  doBranch thenSucc thenGuard;
+                  doBranch elseSucc elseGuard;
+                  []
+                end
+              end
+            | _ -> s.succs
+          in
           (* Reach the successors *)
-          List.iter (fun s' -> reachedStatement s' after) s.succs;
-
-
-          match act with 
-            Post f -> f ()
-          | _ -> ()
+          List.iter (fun s' -> reachedStatement s' after) succsToReach;
 
       end
 
@@ -234,15 +284,20 @@ module ForwardsDataFlow =
                     (docList (fun s -> num s.sid)) 
                     (List.rev
                        (Queue.fold (fun acc s -> s :: acc) [] worklist)));
-          let s = Queue.take worklist in 
-          processStmt s;
+        let keepgoing = 
+          try 
+            let s = Queue.take worklist in 
+            processStmt s;
+            true
+          with Queue.Empty -> 
+            if !T.debug then 
+              ignore (E.log "FF(%s): done\n\n" T.name);
+            false
+        in
+        if keepgoing then
           fixedpoint ()
       in
-      try 
-        fixedpoint ()
-      with Queue.Empty -> 
-        if !T.debug then 
-          ignore (E.log "FF(%s): done\n\n" T.name)
+      fixedpoint ()
           
   end
 
@@ -270,6 +325,11 @@ module type BackwardsTransfer = sig
   (** For each block id, the data at the start. This data structure must be 
    * initialized with the initial data for each block *)
 
+  val funcExitData: t
+  (** The data at function exit.  Used for statements with no successors.
+      This is usually bottom, since we'll also use doStmt on Return 
+      statements. *)
+
   val combineStmtStartData: Cil.stmt -> old:t -> t -> t option
   (** When the analysis reaches the start of a block, combine the old data 
    * with the one we have just computed. Return None if the combination is 
@@ -283,14 +343,14 @@ module type BackwardsTransfer = sig
 
 
   val doStmt: Cil.stmt -> t action
-  (** The (backwards) transfer function for a branch. The {!Jvm.currentPc} is 
+  (** The (backwards) transfer function for a branch. The {!Cil.currentLoc} is 
    * set before calling this. If it returns None, then we have some default 
    * handling. Otherwise, the returned data is the data before the branch 
    * (not considering the exception handlers) *)
 
   val doInstr: Cil.instr -> t -> t action
   (** The (backwards) transfer function for an instruction. The 
-   * {!Jvm.currentPc} is set before calling this. If it returns None, then we 
+   * {!Cil.currentLoc} is set before calling this. If it returns None, then we 
    * have some default handling. Otherwise, the returned data is the data 
    * before the branch (not considering the exception handlers) *)
 
@@ -308,14 +368,14 @@ module BackwardsDataFlow =
     let getStmtStartData (s: stmt) : T.t = 
       try IH.find T.stmtStartData s.sid
       with Not_found -> 
-        E.s (E.bug "BF(%s): stmtStartData is not initialized for %d"
-               T.name s.sid)
+        E.s (E.bug "BF(%s): stmtStartData is not initialized for %d: %a"
+               T.name s.sid d_stmt s)
 
     (** Process a statement and return true if the set of live return 
      * addresses on its entry has changed. *)
     let processStmt (s: stmt) : bool = 
       if !T.debug then 
-        ignore (E.log "BF(%s).stmt %a\n" T.name d_stmt s);
+        ignore (E.log "FF(%s).stmt %d\n" T.name s.sid);
 
 
       (* Find the state before the branch *)
@@ -327,7 +387,7 @@ module BackwardsDataFlow =
              (* Do the default one. Combine the successors *)
              let res = 
                match s.succs with 
-                 [] -> E.s (E.bug "You must doStmt for the statements with no successors")
+                 [] -> T.funcExitData
                | fst :: rest -> 
                    List.fold_left (fun acc succ -> 
                      T.combineSuccessors acc (getStmtStartData succ))
@@ -390,28 +450,60 @@ module BackwardsDataFlow =
                     (docList (fun s -> num s.sid)) 
                     (List.rev
                        (Queue.fold (fun acc s -> s :: acc) [] worklist)));
-        try 
-          let s = Queue.take worklist in 
-          let changes = processStmt s in 
-          if changes then begin
-            (* We must add all predecessors of block b, only if not already 
-             * in and if the filter accepts them. *)
-            List.iter 
-              (fun p ->
-                if not (Queue.fold (fun exists s' -> exists || p.sid = s'.sid) 
-                          false worklist) &&
-                  T.filterStmt p s then 
-                  Queue.add p worklist)
-              s.preds;
-          end;
-          fixedpoint ();
+        let keepgoing = 
+          try 
+            let s = Queue.take worklist in 
+            let changes = processStmt s in 
+            if changes then begin
+              (* We must add all predecessors of block b, only if not already 
+               * in and if the filter accepts them. *)
+              List.iter 
+                (fun p ->
+                   if not (Queue.fold (fun exists s' -> exists || p.sid = s'.sid) 
+                             false worklist) &&
+                     T.filterStmt p s then 
+                       Queue.add p worklist)
+                s.preds;
+            end;
+            true
 
-        with Queue.Empty -> 
-          if !T.debug then 
-            ignore (E.log "BF(%s): done\n\n" T.name)
+          with Queue.Empty -> 
+            if !T.debug then 
+              ignore (E.log "BF(%s): done\n\n" T.name);
+            false
+        in
+        if keepgoing then
+          fixedpoint ();
       in
       fixedpoint ();
           
   end
 
+
+(** Helper utility that finds all of the statements of a function. 
+  It also lists the return statments (including statements that
+  fall through the end of a void function).  Useful when you need an
+  initial set of statements for BackwardsDataFlow.compute. *)
+let sink_stmts = ref []
+let all_stmts = ref []
+let sinkFinder = object(self)
+  inherit nopCilVisitor
+
+  method vstmt s =
+    all_stmts := s ::(!all_stmts);
+    match s.succs with
+      [] -> (sink_stmts := s :: (!sink_stmts);
+	     DoChildren)
+    | _ -> DoChildren
+
+end
+
+(* returns (all_stmts, return_stmts).   *)
+let find_stmts (fdec:fundec) : (stmt list * stmt list) =
+  ignore(visitCilFunction (sinkFinder) fdec);
+  let all = !all_stmts in
+  let ret = !sink_stmts in
+  all_stmts := [];
+  sink_stmts := [];
+  all, ret
 

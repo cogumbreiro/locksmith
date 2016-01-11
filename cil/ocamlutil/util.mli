@@ -10,7 +10,7 @@ val withTimeout : float -> (* Seconds for timeout *)
                 'a -> (* And its argument *)
    'b
 
-val docHash : ?sep:string -> ('a -> 'b -> Pretty.doc) -> unit -> 
+val docHash : ?sep:Pretty.doc -> ('a -> 'b -> Pretty.doc) -> unit -> 
   (('a, 'b) Hashtbl.t) -> Pretty.doc 
 
 
@@ -43,6 +43,7 @@ val list_mapi: (int -> 'a -> 'b) -> 'a list -> 'b list
 (** Like fold_left but pass the index into the list as well *)
 val list_fold_lefti: ('acc -> int -> 'a -> 'acc) -> 'acc -> 'a list -> 'acc
 
+(** Generates the range of integers starting with a and ending with b *)
 val int_range_list : int -> int -> int list
 
 (* Create a list of length l *)
@@ -138,14 +139,6 @@ val tryFinally:
     'a -> 'b
 
 
-(** The state information that the UI must display is viewed abstractly as a 
- * set of registers. *)
-type registerInfo = {
-    rName: string; (** The name of the register *)
-    rGroup: string; (** The name of the group to which this register belongs.*)
-    rVal: Pretty.doc; (** The value to be displayed about a register *)
-    rOneLineVal: Pretty.doc option (** The value to be displayed on one line *)
-} 
 
 
 (** Get the value of an option.  Raises Failure if None *)
@@ -263,7 +256,8 @@ val registerSymbolName: string -> symbol
 
 (** Register a number of consecutive symbol ids. The naming function will be 
  * invoked with indices from 0 to the counter - 1. Returns the id of the 
- * first symbol created *)
+ * first symbol created. The naming function is invoked lazily, only when the 
+ * name of the symbol is required. *)
 val registerSymbolRange: int -> (int -> string) -> symbol
 
 
@@ -300,7 +294,7 @@ module Int32Op : sig
    val (/%) : int32 -> int32 -> int32
    val (~-%) : int32 -> int32
 
-   val (<<%) : int32 -> int32 -> int32
+   val sll : int32 -> int32 -> int32
    val (>>%) : int32 -> int32 -> int32
    val (>>>%) : int32 -> int32 -> int32
 
@@ -315,8 +309,3 @@ end
    name or id in some field that occurs before any fields that have cyclic
    pointers. *)
 val equals: 'a -> 'a -> bool
-
-(************************************************************************)
-
-val isSome : 'a option -> bool
-val getSome : 'a option -> 'a

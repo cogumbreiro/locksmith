@@ -1,48 +1,33 @@
 ************************* STARTING *************************
 
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
+functions declared and used but not defined:
   printf
   pthread_join
 shared: alloc.thread_no:thread-ex.c:41
 
 Warning: Possible data race: alloc.thread_no:thread-ex.c:41 is not protected!
  references:
-  dereference at thread-ex.c:34
-    locations possibly dereferenced: 
-      alloc.thread_no:thread-ex.c:41
-      data1.thread_no:thread-ex.c:41
-    locks acquired at dereference: 
-      <empty>
-    in: FORK at thread-ex.c:52 -> print_message_function thread-ex.c:52
+  dereference of *data.thread_no:thread-ex.c:30 at thread-ex.c:34
+    alloc.thread_no:thread-ex.c:41 => data1.thread_no:thread-ex.c:41 
+                                   => *data.thread_no:thread-ex.c:30 at print_message_function thread-ex.c:52
+  locks acquired:
+    <empty>
+  in: FORK at thread-ex.c:52 
+             
 
-  dereference at thread-ex.c:34
-    locations possibly dereferenced: 
-      alloc.thread_no:thread-ex.c:41
-      data1.thread_no:thread-ex.c:41
-    locks acquired at dereference: 
-      <empty>
-    in: main at thread-ex.c:38 -> print_message_function thread-ex.c:52
+  dereference of *data.thread_no:thread-ex.c:30 at thread-ex.c:34
+    alloc.thread_no:thread-ex.c:41 => data1.thread_no:thread-ex.c:41 
+                                   => *data.thread_no:thread-ex.c:30 at print_message_function thread-ex.c:52
+  locks acquired:
+    <empty>
+  in: main at thread-ex.c:38 
+             
 
-  dereference at thread-ex.c:60
-    locations possibly dereferenced: 
-      alloc.thread_no:thread-ex.c:41
-      data1.thread_no:thread-ex.c:41
-    locks acquired at dereference: 
-      <empty>
-    in: main at thread-ex.c:38
+  dereference of data1.thread_no:thread-ex.c:41 at thread-ex.c:60
+    alloc.thread_no:thread-ex.c:41 => data1.thread_no:thread-ex.c:41 
+  locks acquired:
+    <empty>
+  in: main at thread-ex.c:38 
+             
 
 *************************** DONE ***************************

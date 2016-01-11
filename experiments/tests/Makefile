@@ -94,6 +94,7 @@ TESTS = \
 	uniq3.c \
 	uniq4.c \
 	uniq5.c \
+	uniq6.c \
 	uniq-fn.c \
 	va_list1.c \
 	voidptr1.c \
@@ -111,15 +112,15 @@ OPTS=
 all: init runall
 
 runall: runintro $(TESTS:%.c=out/%.out)
-	$(ECHO)echo "</table></html>" >> out/report.html
+	$(ECHO) echo "</table></html>" >> out/report.html
 
 runintro:
-	$(ECHO)echo "running all tests"
+	$(ECHO) echo "running all tests"
 
 init:
 	$(ECHO)$(RM) -r out
 	$(ECHO)mkdir out
-	$(ECHO)echo "<html><table border=1pt>" > out/report.html
+	$(ECHO) echo "<html><table border=1pt>" > out/report.html
 	$(ECHO)test -f core && $(RM) -f core || true
 
 cleanok:
@@ -130,8 +131,8 @@ clean:
 	$(ECHO)$(RM) out/* diffs/*
 
 out/%.out: %.c
-	$(ECHO)echo -n $<
-	$(ECHO)echo -n "<tr> <td> $< <td> " >> out/report.html
+	$(ECHO) echo -n $<
+	$(ECHO) echo -n "<tr> <td> $< <td> " >> out/report.html
 	$(ECHO)$(CILLY) --save-profile-data=out/$(basename $<).txt $(OPTS) $< 2>&1 | \
 		awk -f filter.awk | \
 		sed -e 's/#[0-9]*\\n//g' > $@; \

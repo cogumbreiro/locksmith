@@ -1,20 +1,5 @@
 ************************* STARTING *************************
 
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
 shared: &non_protected:simple2.c:5
         &shared:simple2.c:4
 &shared:simple2.c:4 is protected by:
@@ -23,32 +8,25 @@ shared: &non_protected:simple2.c:5
 
 Warning: Possible data race: &non_protected:simple2.c:5 is not protected!
  references:
-  dereference at simple2.c:8
-    locations possibly dereferenced: 
-      &non_protected:simple2.c:5
-    locks acquired at dereference: 
-      <empty>
-    in: FORK at simple2.c:18 -> run simple2.c:18
+  dereference of &non_protected:simple2.c:5 at simple2.c:8
+    &non_protected:simple2.c:5
+  locks acquired:
+    <empty>
+  in: FORK at simple2.c:18 
+             
 
-  dereference at simple2.c:8
-    locations possibly dereferenced: 
-      &non_protected:simple2.c:5
-    locks acquired at dereference: 
-      <empty>
-    in: FORK at simple2.c:17 -> run simple2.c:17
+  dereference of &non_protected:simple2.c:5 at simple2.c:8
+    &non_protected:simple2.c:5
+  locks acquired:
+    <empty>
+  in: FORK at simple2.c:17 
+             
 
-  dereference at simple2.c:8
-    locations possibly dereferenced: 
-      &non_protected:simple2.c:5
-    locks acquired at dereference: 
-      <empty>
-    in: main at simple2.c:14 -> run simple2.c:18
-
-  dereference at simple2.c:8
-    locations possibly dereferenced: 
-      &non_protected:simple2.c:5
-    locks acquired at dereference: 
-      <empty>
-    in: main at simple2.c:14 -> run simple2.c:17
+  dereference of &non_protected:simple2.c:5 at simple2.c:8
+    &non_protected:simple2.c:5
+  locks acquired:
+    <empty>
+  in: main at simple2.c:14 
+             
 
 *************************** DONE ***************************

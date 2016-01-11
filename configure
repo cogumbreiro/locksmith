@@ -1,0 +1,3 @@
+cd cil
+./configure EXTRASRCDIRS=../src EXTRAFEATURES="locksmith"
+cd ..

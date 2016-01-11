@@ -1,45 +1,30 @@
 ************************* STARTING *************************
 
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
 shared: &j:goto.c:4
 
 Warning: Possible data race: &j:goto.c:4 is not protected!
  references:
-  dereference at goto.c:11
-    locations possibly dereferenced: 
-      &j:goto.c:4
-    locks acquired at dereference: 
-      concrete l:goto.c:18
-      l:goto.c:5
-    in: FORK at goto.c:20 -> dostuff goto.c:20
+  dereference of &j:goto.c:4 at goto.c:11
+    &j:goto.c:4
+  locks acquired:
+    concrete l:goto.c:18
+    l:goto.c:5
+  in: FORK at goto.c:20 
+             
 
-  dereference at goto.c:11
-    locations possibly dereferenced: 
-      &j:goto.c:4
-    locks acquired at dereference: 
-      concrete l:goto.c:18
-      l:goto.c:5
-    in: main at goto.c:16 -> dostuff goto.c:20
+  dereference of &j:goto.c:4 at goto.c:11
+    &j:goto.c:4
+  locks acquired:
+    concrete l:goto.c:18
+    l:goto.c:5
+  in: main at goto.c:16 
+             
 
-  dereference at goto.c:33
-    locations possibly dereferenced: 
-      &j:goto.c:4
-    locks acquired at dereference: 
-      <empty>
-    in: main at goto.c:16
+  dereference of &j:goto.c:4 at goto.c:33
+    &j:goto.c:4
+  locks acquired:
+    <empty>
+  in: main at goto.c:16 
+             
 
 *************************** DONE ***************************

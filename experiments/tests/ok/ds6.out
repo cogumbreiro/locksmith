@@ -1,67 +1,42 @@
 ************************* STARTING *************************
 
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
 shared: alloc.data:ds6.c:40
         alloc.next:ds6.c:40
 
 Warning: Possible data race: alloc.data:ds6.c:40 is protected by non-linear or concrete lock(s):
-  (*cur).lock:ds6.c:14
-  (*new).lock:ds6.c:40
+  *cur.lock:ds6.c:14
+  *new.lock:ds6.c:40
   non linear concrete new->lock:ds6.c:42
  references:
-  dereference at ds6.c:26
-    locations possibly dereferenced: 
-      (*cur).data:ds6.c:14
-      alloc.data:ds6.c:40
-    locks acquired at dereference: 
-      (*cur).lock:ds6.c:14
-      (*new).lock:ds6.c:40
-      non linear concrete new->lock:ds6.c:42
-    in: FORK at ds6.c:46 -> run ds6.c:46
+  dereference of data:ds6.c:21 at ds6.c:26
+    alloc.data:ds6.c:40 => *cur.data:ds6.c:14 
+                        => data:ds6.c:21 
+  locks acquired:
+    *cur.lock:ds6.c:14
+    *new.lock:ds6.c:40
+    non linear concrete new->lock:ds6.c:42
+  in: FORK at ds6.c:46 
+             
 
-  dereference at ds6.c:26
-    locations possibly dereferenced: 
-      (*cur).data:ds6.c:14
-      alloc.data:ds6.c:40
-    locks acquired at dereference: 
-      (*cur).lock:ds6.c:14
-      (*new).lock:ds6.c:40
-      non linear concrete new->lock:ds6.c:42
-    in: FORK at ds6.c:45 -> run ds6.c:45
+  dereference of data:ds6.c:21 at ds6.c:26
+    alloc.data:ds6.c:40 => *cur.data:ds6.c:14 
+                        => data:ds6.c:21 
+  locks acquired:
+    *cur.lock:ds6.c:14
+    *new.lock:ds6.c:40
+    non linear concrete new->lock:ds6.c:42
+  in: FORK at ds6.c:45 
+             
 
-  dereference at ds6.c:26
-    locations possibly dereferenced: 
-      (*cur).data:ds6.c:14
-      alloc.data:ds6.c:40
-    locks acquired at dereference: 
-      (*cur).lock:ds6.c:14
-      (*new).lock:ds6.c:40
-      non linear concrete new->lock:ds6.c:42
-    in: main at ds6.c:34 -> run ds6.c:46
-
-  dereference at ds6.c:26
-    locations possibly dereferenced: 
-      (*cur).data:ds6.c:14
-      alloc.data:ds6.c:40
-    locks acquired at dereference: 
-      (*cur).lock:ds6.c:14
-      (*new).lock:ds6.c:40
-      non linear concrete new->lock:ds6.c:42
-    in: main at ds6.c:34 -> run ds6.c:45
+  dereference of data:ds6.c:21 at ds6.c:26
+    alloc.data:ds6.c:40 => *cur.data:ds6.c:14 
+                        => data:ds6.c:21 
+  locks acquired:
+    *cur.lock:ds6.c:14
+    *new.lock:ds6.c:40
+    non linear concrete new->lock:ds6.c:42
+  in: main at ds6.c:34 
+             
 
 alloc.next:ds6.c:40 is protected by:
   concrete global_lock:ds6.c:38

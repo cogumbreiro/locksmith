@@ -58,9 +58,9 @@
 #ifdef _MSVC
 #define LONGLONG __int64
 #define CONST_STRING_LITERALS "false"
-#define VERSION "0"
-#define VERSION_MAJOR 0
-#define VERSION_MINOR 0
+#define VERSION "Microsoft C"
+#define VERSION_MAJOR (_MSC_VER / 100)
+#define VERSION_MINOR (_MSC_VER % 100)
 #endif
 
 /* The type for the machine dependency structure is generated from the
@@ -73,15 +73,15 @@ int main() {
   printf("\t version_minor    = %d;\n", VERSION_MINOR);
   printf("\t version          = \"%s\";\n", VERSION);
   // Size of certain types
-  printf("\t sizeof_int       = %d;\n", sizeof(int));
   printf("\t sizeof_short     = %d;\n", sizeof(short));
+  printf("\t sizeof_int       = %d;\n", sizeof(int));
   printf("\t sizeof_long      = %d;\n", sizeof(long));
   printf("\t sizeof_longlong  = %d;\n", sizeof(LONGLONG));
   printf("\t sizeof_ptr       = %d;\n", sizeof(int *));
   printf("\t sizeof_enum      = %d;\n", sizeof(enum e { ONE, TWO }));
+  printf("\t sizeof_float     = %d;\n", sizeof(float));
+  printf("\t sizeof_double    = %d;\n", sizeof(double));
   printf("\t sizeof_longdouble  = %d;\n", sizeof(long double));
-  printf("\t sizeof_wchar     = %d;\n", sizeof(wchar_t));
-  printf("\t sizeof_sizeof    = %d;\n", sizeof(sizeof(int)));
   printf("\t sizeof_void      = %d;\n", sizeof(void));
   printf("\t sizeof_fun       = %d;\n",
 #ifdef __GNUC__
@@ -90,6 +90,43 @@ int main() {
          0
 #endif
            );
+
+  // definition of size_t
+  {
+    printf("\t size_t = \"%s\";\n", TYPE_SIZE_T);
+    printf("\t wchar_t = \"%s\";\n", TYPE_WCHAR_T);
+  }
+
+  // The alignment of a short
+  {
+    struct shortstruct {
+      char c;
+      short s;
+    };
+    printf("\t alignof_short = %d;\n",
+           (int)(&((struct shortstruct*)0)->s));
+  }
+
+  // The alignment of an int
+  {
+    struct intstruct {
+      char c;
+      int i;
+    };
+    printf("\t alignof_int = %d;\n",
+           (int)(&((struct intstruct*)0)->i));
+  }
+  
+  // The alignment of a long
+  {
+    struct longstruct {
+      char c;
+      long l;
+    };
+    printf("\t alignof_long = %d;\n",
+           (int)(&((struct longstruct*)0)->l));
+  }
+
   // The alignment of long long
   {
     struct longlong {
@@ -100,6 +137,36 @@ int main() {
            (int)(&((struct longlong*)0)->ll));
   }
 
+  // The alignment of a ptr
+  {
+    struct ptrstruct {
+      char c; 
+      int * p;
+    };
+    printf("\t alignof_ptr = %d;\n",
+           (int)(&((struct ptrstruct*)0)->p));
+  }
+
+  // The alignment of an enum
+  {
+    struct enumstruct {
+      char c; 
+      enum e2 { THREE, FOUR, FIVE } e;
+    };
+    printf("\t alignof_enum = %d;\n",
+           (int)(&((struct enumstruct*)0)->e));
+  }
+
+  // The alignment of a float
+  {
+    struct floatstruct {
+      char c;
+      float f;
+    };
+    printf("\t alignof_float = %d;\n",
+           (int)(&((struct floatstruct*)0)->f));
+  }
+  
   // The alignment of double
   {
     struct s1 {
@@ -135,6 +202,21 @@ int main() {
          0
 #endif
          );
+
+// The alignment of anything with __attribute__((aligned))
+#ifdef __GNUC__
+  {
+    char __attribute__((aligned)) c;
+    long double  __attribute__((aligned)) ld;
+    if (__alignof(c) != __alignof(ld)) {
+      fprintf(stderr, "__attribute__((aligned)) has a different effect on different types.  alignments may be computed incorrectly.\n");
+    }
+    printf("\t alignof_aligned = %d;\n", __alignof(c));
+  }
+#else
+  printf("\t alignof_aligned = 0;\n");
+#endif
+
 
   // Whether char is unsigned
   printf("\t char_is_unsigned = %s;\n", 

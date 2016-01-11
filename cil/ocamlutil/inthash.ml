@@ -1,4 +1,5 @@
 (** A hash table specialized on integer keys *)
+type key = int
 type 'a t =
   { mutable size: int;                        (* number of elements *)
     mutable data: 'a bucketlist array } (* the buckets *)
@@ -26,6 +27,8 @@ let copy h =
 let copy_into src dest = 
   dest.size <- src.size;
   dest.data <- Array.copy src.data
+
+let length h = h.size
 
 let resize tbl =
   let odata = tbl.data in
@@ -63,6 +66,18 @@ let remove h key =
   let i = (hash key) mod (Array.length h.data) in
   h.data.(i) <- remove_bucket h.data.(i)
 
+let remove_all h key =
+  let rec remove_bucket = function
+      Empty ->
+        Empty
+    | Cons(k, i, next) ->
+        if k = key
+        then begin h.size <- pred h.size; 
+	  remove_bucket next end
+        else Cons(k, i, remove_bucket next) in
+  let i = (hash key) mod (Array.length h.data) in
+  h.data.(i) <- remove_bucket h.data.(i)
+
 let rec find_rec key = function
     Empty ->
       raise Not_found
@@ -90,6 +105,10 @@ let find_all h key =
   | Cons(k, d, rest) ->
       if k = key then d :: find_in_bucket rest else find_in_bucket rest in
   find_in_bucket h.data.((hash key) mod (Array.length h.data))
+
+let tryfind h key =
+  try Some(find h key)
+  with Not_found -> None
 
 let replace h key info =
   let rec replace_bucket = function
@@ -164,7 +183,8 @@ let memoize (h: 'a t) (key: int) (f: int -> 'a) : 'a =
     let it = f key in
     h.data.(i) <- Cons(key, it, h.data.(i));
     h.size <- succ h.size;
-    if h.size > Array.length h.data lsl 1 then resize h
+    if h.size > Array.length h.data lsl 1 then resize h;
+    it
   in
   find_in_bucket key h.data.(i)
                   

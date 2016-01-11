@@ -74,7 +74,7 @@ val nil          : doc
 (** Concatenates two documents. This is an infix operator that associates to 
     the left. *)
 val (++)         : doc -> doc -> doc 
-
+val concat       : doc -> doc -> doc
 
 (** A document that prints the given string *)
 val text         : string -> doc
@@ -156,11 +156,24 @@ val d_list: string -> (unit -> 'a -> doc) -> unit -> 'a list -> doc
 val docArray: ?sep:doc -> (int -> 'a -> doc) -> unit -> 'a array -> doc
 
 (** Prints an ['a option] with [None] or [Some] *)
-val docOpt: (unit -> 'a -> doc) -> unit -> 'a option -> doc
+val docOpt: ('a -> doc) -> unit -> 'a option -> doc
+
+
+(** Print an int32 *)
+val d_int32: int32 -> doc
+val f_int32: unit -> int32 -> doc
+
+val d_int64: int64 -> doc
+val f_int64: unit -> int64 -> doc
 
 (** Format maps. *)
 module MakeMapPrinter :
-  functor (Map: Map.S) -> sig
+  functor (Map: sig
+                  type key
+                  type 'a t
+                  val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+                end) ->
+sig
     (** Format a map, analogous to docList. *)
     val docMap: ?sep:doc -> (Map.key -> 'a -> doc) -> unit -> 'a Map.t -> doc
 
@@ -174,16 +187,38 @@ module MakeMapPrinter :
                -> doc
   end
 
+(** Format sets. *)
+module MakeSetPrinter :
+  functor (Set: sig 
+                  type elt
+                  type t
+                  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
+                end) ->
+sig
+    (** Format a set, analogous to docList. *)
+    val docSet: ?sep:doc -> (Set.elt -> doc) -> unit -> Set.t -> doc
+
+    (** Format a set, analogous to d_list. *)
+    val d_set: string
+               -> (unit -> Set.elt -> doc)
+               -> unit
+               -> Set.t
+               -> doc
+end
+
 (** A function that is useful with the [printf]-like interface *)
 val insert: unit -> doc -> doc
 
-val dprintf: ('a, unit, doc) format -> 'a  
+val dprintf: ('a, unit, doc, doc) format4 -> 'a  
 (** This function provides an alternative method for constructing 
     [doc] objects. The first argument for this function is a format string 
     argument (of type [('a, unit, doc) format]; if you insist on 
     understanding what that means see the module [Printf]). The format string 
     is like that for the [printf] function in C, except that it understands a 
     few more formatting controls, all starting with the @ character. 
+
+    See the gprintf function if you want to pipe the result of dprintf into 
+    some other functions.
 
  The following special formatting characters are understood (these do not 
  correspond to arguments of the function):
@@ -217,6 +252,14 @@ val dprintf: ('a, unit, doc) format -> 'a
 
 *)
 
+(** Like {!Pretty.dprintf} but more general. It also takes a function that is 
+ * invoked on the constructed document but before any formatting is done. The 
+ * type of the format argument means that 'a is the type of the parameters of 
+ * this function, unit is the type of the first argument to %a and %t 
+ * formats, doc is the type of the intermediate result, and 'b is the type of 
+ * the result of gprintf. *)
+val gprintf: (doc -> 'b) -> ('a, unit, doc, 'b) format4 -> 'a
+
 (** Format the document to the given width and emit it to the given channel *)
 val fprint: out_channel -> width:int -> doc -> unit
 
@@ -232,9 +275,6 @@ val printf: ('a, unit, doc) format -> 'a
 (** Like {!Pretty.fprintf} applied to [stderr] *)
 val eprintf: ('a, unit, doc) format -> 'a 
 
-(** Like {!Pretty.dprintf} but more general. It also takes a function that is 
- * invoked on the constructed document but before any formatting is done. *) 
-val gprintf: (doc -> doc) -> ('a, unit, doc) format -> 'a
                                                                      
 (* sm: arg!  why can't I write this function?! *)
 (* * Like {!Pretty.dprintf} but yielding a string with no newlines *)
@@ -268,3 +308,9 @@ val flushOften   : bool ref  (** If true the it flushes after every print *)
 (** Keep a running count of the taken newlines. You can read and write this 
   * from the client code if you want *)
 val countNewLines : int ref
+
+
+(** A function that when used at top-level in a module will direct 
+ * the pa_prtype module generate automatically the printing functions for a 
+ * type *)
+val auto_printer: string -> 'b

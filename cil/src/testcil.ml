@@ -255,7 +255,7 @@ let testSizeOf () =
         | TArray (bt, Some len, _) -> 
             let leni = 
               match isInteger len with
-                Some i64 -> Int64.to_int i64
+                Some i64 -> i64_to_int i64
               | None -> E.s (E.bug "Array length is not a constant")
             in
             let i = Random.int leni in
@@ -389,12 +389,12 @@ let createFile () =
     { fileName = "testingcil.c";
       globals  = getGlobals ();
       globinit = None;
-      globinitcalled = false
+      globinitcalled = false;
     } 
   in
   (* Print the file *)
   let oc = open_out "testingcil.c" in
-  dumpFile defaultCilPrinter oc file;
+  dumpFile defaultCilPrinter oc "testingcil.c" file;
   close_out oc
 
   

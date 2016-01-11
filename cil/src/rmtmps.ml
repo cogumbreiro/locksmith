@@ -45,6 +45,9 @@ module H = Hashtbl
 module E = Errormsg
 module U = Util
 
+(* Set on the command-line: *)
+let keepUnused = ref false
+let rmUnusedInlines = ref false
 
 
 let trace = Trace.trace "rmtmps"
@@ -182,6 +185,14 @@ let categorizePragmas file =
 	    in
 	    List.iter processArg args
 	  end
+      | GVarDecl (v, _) -> begin
+          (* Look for alias attributes, e.g. Linux modules *)
+          match filterAttributes "alias" v.vattr with
+              [] -> ()  (* ordinary prototype. *)
+            | [Attr("alias", [AStr othername])] ->
+                H.add keepers.defines othername ()
+           | _ -> E.s (error "Bad alias attribute at %a" d_loc !currentLoc)
+        end          
 
       (*** Begin CCured-specific checks:  ***)
       (* these pragmas indirectly require that we keep the function named in
@@ -195,7 +206,7 @@ let categorizePragmas file =
 	    | _ ->
 		badPragma location directive
 	  end
-      | GPragma (Attr("ccuredvararg" as directive, funcname :: (ASizeOf t) :: _), location) ->
+      | GPragma (Attr("ccuredvararg", funcname :: (ASizeOf t) :: _), location) ->
 	  begin
 	    match t with
 	    | TComp(c,_) when c.cstruct -> (* struct *)
@@ -263,19 +274,20 @@ let amputateFunctionBodies keptGlobals file =
 
 
 let isPragmaRoot keepers = function
-  | GType ({tname = name} as info, _) ->
+  | GType ({tname = name}, _) ->
       H.mem keepers.typedefs name
-  | GEnumTag ({ename = name} as info, _)
-  | GEnumTagDecl ({ename = name} as info, _) ->
+  | GEnumTag ({ename = name}, _)
+  | GEnumTagDecl ({ename = name}, _) ->
       H.mem keepers.enums name
-  | GCompTag ({cname = name; cstruct = structure} as info, _)
-  | GCompTagDecl ({cname = name; cstruct = structure} as info, _) ->
+  | GCompTag ({cname = name; cstruct = structure}, _)
+  | GCompTagDecl ({cname = name; cstruct = structure}, _) ->
       let collection = if structure then keepers.structs else keepers.unions in
       H.mem collection name
-  | GVar ({vname = name} as info, _, _)
-  | GVarDecl ({vname = name} as info, _)
-  | GFun ({svar = {vname = name} as info}, _) ->
-      H.mem keepers.defines name
+  | GVar ({vname = name; vattr = attrs}, _, _)
+  | GVarDecl ({vname = name; vattr = attrs}, _)
+  | GFun ({svar = {vname = name; vattr = attrs}}, _) ->
+      H.mem keepers.defines name ||
+      hasAttribute "used" attrs
   | _ ->
       false
 
@@ -322,6 +334,9 @@ let hasExportingAttribute funvar =
  * - functions bearing a "constructor" or "destructor" attribute
  * - functions declared extern but not inline
  * - functions declared neither inline nor static
+ *
+ * gcc incorrectly (according to C99) makes inline functions visible to
+ * the linker.  So we can only remove inline functions on MSVC.
  *)
 
 let isExportedRoot global =
@@ -330,24 +345,24 @@ let isExportedRoot global =
       false, "static variable"
   | GVar _ ->
       true, "non-static variable"
-  | GFun ({svar = v}, _) ->
-      begin
-	match hasExportingAttribute v, v.vstorage, v.vinline with
-	| true, _, _ ->
-	    true, "constructor or destructor function"
-	| _, Extern, false ->
-	    true, "extern non-inline function"
-	| _, Extern, true ->
-	    false, "extern inline function"
-	| _, Static, _ ->
-            false, "static function"
-	| _ ->
-	    true, "other function"
-      end
+  | GFun ({svar = v}, _) -> begin 
+      if hasExportingAttribute v then 
+	true, "constructor or destructor function"
+      else if v.vstorage = Static then 
+        false, "static function"
+      else if v.vinline && v.vstorage != Extern
+              && (!msvcMode || !rmUnusedInlines) then 
+        false, "inline function"
+      else
+	true, "other function"
+  end
+  | GVarDecl(v,_) when hasAttribute "alias" v.vattr ->
+      true, "has GCC alias attribute"
   | _ ->
       false, "neither function nor variable"
   in
-  trace (dprintf "isExportedRoot %a -> %b, %s@!" d_shortglobal global result reason);
+  trace (dprintf "isExportedRoot %a -> %b, %s@!" 
+           d_shortglobal global result reason);
   result
 
 
@@ -366,13 +381,13 @@ let isExportedRoot global =
 
 let isCompleteProgramRoot global =
   let result = match global with
-  | GFun ({svar = {vname = "main"; vstorage = vstorage} as info}, _) ->
+  | GFun ({svar = {vname = "main"; vstorage = vstorage}}, _) ->
       vstorage <> Static
   | GFun (fundec, _)
     when hasExportingAttribute fundec.svar ->
       true
   | _ ->
-      true
+      false
   in
   trace (dprintf "complete program root -> %b for %a@!" result d_shortglobal global);
   result
@@ -386,7 +401,9 @@ let isCompleteProgramRoot global =
 
 
 (* This visitor recursively marks all reachable types and variables as used. *)
-class markReachableVisitor globalMap = object (self)
+class markReachableVisitor 
+    ((globalMap: (string, Cil.global) H.t),
+     (currentFunc: fundec option ref)) = object (self)
   inherit nopCilVisitor
 
   method vglob = function
@@ -408,6 +425,24 @@ class markReachableVisitor globalMap = object (self)
 	DoChildren
     | _ ->
 	SkipChildren
+
+  method vinst = function
+      Asm (_, tmpls, _, _, _, _) when !msvcMode -> 
+          (* If we have inline assembly on MSVC, we cannot tell which locals 
+           * are referenced. Keep thsem all *)
+        (match !currentFunc with 
+          Some fd -> 
+            List.iter (fun v -> 
+              let vre = Str.regexp_string (Str.quote v.vname) in 
+              if List.exists (fun tmp -> 
+                try ignore (Str.search_forward vre tmp 0); true
+                with Not_found -> false)
+                  tmpls 
+              then
+                v.vreferenced <- true) fd.slocals
+        | _ -> assert false);
+        DoChildren
+    | _ -> DoChildren
 
   method vvrbl v =
     if not v.vreferenced then
@@ -433,6 +468,12 @@ class markReachableVisitor globalMap = object (self)
 	  v.vreferenced <- true;
       end;
     SkipChildren
+
+  method vexpr (e: exp) = 
+    match e with 
+      Const (CEnum (_, _, ei)) -> ei.ereferenced <- true;
+                                  DoChildren
+    | _ -> DoChildren
 
   method vtype typ =
     let old : bool =
@@ -495,7 +536,8 @@ end
 
 
 let markReachable file isRoot =
-  (* build a mapping from global names back to their definitions & declarations *)
+  (* build a mapping from global names back to their definitions & 
+   * declarations *)
   let globalMap = Hashtbl.create 137 in
   let considerGlobal global =
     match global with
@@ -508,12 +550,17 @@ let markReachable file isRoot =
   in
   iterGlobals file considerGlobal;
 
+  let currentFunc = ref None in 
+
   (* mark everything reachable from the global roots *)
-  let visitor = new markReachableVisitor globalMap in
+  let visitor = new markReachableVisitor (globalMap, currentFunc) in
   let visitIfRoot global =
     if isRoot global then
       begin
 	trace (dprintf "traversing root global: %a\n" d_shortglobal global);
+        (match global with 
+          GFun(fd, _) -> currentFunc := Some fd
+        | _ -> currentFunc := None);
 	ignore (visitCilGlobal visitor global)
       end
     else
@@ -690,9 +737,6 @@ type rootsFilter = global -> bool
 
 let isDefaultRoot = isExportedRoot
 
-
-let keepUnused = ref false
-
 let rec removeUnusedTemps ?(isRoot : rootsFilter = isDefaultRoot) file =
   if !keepUnused || Trace.traceActive "disableTmpRemoval" then
     Trace.trace "disableTmpRemoval" (dprintf "temp removal disabled\n")
@@ -702,7 +746,7 @@ let rec removeUnusedTemps ?(isRoot : rootsFilter = isDefaultRoot) file =
         ignore (E.log "Removing unused temporaries\n" );
 
       if Trace.traceActive "printCilTree" then
-	dumpFile defaultCilPrinter stdout file;
+	dumpFile defaultCilPrinter stdout "stdout" file;
 
       (* digest any pragmas that would create additional roots *)
       let keepers = categorizePragmas file in

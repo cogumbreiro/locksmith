@@ -1,30 +1,17 @@
 ************************* STARTING *************************
 
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
 shared: alloc.gdata:exist3-false-positive.c:40
 
 Warning: Possible data race: alloc.gdata:exist3-false-positive.c:40 is not protected!
  references:
-  dereference at exist3-false-positive.c:22
-    locations possibly dereferenced: 
-      (*s).gdata:exist3-false-positive.c:34
-      alloc.gdata:exist3-false-positive.c:40
-    locks acquired at dereference: 
-      <empty>
-    in: main at exist3-false-positive.c:33 -> pack exist3-false-positive.c:42 -> f exist3-false-positive.c:46 -> doit exist3-false-positive.c:28
+  dereference of *in.gdata:exist3-false-positive.c:17 at exist3-false-positive.c:22
+    alloc.gdata:exist3-false-positive.c:40 => s->gdata:exist3-false-positive.c:34 
+                                           => s.gdata:exist3-false-positive.c:35 at pack exist3-false-positive.c:42
+                                           => in->gdata:exist3-false-positive.c:26 at f exist3-false-positive.c:45
+                                           => *in.gdata:exist3-false-positive.c:17 at doit exist3-false-positive.c:28
+  locks acquired:
+    <empty>
+  in: main at exist3-false-positive.c:33 
+             
 
 *************************** DONE ***************************

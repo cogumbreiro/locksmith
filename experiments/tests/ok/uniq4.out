@@ -2,83 +2,53 @@
 
 
 uniq4.c:17: Warning: assigning number to pointer
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
 shared: &j:uniq4.c:5
 
 Warning: Possible data race: &j:uniq4.c:5 is not protected!
  references:
-  dereference at uniq4.c:15
-    locations possibly dereferenced: 
-      &j:uniq4.c:5
-    locks acquired at dereference: 
-      <empty>
-    in: FORK at uniq4.c:27 -> dostuff uniq4.c:27
+  dereference of &j:uniq4.c:5 at uniq4.c:15
+    &j:uniq4.c:5
+  locks acquired:
+    <empty>
+  in: FORK at uniq4.c:27 
+             
 
-  dereference at uniq4.c:17
-    locations possibly dereferenced: 
-      &j:uniq4.c:5
-    locks acquired at dereference: 
-      concrete l:uniq4.c:24
-      l:uniq4.c:6
-    in: FORK at uniq4.c:27 -> dostuff uniq4.c:27
+  dereference of &j:uniq4.c:5 at uniq4.c:17
+    &j:uniq4.c:5
+  locks acquired:
+    concrete l:uniq4.c:24
+    l:uniq4.c:6
+  in: FORK at uniq4.c:27 
+             
 
-  dereference at uniq4.c:15
-    locations possibly dereferenced: 
-      &j:uniq4.c:5
-    locks acquired at dereference: 
-      <empty>
-    in: FORK at uniq4.c:26 -> dostuff uniq4.c:26
+  dereference of &j:uniq4.c:5 at uniq4.c:15
+    &j:uniq4.c:5
+  locks acquired:
+    <empty>
+  in: FORK at uniq4.c:26 
+             
 
-  dereference at uniq4.c:17
-    locations possibly dereferenced: 
-      &j:uniq4.c:5
-    locks acquired at dereference: 
-      concrete l:uniq4.c:24
-      l:uniq4.c:6
-    in: FORK at uniq4.c:26 -> dostuff uniq4.c:26
+  dereference of &j:uniq4.c:5 at uniq4.c:17
+    &j:uniq4.c:5
+  locks acquired:
+    concrete l:uniq4.c:24
+    l:uniq4.c:6
+  in: FORK at uniq4.c:26 
+             
 
-  dereference at uniq4.c:15
-    locations possibly dereferenced: 
-      &j:uniq4.c:5
-    locks acquired at dereference: 
-      <empty>
-    in: main at uniq4.c:22 -> dostuff uniq4.c:27
+  dereference of &j:uniq4.c:5 at uniq4.c:15
+    &j:uniq4.c:5
+  locks acquired:
+    <empty>
+  in: main at uniq4.c:22 
+             
 
-  dereference at uniq4.c:15
-    locations possibly dereferenced: 
-      &j:uniq4.c:5
-    locks acquired at dereference: 
-      <empty>
-    in: main at uniq4.c:22 -> dostuff uniq4.c:26
-
-  dereference at uniq4.c:17
-    locations possibly dereferenced: 
-      &j:uniq4.c:5
-    locks acquired at dereference: 
-      concrete l:uniq4.c:24
-      l:uniq4.c:6
-    in: main at uniq4.c:22 -> dostuff uniq4.c:27
-
-  dereference at uniq4.c:17
-    locations possibly dereferenced: 
-      &j:uniq4.c:5
-    locks acquired at dereference: 
-      concrete l:uniq4.c:24
-      l:uniq4.c:6
-    in: main at uniq4.c:22 -> dostuff uniq4.c:26
+  dereference of &j:uniq4.c:5 at uniq4.c:17
+    &j:uniq4.c:5
+  locks acquired:
+    concrete l:uniq4.c:24
+    l:uniq4.c:6
+  in: main at uniq4.c:22 
+             
 
 *************************** DONE ***************************

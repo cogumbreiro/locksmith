@@ -40,6 +40,7 @@ use strict;
 use Data::Dumper;
 use FindBin;
 use lib "$FindBin::Bin";
+use lib "$FindBin::Bin/../lib"; # The libraries are in the lib directory
 # Read the configuration script
 use CilConfig;
 
@@ -93,7 +94,7 @@ sub collectOneArgument {
 }
 
 sub usage {
-    print "cilly [options] [gcc_or_mscl arguments]\n";
+    print "Usage: cilly [options] [gcc_or_mscl arguments]\n";
 }
 
 sub helpMessage {

@@ -1,42 +1,21 @@
 ************************* STARTING *************************
 
-
-forkloop.c:5: Warning: subtyping incompatible types:
-int
-(void)
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
 shared: &i:forkloop.c:10
 
 Warning: Possible data race: &i:forkloop.c:10 is not protected!
  references:
-  dereference at forkloop.c:5
-    locations possibly dereferenced: 
-      &i:forkloop.c:10
-      dostuff.a:forkloop.c:12
-    locks acquired at dereference: 
-      <empty>
-    in: FORK at forkloop.c:12 -> dostuff forkloop.c:12
+  dereference of cast:forkloop.c:5 at forkloop.c:5
+    &i:forkloop.c:10 => cast:forkloop.c:5 at dostuff forkloop.c:12
+  locks acquired:
+    <empty>
+  in: FORK at forkloop.c:12 
+             
 
-  dereference at forkloop.c:5
-    locations possibly dereferenced: 
-      &i:forkloop.c:10
-      dostuff.a:forkloop.c:12
-    locks acquired at dereference: 
-      <empty>
-    in: main at forkloop.c:8 -> dostuff forkloop.c:12
+  dereference of cast:forkloop.c:5 at forkloop.c:5
+    &i:forkloop.c:10 => cast:forkloop.c:5 at dostuff forkloop.c:12
+  locks acquired:
+    <empty>
+  in: main at forkloop.c:8 
+             
 
 *************************** DONE ***************************

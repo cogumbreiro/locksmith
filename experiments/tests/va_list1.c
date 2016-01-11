@@ -15,7 +15,7 @@ int main(int argc , char **argv ) {
 
   req = (int *)calloc(1U, sizeof(int ));
   pthread_create(&hthread, 0, & signal_waiter, 0);
-  Log((char *)"Attempting to read log file %s for resuming download job...", logfile);
+  Log((char *)"Attempting to read log file %s for resuming download job...", "A");
   resume_get();
   return (0);
 }

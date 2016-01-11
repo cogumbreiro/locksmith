@@ -1,20 +1,13 @@
 ************************* STARTING *************************
 
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
+
+state.c:84: Warning: assigning pointer to non-pointer: (void)*^{*p.cur:state.c:81}
+ ->
+ int
+
+state.c:84: Warning: assigning pointer to non-pointer: (void)*^{*p.data:state.c:81}
+ ->
+ int
 shared: &pool_list_head:state.c:28
         &pool_list_tail:state.c:29
         alloc.cur:state.c:38
@@ -30,82 +23,894 @@ shared: &pool_list_head:state.c:28
   pool_list_lock:state.c:32
 
 Warning: Possible data race: alloc.cur:state.c:38 is protected by non-linear or concrete lock(s):
-  (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).pool_lock:state.c:107
-  (*new_pool).pool_lock:state.c:36
+  *new_pool.pool_lock:state.c:36
+  *p->pool_lock:state.c:107
   non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
   non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
   non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
   non linear concrete new_pool->pool_lock:state.c:42
  references:
-  dereference at state.c:84
-    locations possibly dereferenced: 
-      (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).cur:state.c:107
-      (*new_pool).cur:state.c:36
-      alloc.cur:state.c:38
-    locks acquired at dereference: 
-      (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).pool_lock:state.c:107
-      (*new_pool).pool_lock:state.c:36
-      non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock:state.c:42
-    in: FORK at state.c:121 -> go1 state.c:121 -> qsd_pmalloc state.c:108
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:100
+             
 
-  dereference at state.c:84
-    locations possibly dereferenced: 
-      (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).cur:state.c:107
-      (*new_pool).cur:state.c:36
-      alloc.cur:state.c:38
-    locks acquired at dereference: 
-      (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).pool_lock:state.c:107
-      (*new_pool).pool_lock:state.c:36
-      non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock:state.c:42
-    in: FORK at state.c:120 -> go1 state.c:120 -> qsd_pmalloc state.c:108
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:101
+             
 
-  dereference at state.c:84
-    locations possibly dereferenced: 
-      (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).cur:state.c:107
-      (*new_pool).cur:state.c:36
-      alloc.cur:state.c:38
-    locks acquired at dereference: 
-      (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).pool_lock:state.c:107
-      (*new_pool).pool_lock:state.c:36
-      non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock:state.c:42
-    in: main at state.c:117 -> go1 state.c:121 -> qsd_pmalloc state.c:108
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:102
+             
 
-  dereference at state.c:84
-    locations possibly dereferenced: 
-      (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).cur:state.c:107
-      (*new_pool).cur:state.c:36
-      alloc.cur:state.c:38
-    locks acquired at dereference: 
-      (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).pool_lock:state.c:107
-      (*new_pool).pool_lock:state.c:36
-      non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock:state.c:42
-    in: main at state.c:117 -> go1 state.c:120 -> qsd_pmalloc state.c:108
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:108
+             
 
-  dereference at state.c:84
-    locations possibly dereferenced: 
-      (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).cur:state.c:107
-      (*new_pool).cur:state.c:36
-      alloc.cur:state.c:38
-    locks acquired at dereference: 
-      (**p, **tmp, *get_new_pool.return, *qsd_pmalloc.p, *go2.p, *qsd_pmalloc.p, *qsd_pmalloc.p).pool_lock:state.c:107
-      (*new_pool).pool_lock:state.c:36
-      non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
-      non linear concrete new_pool->pool_lock:state.c:42
-    in: FORK at state.c:111 -> go2 state.c:111 -> qsd_pmalloc state.c:100
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:113
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:114
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:102
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:108
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:113
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:114
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:102
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:108
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:113
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:121  -> state.c:114
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:102
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:108
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:113
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:114
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:102
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:108
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:113
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:114
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:102
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:108
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:113
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:120  -> state.c:114
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:102
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:108
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:113
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:114
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:102
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:108
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:113
+                          
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:114
+                          
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:102
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:108
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:113
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: main at state.c:117  -> state.c:114
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:111  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:111  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:84
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:111  -> state.c:102
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:111  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:111  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:85
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:111  -> state.c:102
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:111  -> state.c:100
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:111  -> state.c:101
+             
+
+  dereference of *p.cur:state.c:81 at state.c:86
+    alloc.cur:state.c:38 => *new_pool.cur:state.c:36 
+                         => *p->cur:state.c:107 at get_new_pool state.c:107
+                         => *p.cur:state.c:81 at qsd_pmalloc state.c:108
+  locks acquired:
+    *new_pool.pool_lock:state.c:36
+    *p->pool_lock:state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:120 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock::-1 -> go1 state.c:121 -> get_new_pool state.c:107
+    non linear concrete new_pool->pool_lock:state.c:42
+  in: FORK at state.c:111  -> state.c:102
+             
 
 alloc.prev:state.c:38 is protected by:
   concrete pool_list_lock:state.c:32

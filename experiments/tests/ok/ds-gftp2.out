@@ -1,49 +1,47 @@
 ************************* STARTING *************************
 
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
 shared: alloc.cancel:ds-gftp2.c:43
         alloc.done:ds-gftp2.c:43
         alloc.numfiles:ds-gftp2.c:43
 
 Warning: Possible data race: alloc.numfiles:ds-gftp2.c:43 is not protected!
  references:
-  dereference at ds-gftp2.c:77
-    locations possibly dereferenced: 
-      (*gftp_tdata_new, *tdata).numfiles:ds-gftp2.c:39
-      (*tdata).numfiles:ds-gftp2.c:107
-      alloc.numfiles:ds-gftp2.c:43
-    locks acquired at dereference: 
-      (*tdata, *tmp, *gftp_tdata_new.return).statmutex:ds-gftp2.c:107
-      concrete tdata->statmutex::-1 -> gftp_tdata_new ds-gftp2.c:107
-    in: main at ds-gftp2.c:102 -> pack ds-gftp2.c:110 -> doit2 ds-gftp2.c:112 -> update_file_status ds-gftp2.c:97
+  dereference of gftp_transfer.numfiles:ds-gftp2.c:72 at ds-gftp2.c:77
+    alloc.numfiles:ds-gftp2.c:43 => gftp_tdata_new->numfiles:ds-gftp2.c:39 
+                                 => *tdata.numfiles:ds-gftp2.c:107 at gftp_tdata_new ds-gftp2.c:107
+                                 => gftp_transfer.numfiles:ds-gftp2.c:109 at pack ds-gftp2.c:110
+                                 => gftp_transfer.numfiles:ds-gftp2.c:96 
+                                 => gftp_transfer.numfiles:ds-gftp2.c:72 
+  locks acquired:
+    concrete tdata->statmutex::-1 -> gftp_tdata_new ds-gftp2.c:107
+    tdata->statmutex:ds-gftp2.c:107
+  in: main at ds-gftp2.c:102 
+             
 
-  dereference at ds-gftp2.c:108
-    locations possibly dereferenced: 
-      (*gftp_tdata_new, *tdata).numfiles:ds-gftp2.c:39
-      (*tdata).numfiles:ds-gftp2.c:107
-      alloc.numfiles:ds-gftp2.c:43
-    locks acquired at dereference: 
-      <empty>
-    in: main at ds-gftp2.c:102
+  dereference of gftp_transfer.numfiles:ds-gftp2.c:72 at ds-gftp2.c:85
+    alloc.numfiles:ds-gftp2.c:43 => gftp_tdata_new->numfiles:ds-gftp2.c:39 
+                                 => *tdata.numfiles:ds-gftp2.c:107 at gftp_tdata_new ds-gftp2.c:107
+                                 => gftp_transfer.numfiles:ds-gftp2.c:109 at pack ds-gftp2.c:110
+                                 => gftp_transfer.numfiles:ds-gftp2.c:96 
+                                 => gftp_transfer.numfiles:ds-gftp2.c:72 
+  locks acquired:
+    concrete tdata->statmutex::-1 -> gftp_tdata_new ds-gftp2.c:107
+    tdata->statmutex:ds-gftp2.c:107
+  in: main at ds-gftp2.c:102 
+             
+
+  dereference of *tdata.numfiles:ds-gftp2.c:107 at ds-gftp2.c:108
+    alloc.numfiles:ds-gftp2.c:43 => gftp_tdata_new->numfiles:ds-gftp2.c:39 
+                                 => *tdata.numfiles:ds-gftp2.c:107 at gftp_tdata_new ds-gftp2.c:107
+  locks acquired:
+    <empty>
+  in: main at ds-gftp2.c:102 
+             
 
 alloc.cancel:ds-gftp2.c:43 is protected by:
-  (*tdata, *tmp, *gftp_tdata_new.return).structmutex:ds-gftp2.c:107
   concrete tdata->structmutex::-1 -> gftp_tdata_new ds-gftp2.c:107
+  tdata->structmutex:ds-gftp2.c:107
 alloc.done:ds-gftp2.c:43 is protected by:
-  (*tdata, *tmp, *gftp_tdata_new.return).structmutex:ds-gftp2.c:107
   concrete tdata->structmutex::-1 -> gftp_tdata_new ds-gftp2.c:107
+  tdata->structmutex:ds-gftp2.c:107
 *************************** DONE ***************************

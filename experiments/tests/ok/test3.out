@@ -1,73 +1,51 @@
 ************************* STARTING *************************
 
-
-test3.c:23: Warning: subtyping incompatible types:
-int
-(void)
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
+functions declared and used but not defined:
   printf
 shared: &i:test3.c:28
 
 Warning: Possible data race: &i:test3.c:28 is not protected!
  references:
-  dereference at test3.c:23
-    locations possibly dereferenced: 
-      &i:test3.c:28
-      dostuff.a:test3.c:32
-    locks acquired at dereference: 
-      concrete *l::-1 -> dostuff test3.c:32 -> f test3.c:25
-    in: FORK at test3.c:32 -> dostuff test3.c:32
+  dereference of cast:test3.c:23 at test3.c:23
+    &i:test3.c:28 => cast:test3.c:23 at dostuff test3.c:31
+  locks acquired:
+    concrete *l::-1 -> dostuff test3.c:32 -> f test3.c:25
+  in: FORK at test3.c:32 
+             
 
-  dereference at test3.c:23
-    locations possibly dereferenced: 
-      &i:test3.c:28
-      dostuff.a:test3.c:31
-    locks acquired at dereference: 
-      concrete *l::-1 -> dostuff test3.c:31 -> f test3.c:25
-    in: FORK at test3.c:31 -> dostuff test3.c:31
+  dereference of cast:test3.c:23 at test3.c:23
+    &i:test3.c:28 => cast:test3.c:23 at dostuff test3.c:31
+  locks acquired:
+    concrete *l::-1 -> dostuff test3.c:31 -> f test3.c:25
+  in: FORK at test3.c:31 
+             
 
-  dereference at test3.c:23
-    locations possibly dereferenced: 
-      &i:test3.c:28
-      dostuff.a:test3.c:32
-    locks acquired at dereference: 
-      concrete *l::-1 -> dostuff test3.c:32 -> f test3.c:25
-    in: main at test3.c:27 -> dostuff test3.c:32
+  dereference of cast:test3.c:23 at test3.c:23
+    &i:test3.c:28 => cast:test3.c:23 at dostuff test3.c:31
+  locks acquired:
+    concrete *l::-1 -> dostuff test3.c:31 -> f test3.c:25
+  in: main at test3.c:27 
+             
 
-  dereference at test3.c:23
-    locations possibly dereferenced: 
-      &i:test3.c:28
-      dostuff.a:test3.c:31
-    locks acquired at dereference: 
-      concrete *l::-1 -> dostuff test3.c:31 -> f test3.c:25
-    in: main at test3.c:27 -> dostuff test3.c:31
+  dereference of cast:test3.c:23 at test3.c:23
+    &i:test3.c:28 => cast:test3.c:23 at dostuff test3.c:31
+  locks acquired:
+    concrete *l::-1 -> dostuff test3.c:32 -> f test3.c:25
+  in: main at test3.c:27 
+             
 
-  dereference at test3.c:33
-    locations possibly dereferenced: 
-      &i:test3.c:28
-    locks acquired at dereference: 
-      <empty>
-    in: main at test3.c:27
+  dereference of &i:test3.c:28 at test3.c:33
+    &i:test3.c:28
+  locks acquired:
+    <empty>
+  in: main at test3.c:27 
+             
 
-  dereference at test3.c:34
-    locations possibly dereferenced: 
-      &i:test3.c:28
-    locks acquired at dereference: 
-      <empty>
-    in: main at test3.c:27
+  dereference of &i:test3.c:28 at test3.c:34
+    &i:test3.c:28
+  locks acquired:
+    <empty>
+  in: main at test3.c:27 
+             
 
 *************************** DONE ***************************

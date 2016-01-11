@@ -3,9 +3,9 @@
 (* The type of a heap (priority queue): keys are integers, data values
  * are whatever you like *)
 type ('a) t = {
-  mutable elements  : (int * ('a option)) array ;
+          elements  : (int * ('a option)) array ;
   mutable size      : int ; (* current number of elements *)
-  mutable capacity  : int ; (* max number of elements *)
+          capacity  : int ; (* max number of elements *)
 } 
 
 let create size = {
@@ -22,9 +22,7 @@ let is_empty heap = (heap.size = 0)
 
 let insert heap prio elt = begin
   if is_full heap then begin
-    heap.elements <- Array.append heap.elements (Array.create (heap.capacity + 1) (max_int,None));
-    heap.capacity <- (heap.capacity * 2 + 1);
-    (*raise (Invalid_argument "Heap.insert")*)
+    raise (Invalid_argument "Heap.insert")
   end ; 
   heap.size <- heap.size + 1 ;
   let i = ref heap.size in
@@ -34,6 +32,8 @@ let insert heap prio elt = begin
   done ;
   heap.elements.(!i) <- (prio,Some(elt))
   end
+
+let length h = h.size (* LOCKSMITH *)
 
 let examine_max heap = 
   if is_empty heap then begin

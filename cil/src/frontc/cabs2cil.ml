@@ -39,26 +39,76 @@
 
 (* The references to ISO means ANSI/ISO 9899-1999 *)
 module A = Cabs
+module C = Cabshelper
+module V = Cabsvisit
 module E = Errormsg
 module H = Hashtbl
+module IH = Inthash
+module AL = Alpha
 
 open Cabs
+open Cabshelper
 open Pretty
 open Cil
 open Trace
 
 
+let mydebugfunction () = 
+  E.s (error "mydebugfunction")
+
 let debugGlobal = false
 
-(* Leave a certain global alone. Use a negative number to disable. *)
+let continueOnError = true
+
+(** Turn on tranformation that forces correct parameter evaluation order *)
+let forceRLArgEval = ref false
+
+(** Leave a certain global alone. Use a negative number to disable. *)
 let nocil: int ref = ref (-1)
 
-(* Indicates whether we're allowed to duplicate small chunks. *)
+(** Indicates whether we're allowed to duplicate small chunks. *)
 let allowDuplication: bool ref = ref true
+
+(** If false, the destination of a Call instruction should always have the
+    same type as the function's return type.  Where needed, CIL will insert
+    a temporary to make this happen.
+
+    If true, the destination type may differ from the return type, so there
+    is an implicit cast.  This is useful for analyses involving [malloc],
+    because the instruction "T* x = malloc(...);" won't be broken into
+    two instructions, so it's easy to find the allocation type.
+
+    This is false by default.  Set to true to replicate the behavior
+    of CIL 1.3.5 and earlier.
+*)
+let doCollapseCallCast: bool ref = ref true (* LOCKSMITH *)
+
+(** A hook into the code that creates temporary local vars.  By default this
+  is the identity function, but you can overwrite it if you need to change the
+  types of cabs2cil-introduced temp variables. *)
+let typeForInsertedVar: (Cil.typ -> Cil.typ) ref = ref (fun t -> t)
+
+(** Like [typeForInsertedVar], but for casts.  
+  * Casts in the source code are exempt from this hook. *)
+let typeForInsertedCast: (Cil.typ -> Cil.typ) ref = ref (fun t -> t)
+
+(** A hook into the code that remaps argument names in the appropriate
+  * attributes. *)
+let typeForCombinedArg: ((string, string) H.t -> typ -> typ) ref =
+  ref (fun _ t -> t)
+
+(** A hook into the code that remaps argument names in the appropriate
+  * attributes. *)
+let attrsForCombinedArg: ((string, string) H.t ->
+                          attributes -> attributes) ref =
+  ref (fun _ t -> t)
 
 (* ---------- source error message handling ------------- *)
 let lu = locUnknown
-let cabslu = {lineno = -10; filename = "cabs lu"; byteno = -10;}
+let cabslu = {lineno = -10; 
+	      filename = "cabs lu"; 
+	      byteno = -10;
+              ident = 0;}
 
 
 (** Interface to the Cprint printer *)
@@ -72,8 +122,12 @@ let withCprint (f: 'a -> unit) (x: 'a) : unit =
   Cprint.out := old
 
 
+(** Keep a list of the variable ID for the variables that were created to 
+ * hold the result of function calls *)
+let callTempVars: unit IH.t = IH.create 13
+
 (* Keep a list of functions that were called without a prototype. *)
-let noProtoFunctions : (int, bool) H.t = H.create 13
+let noProtoFunctions : bool IH.t = IH.create 13
 
 (* Check that s starts with the prefix p *)
 let prefix p s = 
@@ -122,7 +176,7 @@ let debugLoc = false
 let convLoc (l : cabsloc) =
   if debugLoc then 
     ignore (E.log "convLoc at %s: line %d, btye %d\n" l.filename l.lineno l.byteno);
-  {line = l.lineno; file = l.filename; byte = l.byteno}
+  {line = l.lineno; file = l.filename; byte = l.byteno;}
 
 
 let isOldStyleVarArgName n = 
@@ -132,6 +186,11 @@ let isOldStyleVarArgName n =
 let isOldStyleVarArgTypeName n = 
   if !msvcMode then n = "va_list"  || n = "__ccured_va_list" 
   else n = "__builtin_va_alist_t"
+
+let isVariadicListType t =
+  match unrollType t with
+  | TBuiltin_va_list _ -> true
+  | _ -> false
 
 (* Weimer
  * multi-character character constants
@@ -156,10 +215,10 @@ let isOldStyleVarArgTypeName n =
  * values, turn it into a CIL constant.  Multi-character constants are
  * treated as multi-digit numbers with radix given by the bit width of
  * the specified type (either char or wchar_t). *)
-let reduce_multichar typ =
+let reduce_multichar typ : int64 list -> int64 =
   let radix = bitsSizeOf typ in
   List.fold_left
-    (fun acc -> Int64.add (Int64.shift_left acc 8))
+    (fun acc -> Int64.add (Int64.shift_left acc radix))
     Int64.zero
 
 let interpret_character_constant char_list =
@@ -193,7 +252,7 @@ let cabsPushGlobal (g: global) =
  * we see another definition with an initializer. But if we don't see any 
  * then we turn the last such declaration into a definition without 
  * initializer *)
-let mustTurnIntoDef: (int, bool) H.t = H.create 117
+let mustTurnIntoDef: bool IH.t = IH.create 117
 
 (* Globals that have already been defined. Indexed by the variable name. *)
 let alreadyDefined: (string, location) H.t = H.create 117
@@ -214,8 +273,8 @@ let popGlobals () =
       [] -> tail
 
     | GVarDecl (vi, l) :: rest 
-      when vi.vstorage != Extern && H.mem mustTurnIntoDef vi.vid -> 
-        H.remove mustTurnIntoDef vi.vid;
+      when vi.vstorage != Extern && IH.mem mustTurnIntoDef vi.vid -> 
+        IH.remove mustTurnIntoDef vi.vid;
         revonto (GVar (vi, {init = None}, l) :: tail) rest
 
     | x :: rest -> revonto (x :: tail) rest
@@ -258,7 +317,8 @@ let genv : (string, envdata * location) H.t = H.create 307
   * hash table easily *)
 type undoScope =
     UndoRemoveFromEnv of string
-  | UndoResetAlphaCounter of alphaTableData ref * alphaTableData
+  | UndoResetAlphaCounter of location AL.alphaTableData ref * 
+                             location AL.alphaTableData
   | UndoRemoveFromAlphaTable of string
 
 let scopes :  undoScope list ref list ref = ref []
@@ -298,7 +358,7 @@ let addGlobalToEnv (k: string) (d: envdata) : unit =
  * first argument is a table mapping name prefixes with the largest suffix 
  * used so far for that prefix. The largest suffix is one when only the 
  * version without suffix has been used. *)
-let alphaTable : (string, alphaTableData ref) H.t = H.create 307 
+let alphaTable : (string, location AL.alphaTableData ref) H.t = H.create 307 
         (* vars and enum tags. For composite types we have names like "struct 
          * foo" or "union bar" *)
 
@@ -329,7 +389,7 @@ let newAlphaName (globalscope: bool) (* The name should have global scope *)
   let rec findEnclosingFun = function
       [] -> (* At global scope *)()
     | [s] -> begin
-        let prefix = getAlphaPrefix lookupname in
+        let prefix = AL.getAlphaPrefix lookupname in
         try
           let countref = H.find alphaTable prefix in
           s := (UndoResetAlphaCounter (countref, !countref)) :: !s
@@ -340,7 +400,8 @@ let newAlphaName (globalscope: bool) (* The name should have global scope *)
   in
   if not globalscope then 
     findEnclosingFun !scopes;
-  let newname, oldloc = Cil.newAlphaName alphaTable None lookupname in
+  let newname, oldloc = 
+           AL.newAlphaName alphaTable None lookupname !currentLoc in
   stripKind kind newname, oldloc
 
 
@@ -412,6 +473,7 @@ let lookupVar (n: string) : varinfo * location =
     (EnvVar vi), loc -> vi, loc
   | _ -> raise Not_found
         
+
 let lookupGlobalVar (n: string) : varinfo * location = 
   match H.find genv n with
     (EnvVar vi), loc -> vi, loc
@@ -468,8 +530,12 @@ let alphaConvertVarAndAddToEnv (addtoenv: bool) (vi: varinfo) : varinfo =
             E.s (E.error "It seems that we would need to rename global %s (to %s) because of previous occurrence at %a" 
                    vi.vname newname d_loc oldloc);
         end
-      end else
+      end else begin 
+        (* We have changed the name of a local variable. Can we try to detect 
+         * if the other variable was also local in the same scope? Not for 
+         * now. *)
         copyVarinfo vi newname
+      end
     end
   in
   (* Store all locals in the slocals (in reversed order). We'll reverse them 
@@ -548,22 +614,36 @@ let rec stripConstLocalType (t: typ) : typ =
   | TBuiltin_va_list a -> 
       let a' = dc a in if a != a' then TBuiltin_va_list a' else t
 
-            
-        
+
+let constFoldTypeVisitor = object (self)
+  inherit nopCilVisitor
+  method vtype t: typ visitAction =
+    match t with
+      TArray(bt, Some len, a) -> 
+        let len' = constFold true len in
+        ChangeDoChildrenPost (
+          TArray(bt, Some len', a),
+          (fun x -> x)
+        )
+    | _ -> DoChildren
+end
+
+(* Const-fold any expressions that appear as array lengths in this type *)
+let constFoldType (t:typ) : typ =
+  visitCilType constFoldTypeVisitor t
+
+let typeSigNoAttrs: typ -> typsig = typeSigWithAttrs (fun _ -> [])
 
 (* Create a new temporary variable *)
-let newTempVar typ = 
-  let stripConst t =
-    let a = typeAttrs t in
-    let a1 = dropAttribute "const" a in
-    setTypeAttrs t a1
-  in
+let newTempVar (descr:doc) (descrpure:bool) typ = 
   if !currentFunctionFDEC == dummyFunDec then 
     E.s (bug "newTempVar called outside a function");
 (*  ignore (E.log "stripConstLocalType(%a) for temporary\n" d_type typ); *)
-  let t' = stripConstLocalType typ in
+  let t' = (!typeForInsertedVar) (stripConstLocalType typ) in
   (* Start with the name "tmp". The alpha converter will fix it *)
   let vi = makeVarinfo false "tmp" t' in
+  vi.vdescr <- descr;
+  vi.vdescrpure <- descrpure;
   alphaConvertVarAndAddToEnv false  vi (* Do not add to the environment *)
 (*
     { vname = "tmp";  (* addNewVar will make the name fresh *)
@@ -647,7 +727,6 @@ let createEnumInfo (n: string) : enuminfo * bool =
 
    (* kind is either "struct" or "union" or "enum" and n is a name *)
 let findCompType (kind: string) (n: string) (a: attributes) = 
-  let key = kind ^ " " ^ n in
   let makeForward () = 
     (* This is a forward reference, either because we have not seen this 
      * struct already or because we want to create a version with different 
@@ -701,9 +780,9 @@ module BlockChunk =
         postins: instr list;              (* Some instructions to append at 
                                            * the ends of statements (in 
                                            * reverse order)  *)
-                                        (* A list of case statements visible at the 
-                                         * outer level *)
-        cases: (label * stmt) list
+        cases: stmt list;                 (* A list of case statements 
+                                           * (statements with Case labels) 
+                                           * visible at the outer level *)
       } 
 
     let d_chunk () (c: chunk) = 
@@ -894,21 +973,41 @@ module BlockChunk =
     let caseRangeChunk (el: exp list) (l: location) (next: chunk) = 
       let fst, stmts' = getFirstInChunk next in
       let labels = List.map (fun e -> Case (e, l)) el in
-      let cases  = List.map (fun l -> (l, fst)) labels in
       fst.labels <- labels @ fst.labels;
-      { next with stmts = stmts'; cases = cases @ next.cases}
+      { next with stmts = stmts'; cases = fst :: next.cases}
         
     let defaultChunk (l: location) (next: chunk) = 
       let fst, stmts' = getFirstInChunk next in
       let lb = Default l in
       fst.labels <- lb :: fst.labels;
-      { next with stmts = stmts'; cases = (lb, fst) :: next.cases}
+      { next with stmts = stmts'; cases = fst :: next.cases}
 
         
     let switchChunk (e: exp) (body: chunk) (l: location) =
       (* Make the statement *)
+      let defaultSeen = ref false in
+      let checkForDefault lb : unit = 
+        match lb with
+          Default _ -> if !defaultSeen then
+            E.s (error "Switch statement at %a has duplicate default entries."
+                   d_loc l);
+            defaultSeen := true
+        | _ -> ()
+      in
+      let cases = (* eliminate duplicate entries from body.cases.
+                     A statement is added to body.cases for each case label
+                     it has. *)
+        List.fold_right (fun s acc ->
+                           if List.memq s acc then acc
+                           else begin
+                             List.iter checkForDefault s.labels;
+                             s::acc
+                           end) 
+          body.cases
+          []
+      in
       let switch = mkStmt (Switch (e, c2block body, 
-                                   List.map (fun (_, s) -> s) body.cases, 
+                                   cases, 
                                    l)) in
       { stmts = [ switch (* ; n *) ];
         postins = [];
@@ -984,20 +1083,30 @@ let lookupLabel (l: string) =
 
 
 (** ALLOCA ***)
-let allocaFun = 
-  let fdec = emptyFunction "alloca" in
-  fdec.svar.vtype <- 
-     TFun(voidPtrType, Some [ ("len", !typeOfSizeOf, []) ], false, []);
-  fdec
+let allocaFun () = 
+  if !msvcMode then begin
+    let name = "alloca" in
+    let fdec = emptyFunction name in
+    fdec.svar.vtype <- 
+      TFun(voidPtrType, Some [ ("len", !typeOfSizeOf, []) ], false, []);
+    fdec.svar
+  end
+  else
+    (* Use __builtin_alloca where possible, because this can be used
+       even when gcc is invoked with -fno-builtin *)
+    let alloca, _ = lookupGlobalVar "__builtin_alloca" in
+    alloca
   
 (* Maps local variables that are variable sized arrays to the expression that 
  * denotes their length *)
-let varSizeArrays : (int, exp) H.t = H.create 17
+let varSizeArrays : exp IH.t = IH.create 17
   
 (**** EXP actions ***)
 type expAction = 
     ADrop                               (* Drop the result. Only the 
                                          * side-effect is interesting *)
+  | AType                               (* Only the type of the result
+                                           is interesting.  *)
   | ASet of lval * typ                  (* Put the result in a given lval, 
                                          * provided it matches the type. The 
                                          * type is the type of the lval. *)
@@ -1079,27 +1188,32 @@ let arithmeticConversion    (* c.f. ISO 6.3.1.8 *)
 (* Specify whether the cast is from the source code *)
 let rec castTo ?(fromsource=false) 
                 (ot : typ) (nt : typ) (e : exp) : (typ * exp ) = 
-(*
-  ignore (E.log "%t: castTo:%s %a->%a\n"
-            d_thisloc
-            (if fromsource then "(source)" else "")
-            d_type ot d_type nt);
-*)
-  if not fromsource && typeSig ot = typeSig nt then
+  let debugCast = false in 
+  if debugCast then 
+    ignore (E.log "%t: castTo:%s %a->%a\n"
+              d_thisloc
+              (if fromsource then "(source)" else "")
+              d_type ot d_type nt);
+
+  if not fromsource && Util.equals (typeSig ot) (typeSig nt) then
     (* Do not put the cast if it is not necessary, unless it is from the 
      * source. *)
     (ot, e) 
   else begin
-    let result = (nt, mkCastT e ot nt) in
-(*
-    ignore (E.log "castTo: ot=%a nt=%a\n  result is %a\n" 
-              d_type ot d_type nt
-              d_plainexp (snd result));
-*)
+    let nt' = unrollType nt in
+    let nt' = if fromsource then nt' else !typeForInsertedCast nt' in
+    let result = (nt', 
+                  if !insertImplicitCasts || fromsource then Cil.mkCastT e ot nt' else e) in
+
+    if debugCast then 
+      ignore (E.log "castTo: ot=%a nt=%a\n  result is %a\n" 
+                d_type ot d_type nt'
+                d_plainexp (snd result));
+
     (* Now see if we can have a cast here *)
-    match ot, nt with
-      TNamed(r, _), _ -> castTo r.ttype nt e
-    | _, TNamed(r, _) -> castTo ot r.ttype e
+    match unrollType ot, nt' with
+      TNamed _, _ 
+    | _, TNamed _ -> E.s (bug "unrollType failed in castTo")
     | TInt(ikindo,_), TInt(ikindn,_) -> 
         (* We used to ignore attributes on integer-integer casts. Not anymore *)
         (* if ikindo = ikindn then (nt, e) else *) 
@@ -1113,9 +1227,9 @@ let rec castTo ?(fromsource=false)
           
     | TArray _, TPtr _ -> result
           
-    | TArray(t1,_,_), TArray(t2,None,_) when typeSig t1 = typeSig t2 -> (nt, e)
+    | TArray(t1,_,_), TArray(t2,None,_) when Util.equals (typeSig t1) (typeSig t2) -> (nt', e)
           
-    | TPtr _, TArray(_,_,_) -> (nt, e)
+    | TPtr _, TArray(_,_,_) -> (nt', e)
           
     | TEnum _, TInt _ -> result
     | TFloat _, (TInt _|TEnum _) -> result
@@ -1143,11 +1257,37 @@ let rec castTo ?(fromsource=false)
           (* Even casts between structs are allowed when we are only 
            * modifying some attributes *)
     | TComp (comp1, a1), TComp (comp2, a2) when comp1.ckey = comp2.ckey -> 
-        (nt, e)
+        result
           
-    | _ -> E.s (error "cabs2cil: castTo %a -> %a@!" d_type ot d_type nt)
+          (** If we try to pass a transparent union value to a function 
+           * expecting a transparent union argument, the argument type would 
+           * have been changed to the type of the first argument, and we'll 
+           * see a cast from a union to the type of the first argument. Turn 
+           * that into a field access *)
+    | TComp(tunion, a1), nt -> begin
+        match isTransparentUnion ot with 
+          None -> E.s (error "castTo %a -> %a@!" d_type ot d_type nt')
+        | Some fstfield -> begin
+            (* We do it now only if the expression is an lval *)
+            let e' = 
+              match e with 
+                Lval lv -> 
+                  Lval (addOffsetLval (Field(fstfield, NoOffset)) lv)
+              | _ -> E.s (unimp "castTo: transparent union expression is not an lval: %a\n" d_exp e)
+            in
+            (* Continue casting *)
+            castTo ~fromsource:fromsource fstfield.ftype nt' e'
+        end
+    end
+    | _ -> E.s (error "cabs2cil: castTo %a -> %a@!" d_type ot d_type nt')
   end
 
+(* Like Cil.mkCastT, but it calls typeForInsertedCast *)
+let makeCastT ~(e: exp) ~(oldt: typ) ~(newt: typ) = 
+  Cil.mkCastT e oldt (!typeForInsertedCast newt)
+
+let makeCast ~(e: exp) ~(newt: typ) = 
+  makeCastT e (typeOf e) newt
 
 (* A cast that is used for conditional expressions. Pointers are Ok *)
 let checkBool (ot : typ) (e : exp) : bool =
@@ -1157,6 +1297,29 @@ let checkBool (ot : typ) (e : exp) : bool =
   | TEnum _ -> true
   | TFloat _ -> true
   |  _ -> E.s (error "castToBool %a" d_type ot)
+
+(* Given an expression that is being coerced to bool, 
+   is it a nonzero constant? *)
+let rec isConstTrue (e:exp): bool =
+  match e with
+  | Const(CInt64 (n,_,_)) -> n <> Int64.zero
+  | Const(CChr c) -> 0 <> Char.code c
+  | Const(CStr _ | CWStr _) -> true
+  | Const(CReal(f, _, _)) -> f <> 0.0;
+  | CastE(_, e) -> isConstTrue e
+  | _ -> false
+
+(* Given an expression that is being coerced to bool, is it zero? 
+   This is a more general version of Cil.isZero, which only handles integers.
+   On constant expressions, either isConstTrue or isConstFalse will hold. *)
+let rec isConstFalse (e:exp): bool =
+  match e with
+  | Const(CInt64 (n,_,_)) -> n = Int64.zero
+  | Const(CChr c) -> 0 = Char.code c
+  | Const(CReal(f, _, _)) -> f = 0.0;
+  | CastE(_, e) -> isConstFalse e
+  | _ -> false
+
 
 
 (* We have our own version of addAttributes that does not allow duplicates *)
@@ -1367,16 +1530,24 @@ let rec combineTypes (what: combineWhat) (oldt: typ) (t: typ) : typ =
   | TArray (oldbt, oldsz, olda), TArray (bt, sz, a) -> 
       let newbt = combineTypes CombineOther oldbt bt in
       let newsz = 
-        if Util.equals oldsz sz then sz else
         match oldsz, sz with
           None, Some _ -> sz
         | Some _, None -> oldsz
+        | None, None -> sz
         | Some oldsz', Some sz' -> 
-           (* They are not structurally equal. But perhaps they are equal if 
-            * we evaluate them. Check first machine independent comparison  *)
+            (* They are not structurally equal. But perhaps they are equal if 
+             * we evaluate them. Check first machine independent comparison  *)
            let checkEqualSize (machdep: bool) = 
-              Util.equals (constFold machdep oldsz') 
-                          (constFold machdep sz') 
+             let oldsz'', sz''=
+               (* cast both to the same type.  This prevents complaints such as
+                  "((int)1) <> ((char)1)" *)
+               if machdep then 
+                 mkCast oldsz' !typeOfSizeOf,  mkCast sz' !typeOfSizeOf
+               else
+                 oldsz', sz'
+             in
+             Util.equals (constFold machdep oldsz'') 
+                         (constFold machdep sz'') 
            in
            if checkEqualSize false then 
               oldsz
@@ -1387,7 +1558,6 @@ let rec combineTypes (what: combineWhat) (oldt: typ) (t: typ) : typ =
            end else
               raise (Failure "different array lengths")
            
-        | None, None -> assert false
       in
       TArray (newbt, newsz, cabsAddAttributes olda a)
         
@@ -1405,16 +1575,21 @@ let rec combineTypes (what: combineWhat) (oldt: typ) (t: typ) : typ =
         raise (Failure "diferent vararg specifiers");
       (* If one does not have arguments, believe the one with the 
       * arguments *)
-      let newargs = 
-        if oldargs = None then args else
-        if args = None then oldargs else
+      let newargs, olda' = 
+        if oldargs = None then args, olda else
+        if args = None then oldargs, olda else
         let oldargslist = argsToList oldargs in
         let argslist = argsToList args in
         if List.length oldargslist <> List.length argslist then 
           raise (Failure "different number of arguments")
         else begin
+          (* Construct a mapping between old and new argument names. *)
+          let map = H.create 5 in
+          List.iter2
+            (fun (on, _, _) (an, _, _) -> H.replace map on an)
+            oldargslist argslist;
           (* Go over the arguments and update the old ones with the 
-          * adjusted types *)
+           * adjusted types *)
           Some 
             (List.map2 
                (fun (on, ot, oa) (an, at, aa) -> 
@@ -1422,22 +1597,29 @@ let rec combineTypes (what: combineWhat) (oldt: typ) (t: typ) : typ =
                   * very important if the prototype uses different names than 
                   * the function definition. *)
                  let n = if an <> "" then an else on in
+                 (* Adjust the old type. This hook allows Deputy to do
+                  * alpha renaming of dependent attributes. *)
+                 let ot' = !typeForCombinedArg map ot in
                  let t = 
                    combineTypes 
                      (if what = CombineFundef then 
                        CombineFunarg else CombineOther) 
-                     ot at
+                     ot' at
                  in
                  let a = addAttributes oa aa in
                  (n, t, a))
-               oldargslist argslist)
+               oldargslist argslist),
+          !attrsForCombinedArg map olda
         end
       in
-      TFun (newrt, newargs, oldva, cabsAddAttributes olda a)
+      TFun (newrt, newargs, oldva, cabsAddAttributes olda' a)
         
   | TNamed (oldt, olda), TNamed (t, a) when oldt.tname = t.tname ->
       TNamed (oldt, cabsAddAttributes olda a)
         
+  | TBuiltin_va_list olda, TBuiltin_va_list a -> 
+      TBuiltin_va_list (cabsAddAttributes olda a)
+
         (* Unroll first the new type *)
   | _, TNamed (t, a) -> 
       let res = combineTypes what oldt t.ttype in
@@ -1451,16 +1633,39 @@ let rec combineTypes (what: combineWhat) (oldt: typ) (t: typ) : typ =
   | _ -> raise (Failure "different type constructors")
 
 
+let extInlineSuffRe = Str.regexp "\\(.+\\)__extinline"
+
 (* Create and cache varinfo's for globals. Starts with a varinfo but if the 
  * global has been declared already it might come back with another varinfo. 
  * Returns the varinfo to use (might be the old one), and an indication 
  * whether the variable exists already in the environment *)
 let makeGlobalVarinfo (isadef: bool) (vi: varinfo) : varinfo * bool =
+  let debug = false in
   try (* See if already defined, in the global environment. We could also 
        * look it up in the whole environment but in that case we might see a 
        * local. This can happen when we declare an extern variable with 
        * global scope but we are in a local scope. *)
-    let oldvi, oldloc = lookupGlobalVar vi.vname in
+
+    (* We lookup in the environement. If this is extern inline then the name 
+     * was already changed to foo__extinline. We lookup with the old name *)
+    let lookupname = 
+      (*if vi.vstorage = Static then 
+        if Str.string_match extInlineSuffRe vi.vname 0 then 
+          Str.matched_group 1 vi.vname
+        else
+          vi.vname
+      else*)
+        vi.vname
+    in
+    if debug then 
+      ignore (E.log "makeGlobalVarinfo isadef=%b vi.vname=%s (lookup = %s)\n"
+                isadef vi.vname lookupname);
+
+    (* This may throw an exception Not_found *)
+    let oldvi, oldloc = lookupGlobalVar lookupname in
+    if debug then
+      ignore (E.log "  %s already in the env at loc %a\n" 
+                vi.vname d_loc oldloc);
     (* It was already defined. We must reuse the varinfo. But clean up the 
      * storage.  *)
     let newstorage = (** See 6.2.2 *)
@@ -1482,6 +1687,11 @@ let makeGlobalVarinfo (isadef: bool) (vi: varinfo) : varinfo * bool =
     in
     oldvi.vinline <- oldvi.vinline || vi.vinline;
     oldvi.vstorage <- newstorage;
+    (* If the new declaration has a section attribute, remove any
+     * preexisting section attribute. This mimics behavior of gcc that is
+     * required to compile the Linux kernel properly. *)
+    if hasAttribute "section" vi.vattr then
+      oldvi.vattr <- dropAttribute "section" oldvi.vattr;
     (* Union the attributes *)
     oldvi.vattr <- cabsAddAttributes oldvi.vattr vi.vattr;
     begin 
@@ -1504,6 +1714,8 @@ let makeGlobalVarinfo (isadef: bool) (vi: varinfo) : varinfo * bool =
     oldvi, true
       
   with Not_found -> begin (* A new one.  *)
+    if debug then
+      ignore (E.log "  %s not in the env already\n" vi.vname);
     (* Announce the name to the alpha conversion table. This will not 
      * actually change the name of the vi. See the definition of 
      * alphaConvertVarAndAddToEnv *)
@@ -1511,9 +1723,6 @@ let makeGlobalVarinfo (isadef: bool) (vi: varinfo) : varinfo * bool =
   end 
 
 let conditionalConversion (t2: typ) (t3: typ) : typ =
-  let is_char k = match k with
-    IChar | ISChar | IUChar -> true
-  | _ -> false in 
   let tresult =  (* ISO 6.5.15 *)
     match unrollType t2, unrollType t3 with
       (TInt _ | TEnum _ | TFloat _), 
@@ -1569,7 +1778,7 @@ let rec setOneInit (this: preInit)
       let idx, (* Index in the current comp *)
           restoff (* Rest offset *) =
         match o with 
-        | Index(Const(CInt64(i,_,_)), off) -> Int64.to_int i, off
+        | Index(Const(CInt64(i,_,_)), off) -> i64_to_int i, off
         | Field (f, off) -> 
             (* Find the index of the field *)
             let rec loop (idx: int) = function
@@ -1619,14 +1828,21 @@ let rec collectInitializer
     match unrollType thistype, this with 
     | _ , SinglePre e -> SingleInit e, thistype
     | TArray (bt, leno, at), CompoundPre (pMaxIdx, pArray) -> 
-        let (len, newtype) =
+        let (len: int), newtype =
           (* normal case: use array's declared length, newtype=thistype *)
-          try (lenOfArray leno, thistype)
+          match leno with 
+            Some len -> begin
+              match constFold true len with 
+                Const(CInt64(ni, _, _)) when ni >= 0L -> 
+                  (i64_to_int ni), TArray(bt,leno,at)
 
-          (* unsized array case, length comes from initializers *)
-          with LenOfArray ->
-            (!pMaxIdx + 1,
-             TArray (bt, Some (integer (!pMaxIdx + 1)), at))
+              | _ -> E.s (error "Array length is not a constant expression %a"
+                            d_exp len)
+            end
+          | _ -> 
+              (* unsized array case, length comes from initializers *)
+              (!pMaxIdx + 1,
+               TArray (bt, Some (integer (!pMaxIdx + 1)), at))
         in
         if !pMaxIdx >= len then 
           E.s (E.bug "collectInitializer: too many initializers(%d >= %d)\n"
@@ -1654,7 +1870,7 @@ let rec collectInitializer
             collect ((Index(integer idx, NoOffset), thisi) :: acc) (idx - 1)
         in
         
-        CompoundInit (thistype, collect [] endAt), newtype
+        CompoundInit (newtype, collect [] endAt), newtype
 
     | TComp (comp, _), CompoundPre (pMaxIdx, pArray) when comp.cstruct ->
         let rec collect (idx: int) = function
@@ -1893,14 +2109,15 @@ let afterConversion (c: chunk) : chunk =
            in 
            Util.equals (typeSig tcallres) (typeSig vi.vtype) &&
            Util.equals (typeSig newt) (typeSig (typeOfLval destlv))) && 
-            String.sub vi.vname 0 3 = "tmp" &&
-            vi' == vi) 
+           IH.mem callTempVars vi.vid &&
+           vi' == vi) 
       -> Some [Call(Some destlv, f, args, l)]
-    | _ -> None
+    | i1,i2 ->  None
   in
   (* First add in the postins *)
   let sl = pushPostIns c in
-  peepHole2 collapseCallCast sl;
+  if !doCollapseCallCast then
+    peepHole2 collapseCallCast sl;
   { c with stmts = sl; postins = [] }
 
 (***** Try to suggest a name for the anonymous structures *)
@@ -1909,6 +2126,15 @@ let suggestAnonName (nl: A.name list) =
     [] -> ""
   | (n, _, _, _) :: _ -> n
 
+
+(** Optional constant folding of binary operations *)
+let optConstFoldBinOp (machdep: bool) (bop: binop) 
+                      (e1: exp) (e2:exp) (t: typ) = 
+  if !lowerConstants then 
+    constFoldBinOp machdep bop e1 e2 t
+  else
+    BinOp(bop, e1, e2, t)
+  
 (****** TYPE SPECIFIERS *******)
 let rec doSpecList (suggestedAnonName: string) (* This string will be part of 
                                                 * the names for anonymous 
@@ -1988,9 +2214,22 @@ let rec doSpecList (suggestedAnonName: string) (* This string will be part of
       | A.Tdouble -> 9
       | _ -> 10 (* There should be at most one of the others *)
     in
-    (* Hopefully this is stable sort *)
-    List.sort (fun ts1 ts2 -> compare (order ts1) (order ts2)) tspecs' 
+    List.stable_sort (fun ts1 ts2 -> compare (order ts1) (order ts2)) tspecs' 
   in
+  let getTypeAttrs () : A.attribute list =
+    (* Partitions the attributes in !attrs.
+       Type attributes are removed from attrs and returned, so that they
+       can go into the type definition.  Name attributes are left in attrs,
+       so they will be returned by doSpecAttr and used in the variable 
+       declaration. 
+       Testcase: small1/attr9.c *)
+    let an, af, at = cabsPartitionAttributes ~default:AttrType !attrs in
+    attrs := an;      (* Save the name attributes for later *)
+    if af <> [] then
+      E.s (error "Invalid position for function type attributes.");
+    at
+  in 
+
   (* And now try to make sense of it. See ISO 6.7.2 *)
   let bt = 
     match sortedspecs with
@@ -2062,9 +2301,8 @@ let rec doSpecList (suggestedAnonName: string) (* This string will be part of
     | [A.Tstruct (n, Some nglist, extraAttrs)] -> (* A definition of a struct *)
       let n' =
         if n <> "" then n else anonStructName "struct" suggestedAnonName in
-      (* Use the (non-cv) attributes now *)
-      let a = extraAttrs @ !attrs in
-      attrs := [];
+      (* Use the (non-cv, non-name) attributes in !attrs now *)
+      let a = extraAttrs @ (getTypeAttrs ()) in
       makeCompType true n' nglist (doAttributes a)
 
     | [A.Tunion (n, None, _)] -> (* A reference to a union *)
@@ -2074,8 +2312,7 @@ let rec doSpecList (suggestedAnonName: string) (* This string will be part of
         let n' =
           if n <> "" then n else anonStructName "union" suggestedAnonName in
         (* Use the attributes now *)
-        let a = extraAttrs @ !attrs in
-        attrs := [];
+        let a = extraAttrs @ (getTypeAttrs ()) in
         makeCompType false n' nglist (doAttributes a)
 
     | [A.Tenum (n, None, _)] -> (* Just a reference to an enum *)
@@ -2087,12 +2324,11 @@ let rec doSpecList (suggestedAnonName: string) (* This string will be part of
           if n <> "" then n else anonStructName "enum" suggestedAnonName in
         (* make a new name for this enumeration *)
         let n'', _  = newAlphaName true "enum" n' in
+
         (* Create the enuminfo, or use one that was created already for a
          * forward reference *)
-        (* Use the attributes now *)
-        let a = extraAttrs @ !attrs in 
-        attrs := [];
         let enum, _ = createEnumInfo n'' in 
+        let a = extraAttrs @ (getTypeAttrs ()) in 
         enum.eattr <- doAttributes a;
         let res = TEnum (enum, []) in
 
@@ -2101,7 +2337,7 @@ let rec doSpecList (suggestedAnonName: string) (* This string will be part of
         enterScope ();
         
         (* as each name,value pair is determined, this is called *)
-        let rec processName kname i loc rest = begin
+        let rec processName kname (i: exp) loc rest = begin
           (* add the name to the environment, but with a faked 'typ' field; 
            * we don't know the full type yet (since that includes all of the 
            * tag values), but we won't need them in here  *)
@@ -2110,6 +2346,7 @@ let rec doSpecList (suggestedAnonName: string) (* This string will be part of
           (* add this tag to the list so that it ends up in the real 
           * environment when we're finished  *)
           let newname, _  = newAlphaName true "" kname in
+          
           (kname, (newname, i, loc)) :: loop (increm i 1) rest
         end
             
@@ -2121,11 +2358,13 @@ let rec doSpecList (suggestedAnonName: string) (* This string will be part of
                 
           | (kname, e, cloc) :: rest ->
               (* constant-eval 'e' to determine tag value *)
-              let i = match isIntConstExp e with
-                  Some e' -> e'
-                | _ -> E.s (error "enum without const integer initializer")
+              let e' = getIntConstExp e in
+              let e' = 
+                match isInteger (constFold true e') with 
+                  Some i -> if !lowerConstants then kinteger64 IInt i else e'
+                | _ -> E.s (error "Constant initializer %a not an integer" d_exp e')
               in
-              processName kname i (convLoc cloc) rest
+              processName kname e' (convLoc cloc) rest
         in
         
         (* sm: now throw away the environment we built for eval'ing the enum 
@@ -2143,16 +2382,14 @@ let rec doSpecList (suggestedAnonName: string) (* This string will be part of
         
           
     | [A.TtypeofE e] -> 
-        (* We process e as AExpLeaveArrayfun to avoid conversion of arrays 
-        * and functions into pointers *)
-        let (c, e', t) = doExp false e AExpLeaveArrayFun in
+        let (c, e', t) = doExp false e AType in
         let t' = 
           match e' with 
             StartOf(lv) -> typeOfLval lv
                 (* If this is a string literal, then we treat it as in sizeof*)
           | Const (CStr s) -> begin
               match typeOf e' with 
-                TPtr(bt, _) -> (* This is the type of arary elements *)
+                TPtr(bt, _) -> (* This is the type of array elements *)
                   TArray(bt, Some (SizeOfStr s), [])
               | _ -> E.s (bug "The typeOf a string is not a pointer type")
           end
@@ -2190,7 +2427,11 @@ and makeVarInfoCabs
                 (n,ndt,a) 
       : varinfo = 
   let vtype, nattr = 
-    doType (AttrName false) bt (A.PARENTYPE(attrs, ndt, a)) in
+    doType (AttrName false) 
+      ~allowVarSizeArrays:isformal  (* For locals we handle var-sized arrays
+                                       before makeVarInfoCabs; for formals
+                                       we do it afterwards *)
+      bt (A.PARENTYPE(attrs, ndt, a)) in
   if inline && not (isFunctionType vtype) then
     ignore (error "inline for a non-function: %s" n);
   let t = 
@@ -2206,9 +2447,10 @@ and makeVarInfoCabs
   vi.vstorage <- sto;
   vi.vattr <- nattr;
   vi.vdecl <- ldecl;
-(*
-  ignore (E.log "Created varinfo %s : %a\n" vi.vname d_type vi.vtype); 
-*)
+
+  if false then 
+    ignore (E.log "Created varinfo %s : %a\n" vi.vname d_type vi.vtype); 
+
   vi
 
 (* Process a local variable declaration and allow variable-sized arrays *)
@@ -2249,6 +2491,7 @@ and doAttr (a: A.attribute) : attribute list =
     String.sub n st (fin - st + 1)
   in
   match a with
+  | ("__attribute__", []) -> []  (* An empty list of gcc attributes *)
   | (s, []) -> [Attr (stripUnderscore s, [])]
   | (s, el) -> 
       
@@ -2265,14 +2508,20 @@ and doAttr (a: A.attribute) : attribute list =
               match H.find env n' with 
                 EnvEnum (tag, _), _ -> begin
                   match isInteger (constFold true tag) with 
-                    Some i64 -> AInt (Int64.to_int i64)
+                    Some i64 when !lowerConstants -> AInt (i64_to_int i64)
                   |  _ -> ACons(n', [])
                 end
               | _ -> ACons (n', [])
             with Not_found -> ACons(n', [])
           end
         | A.CONSTANT (A.CONST_STRING s) -> AStr s
-        | A.CONSTANT (A.CONST_INT str) -> AInt (int_of_string str)
+        | A.CONSTANT (A.CONST_INT str) -> begin
+            match parseInt str with
+              Const (CInt64 (v64,_,_)) -> 
+                AInt (i64_to_int v64)
+            | _ -> 
+                E.s (error "Invalid attribute constant: %s")
+          end
         | A.CALL(A.VARIABLE n, args) -> begin
             let n' = if strip then stripUnderscore n else n in
             let ae' = List.map ae args in
@@ -2293,6 +2542,12 @@ and doAttr (a: A.attribute) : attribute list =
         | A.UNARY(A.BNOT, aa) -> AUnOp(BNot, ae aa)
         | A.UNARY(A.NOT, aa) -> AUnOp(LNot, ae aa)
         | A.MEMBEROF (e, s) -> ADot (ae e, s)
+        | A.PAREN(e) -> attrOfExp strip ~foldenum:foldenum e 
+        | A.UNARY(A.MEMOF, aa) -> AStar (ae aa)
+        | A.UNARY(A.ADDROF, aa) -> AAddrOf (ae aa)
+        | A.MEMBEROFPTR (aa1, s) -> ADot(AStar(ae aa1), s)
+        | A.INDEX(aa1, aa2) -> AIndex(ae aa1, ae aa2)
+        | A.QUESTION(aa1, aa2, aa3) -> AQuestion(ae aa1, ae aa2, ae aa3)
         | _ -> 
             ignore (E.log "Invalid expression in attribute: ");
             withCprint Cprint.print_expression a;
@@ -2319,12 +2574,36 @@ and doAttr (a: A.attribute) : attribute list =
 and doAttributes (al: A.attribute list) : attribute list =
   List.fold_left (fun acc a -> cabsAddAttributes (doAttr a) acc) [] al
 
+(* A version of Cil.partitionAttributes that works on CABS attributes.
+   It would  be better to use Cil.partitionAttributes instead to avoid
+   the extra doAttr conversions here, but that's hard to do in doSpecList.*)
+and cabsPartitionAttributes 
+    ~(default:attributeClass)  
+    (attrs:  A.attribute list) :
+    A.attribute list * A.attribute list * A.attribute list = 
+  let rec loop (n,f,t) = function
+      [] -> n, f, t
+    | a :: rest -> 
+        let kind = match doAttr a with 
+            [] -> default
+          | Attr(an, _)::_ -> 
+              (try H.find attributeHash an with Not_found -> default)
+        in
+        match kind with 
+          AttrName _ -> loop (a::n, f, t) rest
+        | AttrFunType _ -> 
+            loop (n, a::f, t) rest
+        | AttrType -> loop (n, f, a::t) rest
+  in
+  loop ([], [], []) attrs
+
 
 
 and doType (nameortype: attributeClass) (* This is AttrName if we are doing 
                                          * the type for a name, or AttrType 
                                          * if we are doing this type in a 
                                          * typedef *)
+           ?(allowVarSizeArrays=false)
            (bt: typ)                    (* The base type *)
            (dt: A.decl_type) 
   (* Returns the new type and the accumulated name (or type attribute 
@@ -2413,22 +2692,39 @@ and doType (nameortype: attributeClass) (* This is AttrName if we are doing
           match len with 
             A.NOTHING -> None 
           | _ -> 
+              (* Check that len is a constant expression.
+                 We used to also cast the length to int here, but that's 
+                 theoretically too restrictive on 64-bit machines. *)
               let len' = doPureExp len in
-              let _, len'' = castTo (typeOf len') intType len' in
-              let elsz = try (bitsSizeOf bt + 7) / 8
-                         with _ -> E.s (error "Cannot compute array length") 
-              in 
-              (match constFold true len' with 
-                Const(CInt64(i, _, _)) ->
-                  if i < 0L then 
-                    E.s (error "Length of array is negative\n");
-                  if Int64.mul i (Int64.of_int elsz) >= 0x80000000L then 
-                    E.s (error "Length of array is too large\n")
-           
+              if not (isIntegralType (typeOf len')) then
+                E.s (error "Array length %a does not have an integral type.");
+              if not allowVarSizeArrays then begin
+                (* Assert that len' is a constant *)
+                let elsz = 
+                  try (bitsSizeOf bt + 7) / 8
+                  with _ -> 1 (** We get this if we cannot compute the size of 
+                                * one element. This can happen, when we define 
+                                * an extern, for example. We use 1 for now *)
+                in 
+                (match constFold true len' with 
+                   Const(CInt64(i, _, _)) ->
+                     if i < 0L then 
+                       E.s (error "Length of array is negative\n");
+                     if Int64.mul i (Int64.of_int elsz) >= 0x80000000L then 
+                       E.s (error "Length of array is too large\n")
 
-                | l -> E.s (error "Length of array is not a constant: %a\n"
-                             d_exp l));
-              Some len''
+                 | l -> 
+                     if isConstant l then 
+                       (* e.g., there may be a float constant involved. 
+                        * We'll leave it to the user to ensure the length is
+                        * non-negative, etc.*)
+                       ignore(warn "Unable to do constant-folding on array length %a.  Some CIL operations on this array may fail."
+                                d_exp l)
+                     else 
+                       E.s (error "Length of array is not a constant: %a\n"
+                              d_exp l))
+              end;
+              Some len'
         in
 	let al' = doAttributes al in
         doDeclType (TArray(bt, lo, al')) acc d
@@ -2463,12 +2759,18 @@ and doType (nameortype: attributeClass) (* This is AttrName if we are doing
         (* Make the argument as for a formal *)
         let doOneArg (s, (n, ndt, a, cloc)) : varinfo = 
           let s' = doSpecList n s in
-          makeVarInfoCabs ~isformal:true ~isglobal:false (convLoc cloc) s' (n,ndt,a)
+          let vi = makeVarInfoCabs ~isformal:true ~isglobal:false 
+                     (convLoc cloc) s' (n,ndt,a) in
+          (* Add the formal to the environment, so it can be referenced by
+             other formals  (e.g. in an array type, although that will be
+             changed to a pointer later, or though typeof).  *) 
+          addLocalToEnv vi.vname (EnvVar vi);
+          vi
         in
         let targs : varinfo list option = 
           match List.map doOneArg args'  with
           | [] -> None (* No argument list *)
-          | [t] when (match t.vtype with TVoid _ -> true | _ -> false) -> 
+          | [t] when isVoidType t.vtype -> 
               Some []
           | l -> Some l
         in
@@ -2476,14 +2778,36 @@ and doType (nameortype: attributeClass) (* This is AttrName if we are doing
         (* Turn [] types into pointers in the arguments and the result type. 
          * Turn function types into pointers to respective. This simplifies 
          * our life a lot, and is what the standard requires. *)
+        let turnArrayIntoPointer (bt: typ) 
+                                 (lo: exp option) (a: attributes) : typ = 
+          let a' : attributes = 
+            match lo with 
+              None -> a
+            | Some l -> begin 
+                 (* Transform the length into an attribute expression *)
+                try 
+                  let la : attrparam = expToAttrParam l in
+                  addAttribute (Attr("arraylen", [ la ])) a
+                with NotAnAttrParam _ -> begin
+                    ignore (warn "Cannot represent the length of array as an attribute");
+                  
+                      a (* Leave unchanged *)
+                end 
+            end
+          in
+          TPtr(bt, a')
+        in
         let rec fixupArgumentTypes (argidx: int) (args: varinfo list) : unit = 
           match args with
             [] -> ()
           | a :: args' -> 
               (match unrollType a.vtype with
-                TArray(t,_,attr) -> a.vtype <- TPtr(t, attr)
+                TArray(bt,lo,attr) -> 
+                  (* Note that for multi-dimensional arrays we strip off only
+                     the first TArray and leave bt alone. *)
+                  a.vtype <- turnArrayIntoPointer bt lo attr
               | TFun _ -> a.vtype <- TPtr(a.vtype, [])
-              | TComp (comp, _) as t -> begin
+              | TComp (comp, _) -> begin
                   match isTransparentUnion a.vtype with
                     None ->  ()
                   | Some fstfield -> 
@@ -2503,7 +2827,7 @@ and doType (nameortype: attributeClass) (* This is AttrName if we are doing
         in
         let tres = 
           match unrollType bt with
-            TArray(t,_,attr) -> TPtr(t, attr)
+            TArray(t,lo,attr) -> turnArrayIntoPointer t lo attr
           | _ -> bt
         in
         doDeclType (TFun (tres, args, isva', [])) acc d
@@ -2518,8 +2842,8 @@ and isVariableSizedArray (dt: A.decl_type)
   let res = ref None in
   let rec findArray = function
     ARRAY (JUSTBASE, al, lo) when lo != A.NOTHING -> 
-      (* Allow non-constant expressions *)
-      let (se, e', _) = doExp false lo (AExp (Some intType)) in
+      (* Try to compile the expression to a constant *)
+      let (se, e', _) = doExp true lo (AExp (Some intType)) in
       if isNotEmpty se || not (isConstant e') then begin
         res := Some (se, e');
         PTR (al, JUSTBASE)
@@ -2573,6 +2897,15 @@ and makeCompType (isstruct: bool)
         E.s (error "Storage or inline not allowed for fields");
       let ftype, nattr = 
         doType (AttrName false) bt (A.PARENTYPE(attrs, ndt, a)) in 
+      (* check for fields whose type is an undefined struct.  This rules
+         out circularity:
+             struct C1 { struct C2 c2; };          //This line is now an error.
+             struct C2 { struct C1 c1; int dummy; };
+       *)
+      (match unrollType ftype with
+         TComp (ci',_) when not ci'.cdefined ->
+           E.s (error "Type of field %s is an undefined struct.\n" n)
+       | _ -> ());
       let width = 
         match widtho with 
           None -> None
@@ -2620,14 +2953,13 @@ and makeCompType (isstruct: bool)
     * the type structure. We do a thourough check and then we reuse the type 
     * for A *)
     let fieldsSig fs = List.map (fun f -> typeSig f.ftype) fs in 
-    if fieldsSig comp.cfields <> fieldsSig flds then
+    if not (Util.equals (fieldsSig comp.cfields) (fieldsSig flds)) then
       ignore (error "%s seems to be multiply defined" (compFullName comp))
   end else 
     comp.cfields <- flds;
 
 (*  ignore (E.log "makeComp: %s: %a\n" comp.cname d_attrlist a); *)
   comp.cattr <- a;
-  let toplevel_typedef = false in
   let res = TComp (comp, []) in
   (* This compinfo is defined, even if there are no fields *)
   comp.cdefined <- true;
@@ -2671,42 +3003,36 @@ and preprocessCast (specs: A.specifier)
   in
   specs1, dt, ie' 
 
-and isIntConstExp (aexp) : exp option =
-  match doExp true aexp (AExp None) with
+and getIntConstExp (aexp) : exp =
+  let c, e, _ = doExp true aexp (AExp None) in 
+  if not (isEmpty c) then 
+    E.s (error "Constant expression %a has effects" d_exp e);
+  match e with 
     (* first, filter for those Const exps that are integers *)
-    | (c, (Const (CInt64 (i,_,_)) as p),_) when isEmpty c ->
-        Some p
-    | (c, (Const (CChr i) as p),_) when isEmpty c ->
-        Some (Const(charConstToInt i))
-    (* other Const expressions are not ok *)
-    | (_, (Const _), _) -> 
-        None
+  | Const (CInt64 _ ) -> e
+  | Const (CEnum _) -> e
+  | Const (CChr i) -> Const(charConstToInt i)
+
+        (* other Const expressions are not ok *)
+  | Const _ -> E.s (error "Expected integer constant and got %a" d_exp e)
+        
     (* now, anything else that 'doExp true' returned is ok (provided
        that it didn't yield side effects); this includes, in particular,
        the various sizeof and alignof expression kinds *)
-    | (c, e, _) when isEmpty c ->
-        Some e
-    (* we only get here when the expression had side effects *)
-    | _ ->
-        None
+  | _ -> e
 
-(* this is like 'isIntConstExp', but retrieves the actual integer
- * the expression denotes; I have not extended it to work with
- * sizeof/alignof since (for CCured) we can't const-eval those,
- * and it's not clear whether they can be bitfield width specifiers
- * anyway (since that's where this function is used) *)
 and isIntegerConstant (aexp) : int option =
   match doExp true aexp (AExp None) with
-      (c, e, _) when isEmpty c -> begin
-        match isInteger e with 
-            Some i64 -> Some (Int64.to_int i64)
-          | _ -> None
-      end
-    | _ -> None
-
+    (c, e, _) when isEmpty c -> begin
+      match isInteger (constFold true e) with
+        Some i64 -> Some (i64_to_int i64)
+      | _ -> None
+    end
+  | _ -> None
+        
      (* Process an expression and in the process do some type checking,
       * extract the effects as separate statements  *)
-and doExp (isconst: bool)    (* In a constant *)
+and doExp (asconst: bool)   (* This expression is used as a constant *)
           (e: A.expression) 
           (what: expAction) : (chunk * exp * typ) = 
   (* A subexpression of array type is automatically turned into StartOf(e). 
@@ -2727,7 +3053,8 @@ and doExp (isconst: bool)    (* In a constant *)
   let finishExp ?(newWhat=what) 
                 (se: chunk) (e: exp) (t: typ) : chunk * exp * typ = 
     match newWhat with 
-      ADrop -> (se, e, t)
+      ADrop 
+    | AType -> (se, e, t)
     | AExpLeaveArrayFun -> 
         (se, e, t) (* It is important that we do not do "processArrayFun" in 
                     * this case. We exploit this when we process the typeOf 
@@ -2754,32 +3081,33 @@ and doExp (isconst: bool)    (* In a constant *)
             (se +++ (Set(lv, e'', !currentLoc)), e'', t'')
     end
   in
-  let rec findField (n: string) (fidlist: fieldinfo list) : offset * typ =
+  let rec findField (n: string) (fidlist: fieldinfo list) : offset =
     (* Depth first search for the field. This appears to be what GCC does. 
      * MSVC checks that there are no ambiguous field names, so it does not 
      * matter how we search *)
     let rec search = function
-        [] -> NoOffset, voidType (* Did not find *)
-      | fid :: rest when fid.fname = n -> Field(fid, NoOffset), fid.ftype
+        [] -> NoOffset (* Did not find *)
+      | fid :: rest when fid.fname = n -> Field(fid, NoOffset)
       | fid :: rest when prefix annonCompFieldName fid.fname -> begin
           match unrollType fid.ftype with 
             TComp (ci, _) -> 
-              let off, t = search ci.cfields in
+              let off = search ci.cfields in
               if off = NoOffset then 
                 search rest  (* Continue searching *)
               else
-                Field (fid, off), t
+                Field (fid, off)
           | _ -> E.s (bug "unnamed field type is not a struct/union")
       end
       | _ :: rest -> search rest
     in
-    let off, t = search fidlist in
+    let off = search fidlist in
     if off = NoOffset then 
       E.s (error "Cannot find field %s" n);
-    off, t
+    off
   in
   try
     match e with
+    | A.PAREN e -> E.s (bug "stripParen")
     | A.NOTHING when what = ADrop -> finishExp empty (integer 0) intType
     | A.NOTHING ->
         let res = Const(CStr "exp_nothing") in
@@ -2792,13 +3120,23 @@ and doExp (isconst: bool)    (* In a constant *)
           let envdata = H.find env n in
           match envdata with
             EnvVar vi, _ ->
-              if isconst && 
+              (* if isconst && 
                  not (isFunctionType vi.vtype) && 
                  not (isArrayType vi.vtype)then
-                E.s (error "variable appears in constant");
+                E.s (error "variable appears in constant"); *)
               finishExp empty (Lval(var vi)) vi.vtype
           | EnvEnum (tag, typ), _ ->
-              finishExp empty tag typ
+              if !Cil.lowerConstants then 
+                finishExp empty tag typ
+              else begin
+                let ei = 
+                  match unrollType typ with 
+                    TEnum(ei, _) -> ei
+                  | _ -> assert false
+                in
+                finishExp empty (Const (CEnum(tag, n, ei))) typ
+              end
+
           | _ -> raise Not_found
         with Not_found -> begin
           if isOldStyleVarArgName n then 
@@ -2835,8 +3173,8 @@ and doExp (isconst: bool)    (* In a constant *)
 
     end      
     | A.UNARY (A.MEMOF, e) -> 
-        if isconst then
-          E.s (error "MEMOF in constant");
+        if asconst then
+          ignore (warn "MEMOF in constant");
         let (se, e', t) = doExp false e (AExp None) in
         let tresult = 
           match unrollType t with
@@ -2861,18 +3199,19 @@ and doExp (isconst: bool)    (* In a constant *)
           | CastE(_, Lval x) -> x
           | _ -> E.s (error "Expected an lval in MEMBEROF (field %s)" str)
         in
-        let field_offset, field_type = 
+        let field_offset = 
           match unrollType t' with
             TComp (comp, _) -> findField str comp.cfields
           | _ -> E.s (error "expecting a struct with field %s" str)
         in
         let lv' = Lval(addOffsetLval field_offset lv) in
+	let field_type = typeOf lv' in
         finishExp se lv' field_type
           
        (* e->str = * (e + off(str)) *)
     | A.MEMBEROFPTR (e, str) -> 
-        if isconst then
-          E.s (error "MEMBEROFPTR in constant");
+        if asconst then
+          ignore (warn "MEMBEROFPTR in constant");
         let (se, e', t') = doExp false e (AExp None) in
         let pointedt = 
           match unrollType t' with
@@ -2880,7 +3219,7 @@ and doExp (isconst: bool)    (* In a constant *)
           | TArray(t1,_,_) -> t1
           | _ -> E.s (error "expecting a pointer to a struct")
         in
-        let field_offset, field_type = 
+        let field_offset = 
           match unrollType pointedt with 
             TComp (comp, _) -> findField str comp.cfields
           | x -> 
@@ -2888,8 +3227,9 @@ and doExp (isconst: bool)    (* In a constant *)
                      "expecting a struct with field %s. Found %a. t1 is %a" 
                      str d_type x d_type t')
         in
-        finishExp se (Lval (mkMem e' field_offset)) field_type
-          
+	let lv' = Lval (mkMem e' field_offset) in
+	let field_type = typeOf lv' in
+        finishExp se lv' field_type
           
     | A.CONSTANT ct -> begin
         let hasSuffix str = 
@@ -2924,7 +3264,7 @@ and doExp (isconst: bool)    (* In a constant *)
 	      | wc::rest ->
 		  let wc_cilexp = Const (CInt64(wc, IInt, None)) in
                   (Index(integer idx, NoOffset), 
-                   SingleInit (mkCast wc_cilexp wchar_t))
+                   SingleInit (makeCast wc_cilexp wchar_t))
                   :: loop (idx + 1) rest
             in
             (* Add the definition for the array *)
@@ -2937,25 +3277,6 @@ and doExp (isconst: bool)    (* In a constant *)
               *)
 
         | A.CONST_WSTRING (ws: int64 list) -> 
-            (* takes a list of strings, and converts it to a WIDE string. *)
-            let intlist_to_wstring (str: int64 list) : string =
-              (* L"\xabcd" "e" must to go
-                 L"\xabcd\x65" and NOT L"\xabcde" *) 
-              let rec loop lst must_escape = match lst with
-                [] -> "" (* "\000" GN: nul-termination is implicit *) 
-              | hd :: tl -> 
-                let must_escape_now = must_escape || 
-                   (compare hd (Int64.of_int 255) > 0) || 
-                   (compare hd Int64.zero < 0) in
-                let this_piece = 
-                  if must_escape_now then 
-                    Printf.sprintf "\\x%Lx" hd
-                  else 
-                    String.make 1 (Char.chr (Int64.to_int hd))
-                in
-                this_piece ^ (loop tl must_escape_now)
-              in loop str false
-            in 
             let res = Const(CWStr ((* intlist_to_wstring *) ws)) in
             finishExp empty res (typeOf res)
 
@@ -2984,6 +3305,13 @@ and doExp (isconst: bool)    (* In a constant *)
             finishExp empty (Const a) b 
               
         | A.CONST_WCHAR char_list ->
+            (* matth: I can't see a reason for a list of more than one char
+             * here, since the kinteger64 below will take only the lower 16
+             * bits of value.  ('abc' makes sense, because CHAR constants have
+             * type int, and so more than one char may be needed to represent 
+             * the value.  But L'abc' has type wchar, and so is equivalent to 
+             * L'c').  But gcc allows L'abc', so I'll leave this here in case
+             * I'm missing some architecture dependent behavior. *)
 	    let value = reduce_multichar !wcharType char_list in
 	    let result = kinteger64 !wcharKind value in
             finishExp empty result (typeOf result)
@@ -3002,6 +3330,10 @@ and doExp (isconst: bool)    (* In a constant *)
               else
                 str, FDouble
             in
+            if kind = FLongDouble then
+              (* We only have 64-bit values in Ocaml *)
+              E.log "treating long double constant %s as double constant."
+                str;
             try
               finishExp empty 
                 (Const(CReal(float_of_string baseint, kind,
@@ -3010,6 +3342,7 @@ and doExp (isconst: bool)    (* In a constant *)
             with e -> begin
               ignore (E.log "float_of_string %s (%s)\n" str 
                         (Printexc.to_string e));
+              E.hadErrors := true;
               let res = Const(CStr "booo CONS_FLOAT") in
               finishExp empty res (typeOf res)
             end
@@ -3023,7 +3356,7 @@ and doExp (isconst: bool)    (* In a constant *)
       (* Intercept the sizeof("string") *)
     | A.EXPR_SIZEOF (A.CONSTANT (A.CONST_STRING s)) -> begin
         (* Process the string first *)
-        match doExp isconst (A.CONSTANT (A.CONST_STRING s)) (AExp None) with 
+        match doExp asconst (A.CONSTANT (A.CONST_STRING s)) (AExp None) with 
           _, Const(CStr s), _ -> 
             finishExp empty (SizeOfStr s) !typeOfSizeOf
         | _ -> E.s (bug "cabs2cil: sizeOfStr")
@@ -3054,7 +3387,7 @@ and doExp (isconst: bool)    (* In a constant *)
                 (* Maybe we are taking the sizeof a variable-sized array *)
           | Lval (Var vi, NoOffset) -> begin
               try 
-                H.find varSizeArrays vi.vid 
+                IH.find varSizeArrays vi.vid 
               with Not_found -> SizeOfE e' 
           end
           | _ -> SizeOfE e'
@@ -3089,7 +3422,7 @@ and doExp (isconst: bool)    (* In a constant *)
           match what with
             AExp (Some _) -> AExp (Some typ)
           | AExp None -> what
-          | ADrop | AExpLeaveArrayFun -> what
+          | ADrop | AType | AExpLeaveArrayFun -> what
           | ASet (lv, lvt) -> 
               (* If the cast from typ to lvt would be dropped, then we 
                * continue with a Set *)
@@ -3099,11 +3432,12 @@ and doExp (isconst: bool)    (* In a constant *)
                 AExp None (* We'll create a temporary *)
         in
         (* Remember here if we have done the Set *)
-        let (se, e', t') = 
+        let (se, e', t'), (needcast: bool) = 
           match ie' with
-            A.SINGLE_INIT e -> doExp isconst e what'
+            A.SINGLE_INIT e -> doExp asconst e what', true
 
           | A.NO_INIT -> E.s (error "missing expression in cast")
+
           | A.COMPOUND_INIT _ -> begin
               (* Pretend that we are declaring and initializing a brand new 
                * variable  *)
@@ -3112,7 +3446,12 @@ and doExp (isconst: bool)    (* In a constant *)
               let spec_res = doSpecList "" s' in
               let se1 = 
                 if !scopes == [] then begin
-                  ignore (createGlobal spec_res 
+                  (* This is a global.  Mark the new vars as static *)
+                  let spec_res' =
+                    let t, sto, inl, attrs = spec_res in
+                    t, Static, inl, attrs
+                  in
+                  ignore (createGlobal spec_res'
                             ((newvar, dt', [], cabslu), ie'));
                   empty
                 end else
@@ -3120,7 +3459,7 @@ and doExp (isconst: bool)    (* In a constant *)
               in
               (* Now pretend that e is just a reference to the newly created 
                * variable *)
-              let se, e', t' = doExp isconst (A.VARIABLE newvar) what' in
+              let se, e', t' = doExp asconst (A.VARIABLE newvar) what' in
               (* If typ is an array then the doExp above has already added a 
                * StartOf. We must undo that now so that it is done once by 
                * the finishExp at the end of this case *)
@@ -3129,27 +3468,37 @@ and doExp (isconst: bool)    (* In a constant *)
                   TArray _, StartOf lv -> Lval lv, typ
                 | _, _ -> e', t'
               in
-              se1 @@ se, e2, t2
+              (* If we are here, then the type t2 is guaranteed to match the 
+               * type of the expression e2, so we do not need a cast. We have 
+               * to worry about this because otherwise, we might need to cast 
+               * between arrays or structures. *)
+              (se1 @@ se, e2, t2), false
           end
         in
         let (t'', e'') = 
           match typ with
             TVoid _ when what' = ADrop -> (t', e') (* strange GNU thing *)
           |  _ -> 
-              (* Do this to check the cast *)
-              let newtyp, newexp = castTo ~fromsource:true t' typ e' in 
+              (* Do this to check the cast, unless we are sure that we do not 
+               * need the check. *)
+              let newtyp, newexp = 
+                if needcast then 
+                  castTo ~fromsource:true t' typ e' 
+                else
+                  t', e'
+              in
               newtyp, newexp
         in
         finishExp se e'' t''
           
     | A.UNARY(A.MINUS, e) -> 
-        let (se, e', t) = doExp isconst e (AExp None) in
+        let (se, e', t) = doExp asconst e (AExp None) in
         if isIntegralType t then
           let tres = integralPromotion t in
           let e'' = 
             match e' with
             | Const(CInt64(i, ik, _)) -> kinteger64 ik (Int64.neg i)
-            | _ -> UnOp(Neg, mkCastT e' t tres, tres)
+            | _ -> UnOp(Neg, makeCastT e' t tres, tres)
           in
           finishExp se e'' tres
         else
@@ -3159,15 +3508,15 @@ and doExp (isconst: bool)    (* In a constant *)
             E.s (error "Unary - on a non-arithmetic type")
         
     | A.UNARY(A.BNOT, e) -> 
-        let (se, e', t) = doExp isconst e (AExp None) in
+        let (se, e', t) = doExp asconst e (AExp None) in
         if isIntegralType t then
           let tres = integralPromotion t in
-          let e'' = UnOp(BNot, mkCastT e' t tres, tres) in
+          let e'' = UnOp(BNot, makeCastT e' t tres, tres) in
           finishExp se e'' tres
         else
           E.s (error "Unary ~ on a non-integral type")
           
-    | A.UNARY(A.PLUS, e) -> doExp isconst e what 
+    | A.UNARY(A.PLUS, e) -> doExp asconst e what 
           
           
     | A.UNARY(A.ADDROF, e) -> begin
@@ -3180,6 +3529,8 @@ and doExp (isconst: bool)    (* In a constant *)
             doExp false 
               (A.QUESTION (e1, A.UNARY(A.ADDROF, e2), A.UNARY(A.ADDROF, e3)))
               what
+        | A.PAREN e1 ->
+            doExp false (A.UNARY(A.ADDROF, e1)) what
         | A.VARIABLE s when 
             isOldStyleVarArgName s 
             && (match !currentFunctionFDEC.svar.vtype with 
@@ -3212,7 +3563,7 @@ and doExp (isconst: bool)    (* In a constant *)
                           * a local we are going to get the address of a copy 
                           * of the local ! *)
                 
-              doExp isconst
+              doExp asconst
                 (A.CALL (A.VARIABLE "__builtin_next_arg", 
                          [A.CONSTANT (A.CONST_INT "0")]))
                 what
@@ -3245,22 +3596,23 @@ and doExp (isconst: bool)    (* In a constant *)
     | A.UNARY((A.PREINCR|A.PREDECR) as uop, e) -> begin
         match e with 
           A.COMMA el -> (* GCC extension *)
-            doExp isconst 
+            doExp asconst 
               (A.COMMA (replaceLastInList el 
                           (fun e -> A.UNARY(uop, e))))
               what
         | A.QUESTION (e1, e2q, e3q) -> (* GCC extension *)
-            doExp isconst 
+            doExp asconst 
               (A.QUESTION (e1, A.UNARY(uop, e2q), 
                            A.UNARY(uop, e3q)))
               what
-
+        | A.PAREN e1 ->
+            doExp asconst (A.UNARY(uop, e1)) what
         | (A.VARIABLE _ | A.UNARY (A.MEMOF, _) | (* Regular lvalues *)
            A.INDEX _ | A.MEMBEROF _ | A.MEMBEROFPTR _ |
            A.CAST _ (* A GCC extension *)) -> begin
              let uop' = if uop = A.PREINCR then PlusA else MinusA in
-             if isconst then
-               E.s (error "PREINCR or PREDECR in constant");
+             if asconst then
+               ignore (warn "PREINCR or PREDECR in constant");
              let (se, e', t) = doExp false e (AExp None) in
              let lv = 
                match e' with 
@@ -3271,7 +3623,7 @@ and doExp (isconst: bool)    (* In a constant *)
                | _ -> E.s (error "Expected lval for ++ or --")
              in
              let tresult, result = doBinOp uop' e' t one intType in
-             finishExp (se +++ (Set(lv, mkCastT result tresult t, 
+             finishExp (se +++ (Set(lv, makeCastT result tresult t, 
                                     !currentLoc)))
                e'
                tresult   (* Should this be t instead ??? *)
@@ -3282,20 +3634,20 @@ and doExp (isconst: bool)    (* In a constant *)
     | A.UNARY((A.POSINCR|A.POSDECR) as uop, e) -> begin
         match e with 
           A.COMMA el -> (* GCC extension *)
-            doExp isconst 
+            doExp asconst 
               (A.COMMA (replaceLastInList el 
                           (fun e -> A.UNARY(uop, e))))
               what
         | A.QUESTION (e1, e2q, e3q) -> (* GCC extension *)
-            doExp isconst 
+            doExp asconst 
               (A.QUESTION (e1, A.UNARY(uop, e2q), A.UNARY(uop, e3q)))
               what
-
+        | A.PAREN e1 -> doExp asconst (A.UNARY(uop,e1)) what
         | (A.VARIABLE _ | A.UNARY (A.MEMOF, _) | (* Regular lvalues *)
            A.INDEX _ | A.MEMBEROF _ | A.MEMBEROFPTR _ | 
            A.CAST _ (* A GCC extension *) ) -> begin
-             if isconst then
-               E.s (error "POSTINCR or POSTDECR in constant");
+             if asconst then
+               ignore (warn "POSTINCR or POSTDECR in constant");
              (* If we do not drop the result then we must save the value *)
              let uop' = if uop = A.POSINCR then PlusA else MinusA in
              let (se, e', t) = doExp false e (AExp None) in
@@ -3310,14 +3662,16 @@ and doExp (isconst: bool)    (* In a constant *)
              in
              let tresult, opresult = doBinOp uop' e' t one intType in
              let se', result = 
-               if what <> ADrop then 
-                 let tmp = newTempVar t in
+               if what <> ADrop && what <> AType then 
+                 let descr = (dd_exp () e') 
+                             ++ (if uop = A.POSINCR then text "++" else text "--") in
+                 let tmp = newTempVar descr true t in
                  se +++ (Set(var tmp, e', !currentLoc)), Lval(var tmp)
                else
                  se, e'
              in
              finishExp 
-               (se' +++ (Set(lv, mkCastT opresult tresult t, 
+               (se' +++ (Set(lv, makeCastT opresult tresult (typeOfLval lv), 
                              !currentLoc)))
                result
                tresult   (* Should this be t instead ??? *)
@@ -3328,25 +3682,25 @@ and doExp (isconst: bool)    (* In a constant *)
     | A.BINARY(A.ASSIGN, e1, e2) -> begin
         match e1 with 
           A.COMMA el -> (* GCC extension *)
-            doExp isconst 
+            doExp asconst 
               (A.COMMA (replaceLastInList el 
                           (fun e -> A.BINARY(A.ASSIGN, e, e2))))
               what
         | A.QUESTION (e1, e2q, e3q) -> (* GCC extension *)
-            doExp isconst 
+            doExp asconst 
               (A.QUESTION (e1, A.BINARY(A.ASSIGN, e2q, e2), 
                            A.BINARY(A.ASSIGN, e3q, e2)))
               what
         | A.CAST (t, A.SINGLE_INIT e) -> (* GCC extension *)
-            doExp isconst
+            doExp asconst
               (A.CAST (t, 
                        A.SINGLE_INIT (A.BINARY(A.ASSIGN, e, 
                                                A.CAST (t, A.SINGLE_INIT e2)))))
               what
-
+        | A.PAREN e1 -> doExp asconst (A.BINARY(A.ASSIGN,e1,e2)) what 
         | (A.VARIABLE _ | A.UNARY (A.MEMOF, _) | (* Regular lvalues *)
            A.INDEX _ | A.MEMBEROF _ | A.MEMBEROFPTR _ ) -> begin
-             if isconst then E.s (error "ASSIGN in constant");
+             if asconst then ignore (warn "ASSIGN in constant");
              let (se1, e1', lvt) = doExp false e1 (AExp None) in
              let lv = 
                match e1' with 
@@ -3363,8 +3717,8 @@ and doExp (isconst: bool)    (* In a constant *)
     | A.BINARY((A.ADD|A.SUB|A.MUL|A.DIV|A.MOD|A.BAND|A.BOR|A.XOR|
       A.SHL|A.SHR|A.EQ|A.NE|A.LT|A.GT|A.GE|A.LE) as bop, e1, e2) -> 
         let bop' = convBinOp bop in
-        let (se1, e1', t1) = doExp isconst e1 (AExp None) in
-        let (se2, e2', t2) = doExp isconst e2 (AExp None) in
+        let (se1, e1', t1) = doExp asconst e1 (AExp None) in
+        let (se2, e2', t2) = doExp asconst e2 (AExp None) in
         let tresult, result = doBinOp bop' e1' t1 e2' t2 in
         finishExp (se1 @@ se2) result tresult
           
@@ -3374,21 +3728,21 @@ and doExp (isconst: bool)    (* In a constant *)
       A.SHR_ASSIGN|A.XOR_ASSIGN) as bop, e1, e2) -> begin
         match e1 with 
           A.COMMA el -> (* GCC extension *)
-            doExp isconst 
+            doExp asconst 
               (A.COMMA (replaceLastInList el 
                           (fun e -> A.BINARY(bop, e, e2))))
               what
         | A.QUESTION (e1, e2q, e3q) -> (* GCC extension *)
-            doExp isconst 
+            doExp asconst 
               (A.QUESTION (e1, A.BINARY(bop, e2q, e2), 
                            A.BINARY(bop, e3q, e2)))
               what
-
+        | A.PAREN e1 -> doExp asconst (A.BINARY(bop,e1,e2)) what
         | (A.VARIABLE _ | A.UNARY (A.MEMOF, _) | (* Regular lvalues *)
            A.INDEX _ | A.MEMBEROF _ | A.MEMBEROFPTR _ |
            A.CAST _ (* GCC extension *) ) -> begin
-             if isconst then
-               E.s (error "op_ASSIGN in constant");
+             if asconst then
+               ignore (warn "op_ASSIGN in constant");
              let bop' = match bop with          
                A.ADD_ASSIGN -> PlusA
              | A.SUB_ASSIGN -> MinusA
@@ -3426,11 +3780,14 @@ and doExp (isconst: bool)    (* In a constant *)
                
           
     | A.BINARY((A.AND|A.OR), _, _) | A.UNARY(A.NOT, _) -> begin
-        let ce = doCondExp isconst e in
+        let ce = doCondExp asconst e in
         (* We must normalize the result to 0 or 1 *)
         match ce with
           CEExp (se, ((Const _) as c)) -> 
-            finishExp se (if isZero c then zero else one) intType
+            finishExp se (if isConstTrue c then one else zero) intType
+	| CEExp (se, (UnOp(LNot, _, _) as e)) ->
+	    (* already normalized to 0 or 1 *)
+	    finishExp se e intType
         | CEExp (se, e) ->
             let e' = 
               let te = typeOf e in
@@ -3439,7 +3796,9 @@ and doExp (isconst: bool)    (* In a constant *)
             in
             finishExp se e' intType
         | _ -> 
-            let tmp = var (newTempVar intType) in
+            let tmp =
+              var (newTempVar (text "<boolean expression>") true intType)
+            in
             finishExp (compileCondExp ce
                          (empty +++ (Set(tmp, integer 1, 
                                          !currentLoc)))
@@ -3450,11 +3809,11 @@ and doExp (isconst: bool)    (* In a constant *)
     end
 
     | A.CALL(f, args) -> 
-        if isconst then
-          E.s (error "CALL in constant");
+        if asconst then
+          ignore (warn "CALL in constant");
         let (sf, f', ft') = 
           match f with                  (* Treat the VARIABLE case separate 
-                                         * becase we might be calling a 
+                                         * because we might be calling a 
                                          * function that does not have a 
                                          * prototype. In that case assume it 
                                          * takes INTs as arguments  *)
@@ -3473,7 +3832,7 @@ and doExp (isconst: bool)    (* In a constant *)
                   makeGlobalVarinfo false (makeGlobalVar n ftype) in
                 (* Make it EXTERN *)
                 proto.vstorage <- Extern;
-                H.add noProtoFunctions proto.vid true;
+                IH.add noProtoFunctions proto.vid true;
                 (* Add it to the file as well *)
                 cabsPushGlobal (GVarDecl (proto, !currentLoc));
                 (empty, Lval(var proto), ftype)
@@ -3504,19 +3863,40 @@ and doExp (isconst: bool)    (* In a constant *)
         in
         let argTypesList = argsToList argTypes in
         (* Drop certain qualifiers from the result type *)
-        let resType' = resType in 
+        let resType' = typeRemoveAttributes ["warn_unused_result"] resType in 
         (* Before we do the arguments we try to intercept a few builtins. For 
          * these we have defined then with a different type, so we do not 
-         * want to give warnings. *)
-        let isVarArgBuiltin = 
+         * want to give warnings. We'll just leave the arguments of these
+         * functions alone*)
+        let isSpecialBuiltin =  
           match f'' with 
             Lval (Var fv, NoOffset) ->
               fv.vname = "__builtin_stdarg_start" ||
               fv.vname = "__builtin_va_arg" ||
+              fv.vname = "__builtin_va_start" ||
+              fv.vname = "__builtin_expect" ||
               fv.vname = "__builtin_next_arg"
             | _ -> false
         in
           
+        (** If the "--forceRLArgEval" flag was used, make sure
+          we evaluate args right-to-left.
+          Added by Nathan Cooprider. **)
+        let force_right_to_left_evaluation (c, e, t) =
+	  (* If chunk is empty then it is not already evaluated *)
+	  (* constants don't need to be pulled out *)
+          if (!forceRLArgEval && (not (isConstant e)) && 
+	      (not isSpecialBuiltin)) then 
+	    (* create a temporary *)
+	    let tmp = newTempVar (dd_exp () e) true t in
+	    (* create an instruction to give the e to the temporary *)
+	    let i = Set(var tmp, e, !currentLoc) in 
+	    (* add the instruction to the chunk *)
+	    (* change the expression to be the temporary *)
+	    (c +++ i, (Lval(var tmp)), t) 
+          else
+	    (c, e, t)
+        in
         (* Do the arguments. In REVERSE order !!! Both GCC and MSVC do this *)
         let rec loopArgs 
             : (string * typ * attributes) list * A.expression list 
@@ -3524,7 +3904,7 @@ and doExp (isconst: bool)    (* In a constant *)
             | ([], []) -> (empty, [])
 
             | args, [] -> 
-                if not isVarArgBuiltin then 
+                if not isSpecialBuiltin then 
                   ignore (warnOpt 
                             "Too few arguments in call to %a."
                             d_exp f');
@@ -3532,154 +3912,190 @@ and doExp (isconst: bool)    (* In a constant *)
 
             | ((_, at, _) :: atypes, a :: args) -> 
                 let (ss, args') = loopArgs (atypes, args) in
-                let (sa, a', att) = doExp false a (AExp (Some at)) in
-                let (at'', a'') = castTo att at a' in
+                (* Do not cast as part of translating the argument. We let 
+                 * the castTo do this work. This was necessary for 
+                 * test/small1/union5, in which a transparent union is passed 
+                 * as an argument *)
+                let (sa, a', att) = force_right_to_left_evaluation
+                                      (doExp false a (AExp None)) in
+                let (_, a'') = castTo att at a' in
                 (ss @@ sa, a'' :: args')
                   
             | ([], args) -> (* No more types *)
-                if not isvar && argTypes != None && not isVarArgBuiltin then 
+                if not isvar && argTypes != None && not isSpecialBuiltin then 
                   (* Do not give a warning for functions without a prototype*)
                   ignore (warnOpt "Too many arguments in call to %a" d_exp f');
                 let rec loop = function
                     [] -> (empty, [])
                   | a :: args -> 
                       let (ss, args') = loop args in
-                      let (sa, a', at) = doExp false a (AExp None) in
+                      let (sa, a', at) = force_right_to_left_evaluation 
+                          (doExp false a (AExp None)) in
                       (ss @@ sa, a' :: args')
                 in
                 loop args
         in
         let (sargs, args') = loopArgs (argTypesList, args) in
-        let f3, what3, args3, is__builtin_va_arg = 
-          let rec dropCasts = function CastE (_, e) -> dropCasts e | e -> e in
-          (* Get the name of the last formal *)
-          let getNameLastFormal () : string = 
-            match !currentFunctionFDEC.svar.vtype with
-              TFun(_, Some args, true, _) -> begin
-                match List.rev args with
-                  (last_par_name, _, _) :: _ -> last_par_name
-                | _ -> ""
-              end
-            | _ -> ""
-          in
-          match f'' with 
-            Lval(Var fv, NoOffset) -> begin
-              if fv.vname = "__builtin_va_arg" then begin
-                match args' with 
-                  marker :: SizeOf resTyp :: _ -> begin
-                    (* Make a variable of the desired type *)
-                    let destlv, destlvtyp = 
-                      match what with 
-                        ASet (lv, lvt) -> lv, lvt
-                      | _ -> var (newTempVar resTyp), resTyp
-                    in
-                    f'',
-                    ASet (destlv, destlvtyp), 
-                    [marker; SizeOf resTyp; AddrOf destlv],
-                    true
-                  end
-                | _ -> 
-                    ignore (warn "Invalid call to %s\n" fv.vname);
-                    f'',what, args', false
-              end else if fv.vname = "__builtin_stdarg_start" then begin
-                match args' with 
-                  marker :: last :: [] -> begin
-                    let isOk = 
-                      match dropCasts last with 
-                        Lval (Var lastv, NoOffset) -> 
-                          lastv.vname = getNameLastFormal ()
-                      | _ -> false
-                    in
-                    if not isOk then 
-                      ignore (warn "The second argument in call to %s should be the last formal argument\n" fv.vname);
-                    
-                    (* Check that "lastv" is indeed the last variable in the 
-                     * prototype and then drop it *)
-                    f'', what, [marker], false
-                  end
-                | _ -> 
-                    ignore (warn "Invalid call to %s\n" fv.vname);
-                    f'',what, args', false
+        (* Setup some pointer to the elements of the call. We may change 
+         * these below *)
+        let prechunk: chunk ref = ref (sf @@ sargs) in (* comes before *)
 
-              (* We have to turn uses of __builtin_varargs_start into uses 
-               * of __builtin_stdarg_start (because we have dropped the 
-               * __builtin_va_alist argument from this function *)
+        (* Do we actually have a call, or an expression? *)
+        let piscall: bool ref = ref true in 
 
-              end else if fv.vname = "__builtin_varargs_start" then begin
-                (* Lookup the prototype for the replacement *)
-                let v, _  = 
-                  try lookupGlobalVar "__builtin_stdarg_start" 
-                  with Not_found -> E.s (bug "Cannot find __builtin_stdarg_start to replace %s\n" fv.vname)
-                in
-                Lval (var v),
-                what,
-                args',
-                false
+        let pf: exp ref = ref f'' in (* function to call *)
+        let pargs: exp list ref = ref args' in (* arguments *)
+        let pis__builtin_va_arg: bool ref = ref false in 
+        let pwhat: expAction ref = ref what in (* what to do with result *)
 
-              end else if fv.vname = "__builtin_next_arg" then begin
-                match args' with 
-                  last :: [] -> begin
-                    let isOk = 
-                      match dropCasts last with 
-                        Lval (Var lastv, NoOffset) -> 
-                          lastv.vname = getNameLastFormal ()
-                      | _ -> false
-                    in
-                    if not isOk then 
-                      ignore (warn "The argument in call to %s should be the last formal argument\n" fv.vname);
-                    
-                    f'', what, [ ], false
-                  end
-                | _ -> 
-                    ignore (warn "Invalid call to %s\n" fv.vname);
-                    f'',what, args', false
-              end else
-                f'', what, args', false
+        let pres: exp ref = ref zero in (* If we do not have a call, this is 
+                                        * the result *)
+        let prestype: typ ref = ref intType in
+
+        let rec dropCasts = function CastE (_, e) -> dropCasts e | e -> e in
+        (* Get the name of the last formal *)
+        let getNameLastFormal () : string = 
+          match !currentFunctionFDEC.svar.vtype with
+            TFun(_, Some args, true, _) -> begin
+              match List.rev args with
+                (last_par_name, _, _) :: _ -> last_par_name
+              | _ -> ""
             end
-          | _ -> f'',what, args', false
+          | _ -> ""
         in
-        begin
-          match what3 with 
-            ADrop -> 
-              finishExp 
-                (sf @@ sargs +++ (Call(None,f3,args3, !currentLoc)))
-                (integer 0) intType
-              (* Set to a variable of corresponding type *)
-          | ASet(lv, vtype) -> 
-              (* Make an exception here for __builtin_va_arg *)
-              if is__builtin_va_arg then 
-                finishExp 
-                  (sf @@ sargs                                         
-                           +++ (Call(None,f3,args3, !currentLoc)))
-                  (Lval(lv))
-                  vtype
-              else
-                finishExp 
-                  (sf @@ sargs                                         
-                           +++ (Call(Some lv,f3,args3, !currentLoc)))
-                  (Lval(lv))
-                  vtype
 
-          | _ -> begin
-              (* Must create a temporary *)
-              match f3, args3 with     (* Some constant folding *)
-                Lval(Var fv, NoOffset), [Const _] 
-                  when fv.vname = "__builtin_constant_p" ->
-                    finishExp (sf @@ sargs) (integer 1) intType
-              | _ -> 
-                  let tmp, restyp' = 
-                    match what3 with
-                      AExp (Some t) -> newTempVar t, t
-                    | _ -> newTempVar resType', resType'
+        (* Try to intercept some builtins *)
+        (match !pf with 
+          Lval(Var fv, NoOffset) -> begin
+            if fv.vname = "__builtin_va_arg" then begin
+              match !pargs with 
+                marker :: SizeOf resTyp :: _ -> begin
+                  (* Make a variable of the desired type *)
+                  let destlv, destlvtyp = 
+                    match !pwhat with 
+                      ASet (lv, lvt) -> lv, lvt
+                    | _ -> var (newTempVar nil true resTyp), resTyp
                   in
-                  let i = Call(Some (var tmp),f3,args3, !currentLoc) in
-                  finishExp (sf @@ sargs +++ i) (Lval(var tmp)) restyp'
+                  pwhat := (ASet (destlv, destlvtyp));
+                  pargs := [marker; SizeOf resTyp; 
+                            CastE(voidPtrType, AddrOf destlv)];
+                  pis__builtin_va_arg := true;
+                end
+              | _ -> 
+                  ignore (warn "Invalid call to %s\n" fv.vname);
+            end else if fv.vname = "__builtin_stdarg_start" ||
+                        fv.vname = "__builtin_va_start" then begin
+              match !pargs with 
+                marker :: last :: [] -> begin
+                  let isOk = 
+                    match dropCasts last with 
+                      Lval (Var lastv, NoOffset) -> 
+                        lastv.vname = getNameLastFormal ()
+                    | _ -> false
+                  in
+                  if not isOk then 
+                    ignore (warn "The second argument in call to %s should be the last formal argument\n" fv.vname);
+                  
+                  (* Check that "lastv" is indeed the last variable in the 
+                   * prototype and then drop it *)
+                  pargs := [ marker ]
+                end
+              | _ -> 
+                  ignore (warn "Invalid call to %s\n" fv.vname);
+                  
+                  (* We have to turn uses of __builtin_varargs_start into uses 
+                   * of __builtin_stdarg_start (because we have dropped the 
+                   * __builtin_va_alist argument from this function) *)
+                  
+            end else if fv.vname = "__builtin_varargs_start" then begin
+              (* Lookup the prototype for the replacement *)
+              let v, _  = 
+                try lookupGlobalVar "__builtin_stdarg_start" 
+                with Not_found -> E.s (bug "Cannot find __builtin_stdarg_start to replace %s\n" fv.vname)
+              in
+              pf := Lval (var v)
+            end else if fv.vname = "__builtin_next_arg" then begin
+              match !pargs with 
+                last :: [] -> begin
+                  let isOk = 
+                    match dropCasts last with 
+                      Lval (Var lastv, NoOffset) -> 
+                        lastv.vname = getNameLastFormal ()
+                    | _ -> false
+                  in
+                  if not isOk then 
+                    ignore (warn "The argument in call to %s should be the last formal argument\n" fv.vname);
+                  
+                  pargs := [ ]
+                end
+              | _ -> 
+                  ignore (warn "Invalid call to %s\n" fv.vname);
+            end else if fv.vname = "__builtin_constant_p" then begin
+              (* Drop the side-effects *)
+              prechunk := empty;
+
+              (* Constant-fold the argument and see if it is a constant *)
+              (match !pargs with 
+                [ arg ] -> begin 
+                  match constFold true arg with 
+                    Const _ -> piscall := false; 
+                               pres := integer 1; 
+                               prestype := intType
+
+                  | _ -> piscall := false; 
+                         pres := integer 0;
+                         prestype := intType
+                end
+              | _ -> 
+                  ignore (warn "Invalid call to builtin_constant_p"));
+            end
           end
-        end
+        | _ -> ());
+
+
+        (* Now we must finish the call *)
+        if !piscall then begin 
+          let addCall (calldest: lval option) (res: exp) (t: typ) = 
+            prechunk := !prechunk +++
+                (Call(calldest, !pf, !pargs, !currentLoc));
+            pres := res;
+            prestype := t
+          in
+          match !pwhat with 
+            ADrop | AType -> addCall None zero intType
+                
+          | ASet(lv, vtype) when !pis__builtin_va_arg -> 
+              (* Make an exception here for __builtin_va_arg *)
+              addCall None (Lval(lv)) vtype
+                  
+          | ASet(lv, vtype) when !doCollapseCallCast || 
+              (Util.equals (typeSig vtype) (typeSig resType'))
+              ->
+              (* We can assign the result directly to lv *)
+              addCall (Some lv) (Lval(lv)) vtype
+                  
+          | _ -> begin
+              let restype'' = 
+                match !pwhat with
+                  AExp (Some t) when !doCollapseCallCast -> t
+                | _ -> resType'
+              in
+              let descr = dprintf "%a(%a)" dd_exp !pf
+                            (docList ~sep:(text ", ") (dd_exp ())) !pargs in
+              let tmp = newTempVar descr false restype'' in
+              (* Remember that this variable has been created for this 
+               * specific call. We will use this in collapseCallCast. *)
+              IH.add callTempVars tmp.vid ();
+              addCall (Some (var tmp)) (Lval(var tmp)) restype''
+          end
+        end;
+              
+        finishExp !prechunk !pres !prestype
+
           
     | A.COMMA el -> 
-        if isconst then 
-          E.s (error "COMMA in constant");
+        if asconst then 
+          ignore (warn "COMMA in constant");
         let rec loop sofar = function
             [e] -> 
               let (se, e', t') = doExp false e what in (* Pass on the action *)
@@ -3696,19 +4112,19 @@ and doExp (isconst: bool)    (* In a constant *)
         loop empty el
           
     | A.QUESTION (e1,e2,e3) when what = ADrop -> 
-        if isconst then
-          E.s (error "QUESTION with ADrop in constant");
+        if asconst then
+          ignore (warn "QUESTION with ADrop in constant");
         let (se3,_,_) = doExp false e3 ADrop in
         let se2 = 
           match e2 with 
             A.NOTHING -> skipChunk
           | _ -> let (se2,_,_) = doExp false e2 ADrop in se2
         in
-        finishExp (doCondition isconst e1 se2 se3) zero intType
+        finishExp (doCondition asconst e1 se2 se3) zero intType
           
     | A.QUESTION (e1, e2, e3) -> begin (* what is not ADrop *)
         (* Compile the conditional expression *)
-        let ce1 = doCondExp isconst e1 in
+        let ce1 = doCondExp asconst e1 in
         (* Now we must find the type of both branches, in order to compute 
          * the type of the result *)
         let se2, e2'o (* is an option. None means use e1 *), t2 = 
@@ -3720,19 +4136,18 @@ and doExp (isconst: bool)    (* In a constant *)
               | _ -> empty, None, intType
             end
           | _ -> 
-              let se2, e2', t2 = doExp isconst e2 (AExp None) in
+              let se2, e2', t2 = doExp asconst e2 (AExp None) in
               se2, Some e2', t2
         in
         (* Do e3 for real *)
-        let se3, e3', t3 = doExp isconst e3 (AExp None) in
+        let se3, e3', t3 = doExp asconst e3 (AExp None) in
         (* Compute the type of the result *)
         let tresult = conditionalConversion t2 t3 in
         match ce1 with
-          CEExp (se1, Const(CInt64(i, _, _))) 
-           when i = Int64.zero && canDrop se2 -> 
+          CEExp (se1, e1') when isConstFalse e1' && canDrop se2 -> 
              finishExp (se1 @@ se3) (snd (castTo t3 tresult e3')) tresult
-        | CEExp (se1, (Const(CInt64(i, _, _)) as e1')) 
-           when i <> Int64.zero && canDrop se3 -> begin
+        | CEExp (se1, e1') when isConstTrue e1' && canDrop se3 -> 
+           begin
              match e2'o with
                None -> (* use e1' *)
                  finishExp (se1 @@ se2) (snd (castTo t2 tresult e1')) tresult
@@ -3743,9 +4158,9 @@ and doExp (isconst: bool)    (* In a constant *)
         | _ -> (* Use a conditional *) begin
             match e2 with 
               A.NOTHING -> 
-                let tmp = var (newTempVar tresult) in
-                let (se1, _, _) = doExp isconst e1 (ASet(tmp, tresult)) in
-                let (se3, _, _) = doExp isconst e3 (ASet(tmp, tresult)) in
+                let tmp = var (newTempVar nil true tresult) in
+                let (se1, _, _) = doExp asconst e1 (ASet(tmp, tresult)) in
+                let (se3, _, _) = doExp asconst e3 (ASet(tmp, tresult)) in
                 finishExp (se1 @@ ifChunk (Lval(tmp)) lu
                                     skipChunk se3)
                   (Lval(tmp))
@@ -3755,13 +4170,13 @@ and doExp (isconst: bool)    (* In a constant *)
                   match what with
                   | ASet (lv, lvt) -> lv, lvt
                   | _ -> 
-                      let tmp = newTempVar tresult in
+                      let tmp = newTempVar nil true tresult in
                       var tmp, tresult
                 in
                 (* Now do e2 and e3 for real *)
-                let (se2, _, _) = doExp isconst e2 (ASet(lv, lvt)) in
-                let (se3, _, _) = doExp isconst e3 (ASet(lv, lvt)) in
-                finishExp (doCondition isconst e1 se2 se3) (Lval(lv)) tresult
+                let (se2, _, _) = doExp asconst e2 (ASet(lv, lvt)) in
+                let (se3, _, _) = doExp asconst e3 (ASet(lv, lvt)) in
+                finishExp (doCondition asconst e1 se2 se3) (Lval(lv)) tresult
         end
 
 (*
@@ -3783,10 +4198,10 @@ and doExp (isconst: bool)    (* In a constant *)
           ignore (checkBool t1 e1');
           let e2'' = 
             if e2 = A.NOTHING then 
-              mkCastT e1' t1 tresult 
-            else mkCastT e2' t2' tresult (* We know se2 is empty *)
+              makeCastT e1' t1 tresult 
+            else makeCastT e2' t2' tresult (* We know se2 is empty *)
           in
-          let e3'' = mkCastT e3' t3' tresult in
+          let e3'' = makeCastT e3' t3' tresult in
           let resexp = 
             match e1' with
               Const(CInt64(i, _, _)) when i <> Int64.zero -> e2''
@@ -3872,17 +4287,18 @@ and doExp (isconst: bool)    (* In a constant *)
             res
           end
         in
-        finishExp empty (mkCast (integer addrval) voidPtrType) voidPtrType
+        finishExp empty (makeCast (integer addrval) voidPtrType) voidPtrType
     end
 
     | A.EXPR_PATTERN _ -> E.s (E.bug "EXPR_PATTERN in cabs2cil input")
 
-  with e -> begin
+  with e when continueOnError -> begin
     ignore (E.log "error in doExp (%s)@!" (Printexc.to_string e));
+    E.hadErrors := true;
     (i2c (dInstr (dprintf "booo_exp(%t)" d_thisloc) !currentLoc),
      integer 0, intType)
   end
-    
+
 (* bop is always the arithmetic version. Change it to the appropriate pointer 
  * version if necessary *)
 and doBinOp (bop: binop) (e1: exp) (t1: typ) (e2: exp) (t2: typ) : typ * exp =
@@ -3890,28 +4306,30 @@ and doBinOp (bop: binop) (e1: exp) (t1: typ) (e2: exp) (t2: typ) : typ * exp =
     let tres = arithmeticConversion t1 t2 in
     (* Keep the operator since it is arithmetic *)
     tres, 
-    constFoldBinOp false bop (mkCastT e1 t1 tres) (mkCastT e2 t2 tres) tres
+    optConstFoldBinOp false bop (makeCastT e1 t1 tres) (makeCastT e2 t2 tres) tres
   in
   let doArithmeticComp () = 
     let tres = arithmeticConversion t1 t2 in
     (* Keep the operator since it is arithemtic *)
     intType, 
-    constFoldBinOp false bop (mkCastT e1 t1 tres) (mkCastT e2 t2 tres) intType
+    optConstFoldBinOp false bop 
+      (makeCastT e1 t1 tres) (makeCastT e2 t2 tres) intType
   in
   let doIntegralArithmetic () = 
     let tres = unrollType (arithmeticConversion t1 t2) in
     match tres with
       TInt _ -> 
         tres,
-        constFoldBinOp false bop (mkCastT e1 t1 tres) (mkCastT e2 t2 tres) tres
+        optConstFoldBinOp false bop 
+          (makeCastT e1 t1 tres) (makeCastT e2 t2 tres) tres
     | _ -> E.s (error "%a operator on a non-integer type" d_binop bop)
   in
   let pointerComparison e1 t1 e2 t2 = 
     (* Cast both sides to an integer *)
     let commontype = !upointType in
     intType,
-    constFoldBinOp false bop (mkCastT e1 t1 commontype) 
-      (mkCastT e2 t2 commontype) intType
+    optConstFoldBinOp false bop (makeCastT e1 t1 commontype) 
+      (makeCastT e2 t2 commontype) intType
   in
 
   match bop with
@@ -3926,7 +4344,7 @@ and doBinOp (bop: binop) (e1: exp) (t1: typ) (e2: exp) (t2: typ) : typ * exp =
         let t1' = integralPromotion t1 in
         let t2' = integralPromotion t2 in
         t1', 
-        constFoldBinOp false bop (mkCastT e1 t1 t1') (mkCastT e2 t2 t2') t1'
+        optConstFoldBinOp false bop (makeCastT e1 t1 t1') (makeCastT e2 t2 t2') t1'
 
   | (PlusA|MinusA) 
       when isArithmeticType t1 && isArithmeticType t2 -> doArithmetic ()
@@ -3935,43 +4353,54 @@ and doBinOp (bop: binop) (e1: exp) (t1: typ) (e2: exp) (t2: typ) : typ * exp =
         doArithmeticComp ()
   | PlusA when isPointerType t1 && isIntegralType t2 -> 
       t1, 
-      constFoldBinOp false PlusPI e1 (mkCastT e2 t2 (integralPromotion t2)) t1
+      optConstFoldBinOp false PlusPI e1 
+        (makeCastT e2 t2 (integralPromotion t2)) t1
   | PlusA when isIntegralType t1 && isPointerType t2 -> 
       t2, 
-      constFoldBinOp false PlusPI e2 (mkCastT e1 t1 (integralPromotion t1)) t2
+      optConstFoldBinOp false PlusPI e2 
+        (makeCastT e1 t1 (integralPromotion t1)) t2
   | MinusA when isPointerType t1 && isIntegralType t2 -> 
       t1, 
-      constFoldBinOp false MinusPI e1 (mkCastT e2 t2 (integralPromotion t2)) t1
+      optConstFoldBinOp false MinusPI e1 
+        (makeCastT e2 t2 (integralPromotion t2)) t1
   | MinusA when isPointerType t1 && isPointerType t2 ->
       let commontype = t1 in
       intType,
-      constFoldBinOp false MinusPP (mkCastT e1 t1 commontype) 
-                                   (mkCastT e2 t2 commontype) intType
+      optConstFoldBinOp false MinusPP (makeCastT e1 t1 commontype) 
+                                      (makeCastT e2 t2 commontype) intType
   | (Le|Lt|Ge|Gt|Eq|Ne) when isPointerType t1 && isPointerType t2 ->
       pointerComparison e1 t1 e2 t2
   | (Eq|Ne) when isPointerType t1 && isZero e2 -> 
-      pointerComparison e1 t1 (mkCastT zero !upointType t1) t1
+      pointerComparison e1 t1 (makeCastT zero !upointType t1) t1
   | (Eq|Ne) when isPointerType t2 && isZero e1 -> 
-      pointerComparison (mkCastT zero !upointType t2) t2 e2 t2
+      pointerComparison (makeCastT zero !upointType t2) t2 e2 t2
 
+  | (Eq|Ne) when isVariadicListType t1 && isZero e2 -> 
+      ignore (warnOpt "Comparison of va_list and zero");
+      pointerComparison e1 t1 (makeCastT zero !upointType t1) t1
+  | (Eq|Ne) when isVariadicListType t2 && isZero e1 -> 
+      ignore (warnOpt "Comparison of zero and va_list");
+      pointerComparison (makeCastT zero !upointType t2) t2 e2 t2
 
   | (Eq|Ne|Le|Lt|Ge|Gt) when isPointerType t1 && isArithmeticType t2 ->
       ignore (warnOpt "Comparison of pointer and non-pointer");
       (* Cast both values to upointType *)
-      doBinOp bop (mkCastT e1 t1 !upointType) !upointType 
-                  (mkCastT e2 t2 !upointType) !upointType
+      doBinOp bop (makeCastT e1 t1 !upointType) !upointType 
+                  (makeCastT e2 t2 !upointType) !upointType
   | (Eq|Ne|Le|Lt|Ge|Gt) when isArithmeticType t1 && isPointerType t2 ->
       ignore (warnOpt "Comparison of pointer and non-pointer");
       (* Cast both values to upointType *)
-      doBinOp bop (mkCastT e1 t1 !upointType) !upointType 
-                  (mkCastT e2 t2 !upointType) !upointType
+      doBinOp bop (makeCastT e1 t1 !upointType) !upointType 
+                  (makeCastT e2 t2 !upointType) !upointType
 
   | _ -> E.s (error "doBinOp: %a\n" d_plainexp (BinOp(bop,e1,e2,intType)))
 
 (* Constant fold a conditional. This is because we want to avoid having 
  * conditionals in the initializers. So, we try very hard to avoid creating 
  * new statements. *)
-and doCondExp (isconst: bool) 
+and doCondExp (asconst: bool) (** Try to evaluate the conditional expression 
+                                * to TRUE or FALSE, because it occurs in a 
+                                * constant *)
               (e: A.expression) : condExpRes = 
   let rec addChunkBeforeCE (c0: chunk) = function
       CEExp (c, e) -> CEExp (c0 @@ c, e)
@@ -3986,14 +4415,14 @@ and doCondExp (isconst: bool)
   in
   match e with 
     A.BINARY (A.AND, e1, e2) -> begin
-      let ce1 = doCondExp isconst e1 in
-      let ce2 = doCondExp isconst e2 in
+      let ce1 = doCondExp asconst e1 in
+      let ce2 = doCondExp asconst e2 in
       match ce1, ce2 with
-        CEExp (se1, (Const(CInt64 _) as ci1)), _ -> 
-          if not (isZero ci1) then 
+        CEExp (se1, ((Const _) as ci1)), _ -> 
+          if isConstTrue ci1 then 
             addChunkBeforeCE se1 ce2
           else 
-            (* se2 might contain labels so we cannot drop it *)
+            (* se2 might contain labels so we cannot always drop it *)
             if canDropCE ce2 then 
               ce1 
             else 
@@ -4001,17 +4430,17 @@ and doCondExp (isconst: bool)
       | CEExp(se1, e1'), CEExp (se2, e2') when 
               !useLogicalOperators && isEmpty se1 && isEmpty se2 -> 
           CEExp (empty, BinOp(LAnd, 
-                              mkCast e1' intType, 
-                              mkCast e2' intType, intType))
+                              makeCast e1' intType, 
+                              makeCast e2' intType, intType))
       | _ -> CEAnd (ce1, ce2)
     end
 
   | A.BINARY (A.OR, e1, e2) -> begin
-      let ce1 = doCondExp isconst e1 in
-      let ce2 = doCondExp isconst e2 in
+      let ce1 = doCondExp asconst e1 in
+      let ce2 = doCondExp asconst e2 in
       match ce1, ce2 with
         CEExp (se1, (Const(CInt64 _) as ci1)), _ -> 
-          if isZero ci1 then 
+          if isConstFalse ci1 then 
             addChunkBeforeCE se1 ce2
           else 
             (* se2 might contain labels so we cannot drop it *)
@@ -4022,15 +4451,15 @@ and doCondExp (isconst: bool)
 
       | CEExp (se1, e1'), CEExp (se2, e2') when 
               !useLogicalOperators && isEmpty se1 && isEmpty se2 ->
-          CEExp (empty, BinOp(LOr, mkCast e1' intType, 
-                              mkCast e2' intType, intType))
+          CEExp (empty, BinOp(LOr, makeCast e1' intType, 
+                              makeCast e2' intType, intType))
       | _ -> CEOr (ce1, ce2)
     end
 
   | A.UNARY(A.NOT, e1) -> begin
-      match doCondExp isconst e1 with 
-        CEExp (se1, (Const(CInt64 _) as ci1)) -> 
-          if isZero ci1 then 
+      match doCondExp asconst e1 with 
+        CEExp (se1, (Const _ as ci1)) -> 
+          if isConstFalse ci1 then 
             CEExp (se1, one) 
           else
             CEExp (se1, zero)
@@ -4044,9 +4473,9 @@ and doCondExp (isconst: bool)
   end
 
   | _ -> 
-      let (se, e, t) as rese = doExp isconst e (AExp None) in
+      let (se, e, t) = doExp asconst e (AExp None) in
       ignore (checkBool t e);
-      CEExp (se, constFold isconst e)
+      CEExp (se, if !lowerConstants then constFold asconst e else e)
 
 and compileCondExp (ce: condExpRes) (st: chunk) (sf: chunk) : chunk = 
   match ce with 
@@ -4150,7 +4579,7 @@ and doInit
   : chunk * (A.initwhat * A.init_expression) list = 
 
   let whoami () = d_lval () (Var so.host, so.soOff) in
-  
+      
   let initl1 = 
     match initl with
     | (A.NEXT_INIT, 
@@ -4163,9 +4592,17 @@ and doInit
        * appears as a single initializer. Ignore the cast  *)
   let initl2 = 
     match initl1 with
-      (what, 
-       A.SINGLE_INIT (A.CAST (_, A.COMPOUND_INIT ci))) :: rest -> 
-         (what, A.COMPOUND_INIT ci) :: rest
+      (what,
+       A.SINGLE_INIT (A.CAST ((specs, dt), A.COMPOUND_INIT ci))) :: rest ->
+        let s', dt', ie' = preprocessCast specs dt (A.COMPOUND_INIT ci) in
+        let typ = doOnlyType s' dt' in
+        if (typeSigNoAttrs typ) = (typeSigNoAttrs so.soTyp) then
+          (* Drop the cast *)
+          (what, A.COMPOUND_INIT ci) :: rest
+        else
+          (* Keep the cast.  A new var will be created to hold
+             the intermediate value.  *)
+          initl1
     | _ -> initl1
   in
   let allinitl = initl2 in
@@ -4344,7 +4781,9 @@ and doInit
       ignore (E.log "oneinit'=%a, t'=%a, so.soTyp=%a\n" 
            d_exp oneinit' d_type t' d_type so.soTyp);
 *)
-      setone so.soOff (mkCastT oneinit' t' so.soTyp);
+      setone so.soOff (if !insertImplicitCasts then 
+                          makeCastT oneinit' t' so.soTyp
+                       else oneinit');
       (* Move on *)
       advanceSubobj so; 
       doInit isconst setone so (acc @@ se) restil
@@ -4377,11 +4816,11 @@ and doInit
                       when not ci.cstruct -> 
       (* Do the expression to find its type *)
       let _, _, t' = doExp isconst oneinit (AExp None) in
-      let tsig = typeSigWithAttrs (fun _ -> []) t' in
+      let tsig = typeSigNoAttrs t' in
       let rec findField = function
           [] -> E.s (error "Cannot find matching union field in cast")
         | fi :: rest 
-           when Util.equals (typeSigWithAttrs (fun _ -> []) fi.ftype) tsig 
+           when Util.equals (typeSigNoAttrs fi.ftype) tsig 
            -> fi
         | _ :: rest -> findField rest
       in
@@ -4410,7 +4849,7 @@ and doInit
   | _, (A.NEXT_INIT, A.COMPOUND_INIT [(A.NEXT_INIT, 
                                        A.SINGLE_INIT oneinit)]) :: restil ->
       let se, oneinit', t' = doExp isconst oneinit (AExp(Some so.soTyp)) in
-      setone so.soOff (mkCastT oneinit' t' so.soTyp);
+      setone so.soOff (makeCastT oneinit' t' so.soTyp);
       (* Move on *)
       advanceSubobj so; 
       doInit isconst setone so (acc @@ se) restil
@@ -4450,7 +4889,7 @@ and doInit
                     let (doidx, idxe', _) = 
                       doExp true idx (AExp(Some intType)) in
                     match constFold true idxe', isNotEmpty doidx with
-                      Const(CInt64(x, _, _)), false -> Int64.to_int x, doidx
+                      Const(CInt64(x, _, _)), false -> i64_to_int x, doidx
                     | _ -> E.s (error 
                       "INDEX initialization designator is not a constant")
                   in
@@ -4487,7 +4926,7 @@ and doInit
               match constFold true idxs', constFold true idxe' with
                 Const(CInt64(s, _, _)), 
                 Const(CInt64(e, _, _)) -> 
-                  Int64.to_int s, Int64.to_int e
+                  i64_to_int s, i64_to_int e
               | _ -> E.s (error 
                  "INDEX_RANGE initialization designator is not a constant")
             in
@@ -4505,7 +4944,7 @@ and doInit
 
         | A.NEXT_INIT -> (* We have not found any RANGE *) 
             let acc' = addressSubobj so what acc in
-            doInit isconst setone so (acc @@ acc') 
+            doInit isconst setone so acc'
               ((A.NEXT_INIT, ie) :: restil)
       in
       expandRange (fun x -> x) what
@@ -4517,7 +4956,7 @@ and doInit
 (* Create and add to the file (if not already added) a global. Return the 
  * varinfo *)
 and createGlobal (specs : (typ * storage * bool * A.attribute list)) 
-                 (((n,ndt,a,cloc) as nm, inite) : A.init_name) : varinfo = 
+                 (((n,ndt,a,cloc), inite) : A.init_name) : varinfo = 
   try
     if debugGlobal then 
       ignore (E.log "createGlobal: %s\n" n);
@@ -4548,8 +4987,11 @@ and createGlobal (specs : (typ * storage * bool * A.attribute list))
         None
       else 
         let se, ie', et = doInitializer vi inite in
-        (* Maybe we now have a better type *)
-        vi.vtype <- et;
+        (* Maybe we now have a better type?  Use the type of the
+         * initializer only if it really differs from the type of
+         * the variable. *)
+        if unrollType vi.vtype != unrollType et then
+          vi.vtype <- et;
         if isNotEmpty se then 
           E.s (error "global initializer");
         Some ie'
@@ -4589,14 +5031,14 @@ and createGlobal (specs : (typ * storage * bool * A.attribute list))
           vi.vstorage <- NoStorage;     (* equivalent and canonical *)
 
         H.add alreadyDefined vi.vname !currentLoc;
-        H.remove mustTurnIntoDef vi.vid;
+        IH.remove mustTurnIntoDef vi.vid;
         cabsPushGlobal (GVar(vi, {init = init}, !currentLoc));
         vi
       end else begin
         if not (isFunctionType vi.vtype) 
-           && not (H.mem mustTurnIntoDef vi.vid) then 
+           && not (IH.mem mustTurnIntoDef vi.vid) then 
           begin
-            H.add mustTurnIntoDef vi.vid true
+            IH.add mustTurnIntoDef vi.vid true
           end;
         if not alreadyInEnv then begin (* Only one declaration *)
           (* If it has function type it is a prototype *)
@@ -4609,7 +5051,7 @@ and createGlobal (specs : (typ * storage * bool * A.attribute list))
         end
       end
     end
-  with e -> begin
+  with e when continueOnError -> begin
     ignore (E.log "error in createGlobal(%s: %a): %s\n" n
               d_loc !currentLoc
               (Printexc.to_string e));
@@ -4653,6 +5095,7 @@ and createLocal ((_, sto, _, _) as specs)
       if debugGlobal then 
         ignore (E.log "createGlobal (local static): %s\n" n);
 
+
       (* Now alpha convert it to make sure that it does not conflict with 
        * existing globals or locals from this function. *)
       let newname, _  = newAlphaName true "" n in
@@ -4667,13 +5110,22 @@ and createLocal ((_, sto, _, _) as specs)
       (* Add it to the environment as a local so that the name goes out of 
        * scope properly *)
       addLocalToEnv n (EnvVar vi);
+
+      (* Maybe this is an array whose length depends on something with local 
+         scope, e.g. "static char device[ sizeof(local) ]".
+         Const-fold the type to fix this. *)
+      vi.vtype <- constFoldType vi.vtype;
+
       let init : init option = 
         if inite = A.NO_INIT then 
           None
         else begin 
           let se, ie', et = doInitializer vi inite in
-          (* Maybe we now have a better type *)
-          vi.vtype <- et;
+          (* Maybe we now have a better type?  Use the type of the
+           * initializer only if it really differs from the type of
+           * the variable. *)
+          if unrollType vi.vtype != unrollType et then
+            vi.vtype <- et;
           if isNotEmpty se then 
             E.s (error "global static initializer");
           (* Maybe the initializer refers to the function itself. 
@@ -4710,7 +5162,7 @@ and createLocal ((_, sto, _, _) as specs)
                         ~isformal:false
                         ~isglobal:false 
 	                loc
-                        (TInt(IUInt, []), NoStorage, false, [])
+                        (!typeOfSizeOf, NoStorage, false, [])
                         ("__lengthof" ^ vi.vname,JUSTBASE, []) 
           in
           (* Register it *)
@@ -4721,14 +5173,28 @@ and createLocal ((_, sto, _, _) as specs)
                   SizeOfE (Lval(Mem(Lval(var vi)), NoOffset)),
                   Lval (var savelen), !typeOfSizeOf) in
           (* Register the length *)
-          H.add varSizeArrays vi.vid sizeof;
+          IH.add varSizeArrays vi.vid sizeof;
           (* There can be no initializer for this *)
           if inite != A.NO_INIT then 
             E.s (error "Variable-sized array cannot have initializer");
-          se0 +++ (Set(var savelen, len, !currentLoc)) 
-            (* Initialize the variable *)
-            +++ (Call(Some(var vi), Lval(var allocaFun.svar), 
+          let setlen =  se0 +++ 
+              (Set(var savelen, makeCast len savelen.vtype, !currentLoc)) in
+          (* Initialize the variable *)
+          let alloca: varinfo = allocaFun () in
+          if !doCollapseCallCast then
+            (* do it in one step *)
+            setlen +++ (Call(Some(var vi), Lval(var alloca), 
+                             [ sizeof  ], !currentLoc))
+          else begin
+            (* do it in two *)
+            let rt, _, _, _ = splitFunctionType alloca.vtype in
+            let tmp = newTempVar (dprintf "alloca(%a)" d_exp sizeof) false rt in
+            setlen
+            +++ (Call(Some(var tmp), Lval(var alloca), 
                       [ sizeof  ], !currentLoc))
+            +++ (Set((var vi), 
+                     makeCast (Lval(var tmp)) vi.vtype, !currentLoc))
+           end
         end else empty
       in
       if inite = A.NO_INIT then
@@ -4751,6 +5217,30 @@ and createLocal ((_, sto, _, _) as specs)
         se1 @@ se4 @@ (assignInit (Var vi, NoOffset) ie' et empty)
       end
           
+and doAliasFun vtype (thisname:string) (othername:string) 
+  (sname:single_name) (loc: cabsloc) : unit =
+  (* This prototype declares that name is an alias for 
+     othername, which must be defined in this file *)
+(*   E.log "%s is alias for %s at %a\n" thisname othername  *)
+(*     d_loc !currentLoc; *)
+  let rt, formals, isva, _ = splitFunctionType vtype in
+  if isva then E.s (error "%a: alias unsupported with varargs."
+                      d_loc !currentLoc);
+  let args = List.map 
+               (fun (n,_,_) -> A.VARIABLE n)
+               (argsToList formals) in
+  let call = A.CALL (A.VARIABLE othername, args) in
+  let stmt = if isVoidType rt then A.COMPUTATION(call, loc)
+                              else A.RETURN(call, loc)
+  in
+  let body = { A.blabels = []; A.battrs = []; A.bstmts = [stmt] } in
+  let fdef = A.FUNDEF (sname, body, loc, loc) in
+  ignore (doDecl true fdef);
+  (* get the new function *)
+  let v,_ = try lookupGlobalVar thisname
+            with Not_found -> E.s (bug "error in doDecl") in
+  v.vattr <- dropAttribute "alias" v.vattr
+
           
 (* Do one declaration *)
 and doDecl (isglobal: bool) : A.definition -> chunk = function
@@ -4764,13 +5254,28 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
       in
       let spec_res = doSpecList sugg s in
       (* Do all the variables and concatenate the resulting statements *)
-      let doOneDeclarator (acc: chunk) (n: init_name) = 
+      let doOneDeclarator (acc: chunk) (name: init_name) = 
+        let (n,ndt,a,l),_ = name in
         if isglobal then begin
-          (* For a global we ignore the varinfo that is created  *)
-          ignore (createGlobal spec_res n); 
+          let bt,_,_,attrs = spec_res in
+          let vtype, nattr = 
+            doType (AttrName false) bt (A.PARENTYPE(attrs, ndt, a)) in
+          (match filterAttributes "alias" nattr with
+             [] -> (* ordinary prototype. *)
+               ignore (createGlobal spec_res name)
+              (*  E.log "%s is not aliased\n" name *)
+           | [Attr("alias", [AStr othername])] ->
+               if not (isFunctionType vtype) then begin
+                 ignore (warn 
+                   "%a: CIL only supports attribute((alias)) for functions.\n"
+                   d_loc !currentLoc);
+                 ignore (createGlobal spec_res name)
+               end else
+                 doAliasFun vtype n othername (s, (n,ndt,a,l)) loc
+           | _ -> E.s (error "Bad alias attribute at %a" d_loc !currentLoc));
           acc
         end else 
-          acc @@ createLocal spec_res n
+          acc @@ createLocal spec_res name
       in
       let res = List.fold_left doOneDeclarator empty nl in
 (*
@@ -4819,8 +5324,19 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
       when isglobal && isExtern specs && isInline specs 
            && (H.mem genv (n ^ "__extinline")) -> 
        currentLoc := convLoc(loc);
-       ignore (warn "Duplicate extern inline definition for %s ignored"
-                 n);
+       let othervi, _ = lookupVar (n ^ "__extinline") in
+       if othervi.vname = n then 
+         (* The previous entry in the env is also an extern inline version
+            of n. *)
+         ignore (warn "Duplicate extern inline definition for %s ignored" n)
+       else begin
+         (* Otherwise, the previous entry is an ordinary function that
+            happens to be named __extinline.  Renaming n to n__extinline
+            would confict with other, so report an error. *)
+         E.s (unimp("Trying to rename %s to\n %s__extinline, but %s__extinline"
+                     ^^ " already exists in the env.\n  \"__extinline\" is"
+                     ^^ " reserved for CIL.\n") n n n)
+       end;
        (* Treat it as a prototype *)
        doDecl isglobal (A.DECDEF ((specs, [((n,dt,a,loc'), A.NO_INIT)]), loc))
 
@@ -4835,6 +5351,8 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
         (fun _ -> dprintf "2cil: %s" n)
         (fun _ ->
           try
+            IH.clear callTempVars;
+
             (* Make the fundec right away, and we'll populate it later. We 
              * need this throughout the code to create temporaries. *)
             currentFunctionFDEC := 
@@ -4855,7 +5373,7 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
             * they need alpha-conv  *)
             enterScope ();  (* Start the scope *)
             
-            H.clear varSizeArrays;
+            IH.clear varSizeArrays;
             
             (* Do not process transparent unions in function definitions.
             * We'll do it later *)
@@ -4876,23 +5394,33 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
                * static *)
               let n', sto' =
                 let n' = n ^ "__extinline" in
-                if inl && sto = Extern then 
+                if inl && sto = Extern then begin
                   n', Static
-                else begin 
+                end else begin 
                   (* Maybe this is the body of a previous extern inline. Then 
                   * we must take that one out of the environment because it 
                   * is not used from here on. This will also ensure that 
                   * then we make this functions' varinfo we will not think 
                   * it is a duplicate definition *)
                   (try
-                    ignore (lookupVar n'); (* n' is defined *)
+                    ignore (lookupVar n'); (* if this succeeds, n' is defined*)
                     let oldvi, _ = lookupVar n in
-                    if oldvi.vname <> n' then 
-                      E.s (bug "extern inline redefinition: %s (expected %s)"
-                             oldvi.vname n');
-                    H.remove env n; H.remove genv n;
-                    H.remove env n'; H.remove genv n'
-                  with Not_found -> ());
+                    if oldvi.vname = n' then begin 
+                      (* oldvi is an extern inline function that has been
+                         renamed to n ^ "__extinline".  Remove it from the
+                         environment. *)
+                      H.remove env n; H.remove genv n;
+                      H.remove env n'; H.remove genv n'
+                    end 
+                    else
+                      (* oldvi is not a renamed extern inline function, and
+                         we should do nothing.  The reason the lookup
+                         of n' succeeded is probably because there's
+                         an ordinary function that happens to be named,
+                         n ^ "__extinline", probably as a result of a previous
+                         pass through CIL.   See small2/extinline.c*)
+                      ()
+                   with Not_found -> ());
                   n, sto 
                 end
               in
@@ -4918,6 +5446,9 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
 
             if H.mem alreadyDefined !currentFunctionFDEC.svar.vname then
               E.s (error "There is a definition already for %s" n);
+
+            H.add alreadyDefined !currentFunctionFDEC.svar.vname funloc;
+
 
 (*
             ignore (E.log "makefunvar:%s@! type=%a@! vattr=%a@!"
@@ -5018,7 +5549,7 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
                   let default =
                     defaultChunk
                       l
-                      (i2c (Set ((Mem (mkCast (integer 0) intPtrType),
+                      (i2c (Set ((Mem (makeCast (integer 0) intPtrType),
                                   NoOffset),
                                  integer 0, l)))
                   in
@@ -5093,7 +5624,7 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
                           makeTempVar !currentFunctionFDEC fstfield.ftype in
                         (* Now take it out of the locals and replace it with 
                         * the current formal. It is not worth optimizing this 
-                        * one  *)
+                        * one.  *)
                         !currentFunctionFDEC.slocals <-
                            f ::
                            (List.filter (fun x -> x.vid <> shadow.vid)
@@ -5118,6 +5649,10 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
              * That set a return value via an ASM statement. As a result, I 
              * am changing this so a final ASM statement does not count as 
              * "fall through" for the purposes of this warning.  *)
+            (* matth: But it's better to assume assembly will fall through,
+             * since  most such blocks do.  It's probably better to print an
+             * unnecessary warning than to break CIL's invariant that
+             * return statements are inserted properly.  *)
             let instrFallsThrough (i : instr) = match i with
               Set _ -> true
             | Call (None, Lval (Var e, NoOffset), _, _) -> 
@@ -5126,7 +5661,7 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
                 else if hasAttribute "noreturn" e.vattr then false
                 else true
             | Call _ -> true
-            | Asm _ -> false
+            | Asm _ -> true
             in 
             let rec stmtFallsThrough (s: stmt) : bool = 
               match s.skind with
@@ -5151,9 +5686,11 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
                    end else begin
                       (* We must examine all cases. If any falls through, 
                        * then the switch falls through. *)
-                      blockFallsThrough b
+                      blockFallsThrough b || blockCanBreak b
                    end
-              | Loop _ -> true (* Conservative *)
+              | Loop (b, _, _, _) -> 
+                  (* A loop falls through if it can break. *)
+                  blockCanBreak b
               | Block b -> blockFallsThrough b
               | TryFinally (b, h, _) -> blockFallsThrough h
               | TryExcept (b, _, h, _) -> true (* Conservative *)
@@ -5191,6 +5728,21 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
               ignore (E.log "blockFallsThrough=%b %a\n" res d_block b);
 *)
               res
+            (* will we leave this statement or block with a break command? *)
+            and stmtCanBreak (s: stmt) : bool = 
+              match s.skind with
+                Instr _ | Return _ | Continue _ | Goto _ -> false
+              | Break _ -> true
+              | If (_, b1, b2, _) -> 
+                  blockCanBreak b1 || blockCanBreak b2
+              | Switch _ | Loop _ -> 
+                  (* switches and loops catch any breaks in their bodies *)
+                  false
+              | Block b -> blockCanBreak b
+              | TryFinally (b, h, _) -> blockCanBreak b || blockCanBreak h
+              | TryExcept (b, _, h, _) -> blockCanBreak b || blockCanBreak h
+            and blockCanBreak b = 
+              List.exists stmtCanBreak b.bstmts
             in
             if blockFallsThrough !currentFunctionFDEC.sbody then begin
               let retval = 
@@ -5198,21 +5750,23 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
                   TVoid _ -> None
                 | (TInt _ | TEnum _ | TFloat _ | TPtr _) as rt -> 
                     ignore (warn "Body of function %s falls-through. Adding a return statement\n"  !currentFunctionFDEC.svar.vname);
-                    Some (mkCastT zero intType rt)
+                    Some (makeCastT zero intType rt)
                 | _ ->
                     ignore (warn "Body of function %s falls-through and cannot find an appropriate return value\n" !currentFunctionFDEC.svar.vname);
                     None
               in
-              !currentFunctionFDEC.sbody.bstmts <- 
-                 !currentFunctionFDEC.sbody.bstmts 
-                 @ [mkStmt (Return(retval, endloc))]
+              if not (hasAttribute "noreturn" 
+                        !currentFunctionFDEC.svar.vattr) then 
+                !currentFunctionFDEC.sbody.bstmts <- 
+                  !currentFunctionFDEC.sbody.bstmts 
+                  @ [mkStmt (Return(retval, endloc))]
             end;
             
             (* ignore (E.log "The env after finishing the body of %s:\n%t\n"
                         n docEnv); *)
             cabsPushGlobal (GFun (!currentFunctionFDEC, funloc));
             empty
-          with e -> begin
+          with e when continueOnError -> begin
             ignore (E.log "error in collectFunction %s: %s\n"
                       n (Printexc.to_string e));
             cabsPushGlobal (GAsm("error in function " ^ n, !currentLoc));
@@ -5263,7 +5817,7 @@ and doTypedef ((specs, nl): A.name_group) =
         let namedTyp = TNamed(ti, []) in
         (* Register the type. register it as local because we might be in a
         * local context  *)
-        addLocalToEnv (kindPlusName "type" n) (EnvTyp (TNamed(ti, [])));
+        addLocalToEnv (kindPlusName "type" n) (EnvTyp namedTyp);
         cabsPushGlobal (GType (ti, !currentLoc))
       with e -> begin
         ignore (E.log "Error on A.TYPEDEF (%s)\n"
@@ -5335,20 +5889,13 @@ and assignInit (lv: lval)
       acc +++ (Set(lv, e'', !currentLoc))
   | CompoundInit (t, initl) -> 
       foldLeftCompound
+        ~implicit:false
         ~doinit:(fun off i it acc -> 
           assignInit (addOffsetLval off lv) i it acc)
         ~ct:t
         ~initl:initl
         ~acc:acc
-(*
-  | ArrayInit (bt, len, initl) -> 
-      let idx = ref ( -1 ) in
-      List.fold_left
-        (fun acc i -> 
-          assignInit (addOffsetLval (Index(integer !idx, NoOffset)) lv) i bt acc)
-        acc
-        initl
-*)
+
   (* Now define the processors for body and statement *)
 and doBody (blk: A.block) : chunk = 
   enterScope ();
@@ -5466,27 +6013,26 @@ and doStatement (s : A.statement) : chunk =
     | A.RETURN (A.NOTHING, loc) -> 
         let loc' = convLoc loc in
         currentLoc := loc';
-        (match !currentReturnType with 
-           TVoid _ -> ()
-          | _ -> 
-            ignore (warn "Return statement without a value in function returning %a\n" d_type !currentReturnType));
+        if not (isVoidType !currentReturnType) then
+          ignore (warn "Return statement without a value in function returning %a\n" d_type !currentReturnType);
         returnChunk None loc'
 
-    | A.RETURN (e, loc) -> begin
+    | A.RETURN (e, loc) ->
         let loc' = convLoc loc in
         currentLoc := loc';
         (* Sometimes we return the result of a void function call *)
-        match !currentReturnType with
-          TVoid _ -> 
-            ignore (warn "Return statement with a value in function returning void");
-            let (se, _, _) = doExp false e ADrop in
-            se @@ returnChunk None loc'
-        | _ ->  
-            let (se, e', et) = 
-              doExp false e (AExp (Some !currentReturnType)) in
-            let (et'', e'') = castTo et (!currentReturnType) e' in
-            se @@ (returnChunk (Some e'') loc')
-    end
+        if isVoidType !currentReturnType then begin
+          ignore (warn "Return statement with a value in function returning void");
+          let (se, _, _) = doExp false e ADrop in
+          se @@ returnChunk None loc'
+        end else begin
+	  let rt =
+	    typeRemoveAttributes ["warn_unused_result"] !currentReturnType
+	  in
+          let (se, e', et) = doExp false e (AExp (Some rt)) in
+          let (et'', e'') = castTo et rt e' in
+          se @@ (returnChunk (Some e'') loc')
+        end
                
     | A.SWITCH (e, s, loc) -> 
         let loc' = convLoc loc in
@@ -5499,10 +6045,11 @@ and doStatement (s : A.statement) : chunk =
     | A.CASE (e, s, loc) -> 
         let loc' = convLoc loc in
         currentLoc := loc';
-        let (se, e', et) = doExp false e (AExp None) in
+        let (se, e', et) = doExp true e (AExp None) in
         if isNotEmpty se then
           E.s (error "Case statement with a non-constant");
-        caseRangeChunk [constFold false e'] loc' (doStatement s)
+        caseRangeChunk [if !lowerConstants then constFold false e' else e'] 
+          loc' (doStatement s)
             
     | A.CASERANGE (el, eh, s, loc) -> 
         let loc' = convLoc loc in
@@ -5514,7 +6061,7 @@ and doStatement (s : A.statement) : chunk =
         let il, ih = 
           match constFold true el', constFold true eh' with
             Const(CInt64(il, _, _)), Const(CInt64(ih, _, _)) -> 
-              Int64.to_int il, Int64.to_int ih
+              i64_to_int il, i64_to_int ih
           | _ -> E.s (unimp "Cannot understand the constants in case range")
         in
         if il > ih then 
@@ -5550,13 +6097,13 @@ and doStatement (s : A.statement) : chunk =
         match !gotoTargetData with
           Some (switchv, switch) -> (* We have already generated this one  *)
             se 
-            @@ i2c(Set (var switchv, mkCast e' uintType, loc'))
+            @@ i2c(Set (var switchv, makeCast e' intType, loc'))
             @@ s2c(mkStmt(Goto (ref switch, loc')))
 
         | None -> begin
             (* Make a temporary variable *)
             let vchunk = createLocal 
-                (TInt(IUInt, []), NoStorage, false, [])
+                (intType, NoStorage, false, [])
                 (("__compgoto", A.JUSTBASE, [], loc), A.NO_INIT) 
             in
             if not (isEmpty vchunk) then 
@@ -5572,7 +6119,7 @@ and doStatement (s : A.statement) : chunk =
             (* And make a label for it since we'll goto it *)
             switch.labels <- [Label ("__docompgoto", loc', false)];
             gotoTargetData := Some (switchv, switch);
-            se @@ i2c (Set(var switchv, mkCast e' uintType, loc')) @@
+            se @@ i2c (Set(var switchv, makeCast e' intType, loc')) @@
             s2c switch
         end
       end
@@ -5586,37 +6133,51 @@ and doStatement (s : A.statement) : chunk =
 
 
 
-    | A.ASM (asmattr, tmpls, outs, ins, clobs, loc) -> 
+    | A.ASM (asmattr, tmpls, details, loc) -> 
         (* Make sure all the outs are variables *)
         let loc' = convLoc loc in
         let attr' = doAttributes asmattr in
         currentLoc := loc';
-        let temps : (lval * varinfo) list ref = ref [] in
         let stmts : chunk ref = ref empty in
-        let outs' = 
-          List.map 
-            (fun (c, e) -> 
-              let (se, e', t) = doExp false e (AExp None) in
-              let lv = 
-                match e' with
-		| Lval lval
-		| StartOf lval -> lval
-                | _ -> E.s (error "Expected lval for ASM outputs")
+	let (tmpls', outs', ins', clobs') =
+	  match details with
+	  | None ->
+	      let tmpls' =
+		if !msvcMode then
+		  tmpls
+		else
+		  let pattern = Str.regexp "%" in
+		  let escape = Str.global_replace pattern "%%" in
+		  List.map escape tmpls
+	      in
+	      (tmpls', [], [], [])
+	  | Some { aoutputs = outs; ainputs = ins; aclobbers = clobs } ->
+              let outs' =
+		List.map
+		  (fun (id, c, e) ->
+		    let (se, e', t) = doExp false e (AExp None) in
+		    let lv =
+                      match e' with
+		      | Lval lval
+		      | StartOf lval -> lval
+                      | _ -> E.s (error "Expected lval for ASM outputs")
+		    in
+		    stmts := !stmts @@ se;
+		    (id, c, lv)) outs
               in
-              stmts := !stmts @@ se;
-              (c, lv)) outs 
-        in
-      (* Get the side-effects out of expressions *)
-        let ins' = 
-          List.map 
-            (fun (c, e) -> 
-              let (se, e', et) = doExp false e (AExp None) in
-              stmts := !stmts @@ se;
-              (c, e'))
-            ins              
-        in
+	      (* Get the side-effects out of expressions *)
+              let ins' =
+		List.map
+		  (fun (id, c, e) ->
+		    let (se, e', et) = doExp false e (AExp None) in
+		    stmts := !stmts @@ se;
+		    (id, c, e'))
+		  ins
+              in
+	      (tmpls, outs', ins', clobs)
+	in
         !stmts @@
-        (i2c (Asm(attr', tmpls, outs', ins', clobs, loc')))
+        (i2c (Asm(attr', tmpls', outs', ins', clobs', loc')))
 
     | TRY_FINALLY (b, h, loc) -> 
         let loc' = convLoc loc in
@@ -5651,22 +6212,43 @@ and doStatement (s : A.statement) : chunk =
         in
         s2c (mkStmt (TryExcept (c2block b', (il', e'), c2block h', loc')))
 
-  with e -> begin
+  with e when continueOnError -> begin
     (ignore (E.log "Error in doStatement (%s)\n" (Printexc.to_string e)));
-    consLabel "booo_statement" empty (convLoc (A.get_statementloc s)) false
+    E.hadErrors := true;
+    consLabel "booo_statement" empty (convLoc (C.get_statementloc s)) false
   end
 
 
+let rec stripParenLocal e = match e with
+  | A.PAREN e2 -> stripParenLocal e2
+  | _ -> e
+
+class stripParenClass : V.cabsVisitor = object (self)
+  inherit V.nopCabsVisitor as super
+  
+  method vexpr e = match e with
+  | A.PAREN e2 ->
+        V.ChangeDoChildrenPost (stripParenLocal e2,stripParenLocal)
+  | _ -> V.DoChildren
+end
+
+let stripParenFile file = V.visitCabsFile (new stripParenClass) file
+
+
 (* Translate a file *)
-let convFile ((fname : string), (dl : Cabs.definition list)) : Cil.file =
+let convFile (f : A.file) : Cil.file =
   Cil.initCIL (); (* make sure we have initialized CIL *)
+
+  (* remove parentheses from the Cabs *)
+  let fname,dl = stripParenFile f in 
+    
   (* Clean up the global types *)
-  E.hadErrors := false;
   initGlobals();
   startFile ();
+  IH.clear noProtoFunctions;
   H.clear compInfoNameEnv;
   H.clear enumInfoNameEnv;
-  H.clear mustTurnIntoDef;
+  IH.clear mustTurnIntoDef;
   H.clear alreadyDefined;
   H.clear staticLocals;
   H.clear typedefs;                      
@@ -5681,9 +6263,11 @@ let convFile ((fname : string), (dl : Cabs.definition list)) : Cil.file =
                                Some (List.map (fun at -> ("", at, [])) 
                                        argTypes),
                                isva, [])) in
-    ignore (alphaConvertVarAndAddToEnv true v)
+    ignore (alphaConvertVarAndAddToEnv true v);
+    (* Add it to the file as well *)
+    cabsPushGlobal (GVarDecl (v, Cil.builtinLoc))
   in
-  H.iter setupBuiltin (if !msvcMode then msvcBuiltins else gccBuiltins);
+  H.iter setupBuiltin Cil.builtinFunctions;
 
   let globalidx = ref 0 in
   let doOneGlobal (d: A.definition) = 
@@ -5727,8 +6311,8 @@ let convFile ((fname : string), (dl : Cabs.definition list)) : Cil.file =
   List.iter doOneGlobal dl;
   let globals = ref (popGlobals ()) in
 
-  H.clear noProtoFunctions;
-  H.clear mustTurnIntoDef;  
+  IH.clear noProtoFunctions;
+  IH.clear mustTurnIntoDef;  
   H.clear alreadyDefined;
   H.clear compInfoNameEnv;
   H.clear enumInfoNameEnv;
@@ -5737,6 +6321,8 @@ let convFile ((fname : string), (dl : Cabs.definition list)) : Cil.file =
   H.clear typedefs;
   H.clear env;
   H.clear genv;
+  IH.clear callTempVars;
+
   if false then ignore (E.log "Cabs2cil converted %d globals\n" !globalidx);
   (* We are done *)
   { fileName = fname;

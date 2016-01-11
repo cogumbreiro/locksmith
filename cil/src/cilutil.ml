@@ -37,6 +37,8 @@
 
 (* Keep here the globally-visible flags *)
 let doCheck= ref false   (* Whether to check CIL *)
+let strictChecking= ref false   (* If doCheck is true and warnings are found,
+                                * treat them as errors. *)
 
 let logCalls = ref false (* Whether to produce a log with all the function 
                           * calls made *)
@@ -50,7 +52,7 @@ let doOneRet = ref false (* make a functions have at most one 'return' *)
 let doStackGuard = ref false (* instrument function calls and returns to
 maintain a separate stack for return addresses *)
 let doHeapify = ref false (* move stack-allocated arrays to the heap *)
-let makeCFG = ref true (* turn the input CIL file into something more like
+let makeCFG = ref true (* LOCKSMITH *) (* turn the input CIL file into something more like
                           * a CFG *)
 let printStats = ref false
 
@@ -67,6 +69,6 @@ let doCxxPP = ref false
 
 let libDir = ref ""
 
-(* polyvios: these are ours: *)
-let livevars = ref false
-let locksmith = ref true
+let dumpFCG = ref false
+let testcil = ref ""
+

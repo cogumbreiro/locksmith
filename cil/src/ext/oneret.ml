@@ -56,7 +56,8 @@ let oneret (f: Cil.fundec) : unit =
                   f.svar.vname)
   in
   (* Does it return anything ? *)
-  let hasRet = match retTyp with TVoid _ -> false | _ -> true in
+  let hasRet = match unrollType retTyp with TVoid _ -> false | _ -> true in
+
   (* Memoize the return result variable. Use only if hasRet *)
   let lastloc = ref locUnknown in 
   let retVar : varinfo option ref = ref None in
@@ -64,7 +65,7 @@ let oneret (f: Cil.fundec) : unit =
     match !retVar with
       Some rv -> rv
     | None -> begin
-        let rv = makeLocalVar f "__retres" retTyp in (* don't collide *)
+        let rv = makeTempVar f ~name:"__retres" retTyp in (* don't collide *)
         retVar := Some rv;
         rv
     end
@@ -96,6 +97,10 @@ let oneret (f: Cil.fundec) : unit =
         [rs]
 
     | [] -> []
+
+    | [{skind=Return (Some (Lval(Var _,NoOffset)), _)} as s]
+         when mainbody && not !haveGoto
+           -> [s]
 
     | ({skind=Return (retval, l)} as s) :: rests -> 
         currentLoc := l;

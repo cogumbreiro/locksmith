@@ -15,6 +15,7 @@ FEATURES:
 
 - Merge uniqueness analysis with liveness analysis to be able to
   remove 3 false alarms in knot.
+  - also look at tests/forkloop2.c
 
 - Dig further into scalability problems.
   - Apps to try: retawq, mt_daapd_nocodec, nsd_comb, clamd
@@ -27,10 +28,6 @@ FEATURES:
     function for deciding we need more precision?  How would we
     implement improving precision on demand?  Can we estimate
     the value of doing this?
-
-- Fix semi-unification infinite looping problem.
-  - Add extended occurs check.
-  - Look at drivers (e.g., wavelan) to understand this better.
 
 - Improve the output.  
   - When printing of context-based results, if an instantiation path
@@ -50,7 +47,3 @@ FEATURES:
 
 - Try making malloc() context-sensitive.  Would save a lot of hassle
   when dealing with malloc wrappers, which are reasonably common.
-
-- forkloop2.c is imprecise
-  - we should be able to get rid of this race, assuming
-    we add liveness to the uniqueness results.

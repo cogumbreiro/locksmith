@@ -45,7 +45,7 @@ banshee_exe = ../bin/banshee.exe
 
 DYCKCFL = dyckcfl
 
-TARGETS =  $(DYCKCFL).o mr_$(DYCKCFL).o $(DYCKCFL)_terms.h $(DYCKCFL)_spec.o $(DYCKCFL)_terms.o $(DYCKCFL)_terms.c dyckcfl-replay.o dyckcfl-replay
+TARGETS =  $(DYCKCFL).o mr_$(DYCKCFL).o $(DYCKCFL)_terms.h $(DYCKCFL)_spec.o $(DYCKCFL)_terms.c $(DYCKCFL)_terms.o dyckcfl-replay.o dyckcfl-replay
 
 TAGFILES = $(wildcard *.c) $(wildcard *.h)
 
@@ -74,6 +74,9 @@ $(DYCKCFL).o:
 	$(CC) -c $(CFLAGS) -DNONSPEC $(DYCKCFL).c
 
 $(DYCKCFL)_terms.h: $(DYCKCFL)_terms.bsp
+	$(banshee_exe) $(DYCKCFL)_terms.bsp
+
+$(DYCKCFL)_terms.c: $(DYCKCFL)_terms.bsp
 	$(banshee_exe) $(DYCKCFL)_terms.bsp
 
 TAGS: $(TAGFILES)

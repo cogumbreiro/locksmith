@@ -1,36 +1,56 @@
 ************************* STARTING *************************
 
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
 shared: &i:function-pointer5.c:6
 
 Warning: Possible data race: &i:function-pointer5.c:6 is not protected!
  references:
-  dereference at function-pointer5.c:10
-    locations possibly dereferenced: 
-      &i:function-pointer5.c:6
-    locks acquired at dereference: 
-      <empty>
-    in: FORK at function-pointer5.c:18 -> bar function-pointer5.c:14
+  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
+    &i:function-pointer5.c:6
+  locks acquired:
+    <empty>
+  in: FORK at function-pointer5.c:18 
+             
 
-  dereference at function-pointer5.c:10
-    locations possibly dereferenced: 
-      &i:function-pointer5.c:6
-    locks acquired at dereference: 
-      <empty>
-    in: main at function-pointer5.c:16 -> bar function-pointer5.c:14
+  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
+    &i:function-pointer5.c:6
+  locks acquired:
+    <empty>
+  in: FORK at function-pointer5.c:18  -> function-pointer5.c:11
+             
+
+  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
+    &i:function-pointer5.c:6
+  locks acquired:
+    <empty>
+  in: main at function-pointer5.c:16 
+             
+
+  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
+    &i:function-pointer5.c:6
+  locks acquired:
+    <empty>
+  in: main at function-pointer5.c:16  -> function-pointer5.c:19
+             
+
+  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
+    &i:function-pointer5.c:6
+  locks acquired:
+    <empty>
+  in: main at function-pointer5.c:16  -> function-pointer5.c:11
+             
+
+  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
+    &i:function-pointer5.c:6
+  locks acquired:
+    <empty>
+  in: main at function-pointer5.c:16  -> function-pointer5.c:19
+                          
+
+  dereference of &i:function-pointer5.c:6 at function-pointer5.c:10
+    &i:function-pointer5.c:6
+  locks acquired:
+    <empty>
+  in: main at function-pointer5.c:16  -> function-pointer5.c:19 -> function-pointer5.c:11
+             
 
 *************************** DONE ***************************

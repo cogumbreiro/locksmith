@@ -166,8 +166,7 @@ and simplifyLval
             start
           with SizeOfError (whystr, t') -> 
             E.s (E.bug "%a: Cannot compute sizeof: %s: %a"
-                   d_loc !currentLoc whystr d_type t');
-            1 (* Make sure it is not a multiple of 8 bits *)
+                   d_loc !currentLoc whystr d_type t')
         in
         if start land 7 <> 0 then begin
           (* We have a bitfield *)
@@ -191,6 +190,15 @@ and simplifyLval
     end
   in
   let tres = TPtr(typeOfLval lv, []) in
+  let typeForCast restOff: typ =
+    (* in (e+i)-> restoff, what should we cast e+i to? *)
+    match restOff with
+      Index _ -> E.s (bug "index in restOff")
+    | NoOffset -> tres
+    | Field(fi, NoOffset) -> (* bitfield *)
+        TPtr(TComp(fi.fcomp, []), [])
+    | Field(fi, _) -> E.s (bug "bug in offsetToInt")
+  in
   match lv with 
     Mem a, off -> 
       let offidx, restoff = offsetToInt (typeOfLval (Mem a, NoOffset)) off in
@@ -201,7 +209,7 @@ and simplifyLval
           a
       in
       let a' = makeBasic setTemp a' in
-      Mem (mkCast a' tres), restoff
+      Mem (mkCast a' (typeForCast restoff)), restoff
 
   | Var v, off when v.vaddrof -> (* We are taking this variable's address *)
       let offidx, restoff = offsetToInt v.vtype off in
@@ -213,7 +221,7 @@ and simplifyLval
         add (mkCast a !upointType) (makeBasic setTemp offidx) 
       in
       let a' = setTemp a' in
-      Mem (mkCast a' tres), restoff
+      Mem (mkCast a' (typeForCast restoff)), restoff
 
   | Var v, off -> 
       (Var v, simplifyOffset setTemp off)
@@ -838,7 +846,7 @@ let feature : featureDescr =
     fd_description = "compiles CIL to 3-address code";
     fd_extraopt = [
       ("--no-split-structs", Arg.Unit (fun _ -> splitStructs := false),
-                    "do not split structured variables"); 
+                    " do not split structured variables"); 
     ];
     fd_doit = (function f -> iterGlobals f doGlobal);
     fd_post_check = true;

@@ -44,12 +44,11 @@ let withTimeout (secs: float) (* Seconds for timeout *)
   end
 
 (** Print a hash table *)
-let docHash ?(sep=",") (one: 'a -> 'b -> doc) () (h: ('a, 'b) H.t) = 
-  let theDoc = ref nil in
+let docHash ?(sep=chr ',') (one: 'a -> 'b -> doc) () (h: ('a, 'b) H.t) = 
   (H.fold 
      (fun key data acc -> 
        if acc == align then acc ++ one key data
-       else acc ++ text sep ++ one key data)
+       else acc ++ sep ++ one key data)
      h
      align) ++ unalign
     
@@ -312,7 +311,7 @@ let restoreHash ?deepCopy (h: ('a, 'b) H.t) : (unit -> unit) =
     match deepCopy with 
       None -> H.copy h 
     | Some f -> 
-        let old = H.create 13 in 
+        let old = H.create (H.length h) in 
         H.iter (fun k d -> H.add old k (f d)) h;
         old
   in
@@ -323,13 +322,13 @@ let restoreIntHash ?deepCopy (h: 'a IH.t) : (unit -> unit) =
     match deepCopy with 
       None -> IH.copy h 
     | Some f -> 
-        let old = IH.create 13 in 
+        let old = IH.create (IH.length h) in 
         IH.iter (fun k d -> IH.add old k (f d)) h;
         old
   in
   (fun () -> 
-    IH.clear old;
-    IH.iter (fun i k -> IH.add old i k) h)
+    IH.clear h;
+    IH.iter (fun i k -> IH.add h i k) old)
 
 let restoreArray ?deepCopy (a: 'a array) : (unit -> unit) = 
   let old = Array.copy a in
@@ -372,19 +371,6 @@ let tryFinally
     raise e
   end
 
-
-
-
-(** The state information that the GUI must display is viewed abstractly as a 
- * set of registers. *)
-type registerInfo = {
-    rName: string; (** The name of the register *)
-    rGroup: string; (** The name of the group to which this register belongs. 
-                     * The special group {!Engine.machineRegisterGroup} 
-                     * contains the machine registers. *)
-    rVal: Pretty.doc; (** The value to be displayed about a register *)
-    rOneLineVal: Pretty.doc option (** The value to be displayed on one line *)
-} 
 
 
 
@@ -727,6 +713,9 @@ let registeredSymbolNames: (string, symbol) H.t = H.create 113
 let symbolNames: string IH.t = IH.create 113 
 let nextSymbolId = ref 0 
 
+(* When we register symbol ranges, we store a naming function for use later 
+ * when we print the symbol *)
+let symbolRangeNaming: (int * int * (int -> string)) list ref = ref []
 
 (* Reset the symbols. We want to allow the registration of symbols at the 
  * top-level. This means that we cannot simply clear the hash tables. The 
@@ -736,7 +725,8 @@ let resetThunk: (unit -> unit) option ref = ref None
 let snapshotSymbols () : unit -> unit = 
   runThunks [ restoreIntHash symbolNames;
               restoreRef nextSymbolId;
-              restoreHash registeredSymbolNames ]
+              restoreHash registeredSymbolNames;
+              restoreRef symbolRangeNaming ]
 
 let resetSymbols () = 
   match !resetThunk with 
@@ -768,17 +758,26 @@ let registerSymbolName (n: string) : symbol =
 let registerSymbolRange (count: int) (mkname: int -> string) : symbol = 
   if count < 0 then E.s (E.bug "registerSymbolRange: invalid counter");
   let first = !nextSymbolId in
-  for i = 0 to count - 1 do 
-    let res = registerSymbolName (mkname i) in
-    assert(i + first = res)
-  done;
+  nextSymbolId := !nextSymbolId + count;
+  symbolRangeNaming := 
+    (first, !nextSymbolId - 1, mkname) :: !symbolRangeNaming;
   first
     
 let symbolName (id: symbol) : string = 
   try IH.find symbolNames id
   with Not_found -> 
-    ignore (E.warn "Cannot find the name of symbol %d" id);
-    "symbol" ^ string_of_int id
+    (* Perhaps it is one of the lazily named symbols *)
+    try 
+      let (fst, _, mkname) = 
+        List.find 
+          (fun (fst,lst,_) -> fst <= id && id <= lst) 
+          !symbolRangeNaming in
+      let n = mkname (id - fst) in
+      IH.add symbolNames id n;
+      n
+    with Not_found ->
+      ignore (E.warn "Cannot find the name of symbol %d" id);
+      "symbol" ^ string_of_int id
 
 (************************************************************************)
 
@@ -803,7 +802,8 @@ module Int32Op = struct
    let (/%) = Int32.div
    let (~-%) = Int32.neg
 
-   let (<<%) = fun i j -> Int32.shift_left i (to_int j)
+   (* We cannot use the <<% because it trips camlp4 *)
+   let sll = fun i j -> Int32.shift_left i (to_int j)
    let (>>%) = fun i j -> Int32.shift_right i (to_int j)
    let (>>>%) = fun i j -> Int32.shift_right_logical i (to_int j)
 end
@@ -813,13 +813,3 @@ end
 
 let equals x1 x2 : bool =
   (compare x1 x2) = 0
-
-(*********************************************************************)
-
-let isSome  = function
-    None -> false
-  | Some _ -> true
-
-let getSome = function
-    None -> raise (Failure "getSome")
-  | Some x -> x

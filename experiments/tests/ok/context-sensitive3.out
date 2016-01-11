@@ -1,100 +1,72 @@
 ************************* STARTING *************************
 
-functions declared but not defined:
-  __builtin_expect
-  __builtin_fabs
-  __builtin_fabsl
-  __builtin_memset
-  __builtin_next_arg
-  __builtin_stdarg_start
-  __builtin_strcat
-  __builtin_strchr
-  __builtin_strncat
-  __builtin_strpbrk
-  __builtin_va_arg
-  __builtin_va_copy
-  __builtin_va_end
-  __builtin_varargs_start
 shared: &x:context-sensitive3.c:4
         &y:context-sensitive3.c:4
 
 Warning: Possible data race: &x:context-sensitive3.c:4 is not protected!
  references:
-  dereference at context-sensitive3.c:10
-    locations possibly dereferenced: 
-      &x:context-sensitive3.c:4
-    locks acquired at dereference: 
-      *munge.l:context-sensitive3.c:17
-      L1:context-sensitive3.c:3
-      concrete L1:context-sensitive3.c:27
-    in: FORK at context-sensitive3.c:31 -> f context-sensitive3.c:31 -> munge context-sensitive3.c:17
+  dereference of p:context-sensitive3.c:7 at context-sensitive3.c:10
+    &x:context-sensitive3.c:4 => munge.p:context-sensitive3.c:19 
+                              => p:context-sensitive3.c:7 at munge context-sensitive3.c:19
+  locks acquired:
+    *munge.l:context-sensitive3.c:17
+    L1:context-sensitive3.c:3
+    concrete L1:context-sensitive3.c:27
+  in: FORK at context-sensitive3.c:31  -> context-sensitive3.c:17
+             
 
-  dereference at context-sensitive3.c:10
-    locations possibly dereferenced: 
-      &x:context-sensitive3.c:4
-    locks acquired at dereference: 
-      *munge.l:context-sensitive3.c:18
-      *munge.l:context-sensitive3.c:19
-      L2:context-sensitive3.c:3
-      concrete L2:context-sensitive3.c:28
-    in: FORK at context-sensitive3.c:31 -> f context-sensitive3.c:31 -> munge context-sensitive3.c:19
+  dereference of p:context-sensitive3.c:7 at context-sensitive3.c:10
+    &x:context-sensitive3.c:4 => munge.p:context-sensitive3.c:19 
+                              => p:context-sensitive3.c:7 at munge context-sensitive3.c:19
+  locks acquired:
+    *munge.l:context-sensitive3.c:18
+    *munge.l:context-sensitive3.c:19
+    L2:context-sensitive3.c:3
+    concrete L2:context-sensitive3.c:28
+  in: FORK at context-sensitive3.c:31  -> context-sensitive3.c:19
+             
 
-  dereference at context-sensitive3.c:10
-    locations possibly dereferenced: 
-      &x:context-sensitive3.c:4
-    locks acquired at dereference: 
-      *munge.l:context-sensitive3.c:17
-      L1:context-sensitive3.c:3
-      concrete L1:context-sensitive3.c:27
-    in: FORK at context-sensitive3.c:30 -> f context-sensitive3.c:30 -> munge context-sensitive3.c:17
+  dereference of p:context-sensitive3.c:7 at context-sensitive3.c:10
+    &x:context-sensitive3.c:4 => munge.p:context-sensitive3.c:19 
+                              => p:context-sensitive3.c:7 at munge context-sensitive3.c:19
+  locks acquired:
+    *munge.l:context-sensitive3.c:17
+    L1:context-sensitive3.c:3
+    concrete L1:context-sensitive3.c:27
+  in: FORK at context-sensitive3.c:30  -> context-sensitive3.c:17
+             
 
-  dereference at context-sensitive3.c:10
-    locations possibly dereferenced: 
-      &x:context-sensitive3.c:4
-    locks acquired at dereference: 
-      *munge.l:context-sensitive3.c:18
-      *munge.l:context-sensitive3.c:19
-      L2:context-sensitive3.c:3
-      concrete L2:context-sensitive3.c:28
-    in: FORK at context-sensitive3.c:30 -> f context-sensitive3.c:30 -> munge context-sensitive3.c:19
+  dereference of p:context-sensitive3.c:7 at context-sensitive3.c:10
+    &x:context-sensitive3.c:4 => munge.p:context-sensitive3.c:19 
+                              => p:context-sensitive3.c:7 at munge context-sensitive3.c:19
+  locks acquired:
+    *munge.l:context-sensitive3.c:18
+    *munge.l:context-sensitive3.c:19
+    L2:context-sensitive3.c:3
+    concrete L2:context-sensitive3.c:28
+  in: FORK at context-sensitive3.c:30  -> context-sensitive3.c:19
+             
 
-  dereference at context-sensitive3.c:10
-    locations possibly dereferenced: 
-      &x:context-sensitive3.c:4
-    locks acquired at dereference: 
-      *munge.l:context-sensitive3.c:17
-      L1:context-sensitive3.c:3
-      concrete L1:context-sensitive3.c:27
-    in: main at context-sensitive3.c:22 -> f context-sensitive3.c:31 -> munge context-sensitive3.c:17
+  dereference of p:context-sensitive3.c:7 at context-sensitive3.c:10
+    &x:context-sensitive3.c:4 => munge.p:context-sensitive3.c:19 
+                              => p:context-sensitive3.c:7 at munge context-sensitive3.c:19
+  locks acquired:
+    *munge.l:context-sensitive3.c:17
+    L1:context-sensitive3.c:3
+    concrete L1:context-sensitive3.c:27
+  in: main at context-sensitive3.c:22  -> context-sensitive3.c:17
+             
 
-  dereference at context-sensitive3.c:10
-    locations possibly dereferenced: 
-      &x:context-sensitive3.c:4
-    locks acquired at dereference: 
-      *munge.l:context-sensitive3.c:17
-      L1:context-sensitive3.c:3
-      concrete L1:context-sensitive3.c:27
-    in: main at context-sensitive3.c:22 -> f context-sensitive3.c:30 -> munge context-sensitive3.c:17
-
-  dereference at context-sensitive3.c:10
-    locations possibly dereferenced: 
-      &x:context-sensitive3.c:4
-    locks acquired at dereference: 
-      *munge.l:context-sensitive3.c:18
-      *munge.l:context-sensitive3.c:19
-      L2:context-sensitive3.c:3
-      concrete L2:context-sensitive3.c:28
-    in: main at context-sensitive3.c:22 -> f context-sensitive3.c:31 -> munge context-sensitive3.c:19
-
-  dereference at context-sensitive3.c:10
-    locations possibly dereferenced: 
-      &x:context-sensitive3.c:4
-    locks acquired at dereference: 
-      *munge.l:context-sensitive3.c:18
-      *munge.l:context-sensitive3.c:19
-      L2:context-sensitive3.c:3
-      concrete L2:context-sensitive3.c:28
-    in: main at context-sensitive3.c:22 -> f context-sensitive3.c:30 -> munge context-sensitive3.c:19
+  dereference of p:context-sensitive3.c:7 at context-sensitive3.c:10
+    &x:context-sensitive3.c:4 => munge.p:context-sensitive3.c:19 
+                              => p:context-sensitive3.c:7 at munge context-sensitive3.c:19
+  locks acquired:
+    *munge.l:context-sensitive3.c:18
+    *munge.l:context-sensitive3.c:19
+    L2:context-sensitive3.c:3
+    concrete L2:context-sensitive3.c:28
+  in: main at context-sensitive3.c:22  -> context-sensitive3.c:19
+             
 
 &y:context-sensitive3.c:4 is protected by:
   *munge.l:context-sensitive3.c:18
