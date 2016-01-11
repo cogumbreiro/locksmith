@@ -53,12 +53,12 @@ TAGFILES = $(wildcard *.c) $(wildcard *.h)
 
 ifdef DEBUG
 CFLAGS = -I$(engine_dir) -I$(region_dir) -Ddeletes= -Dtraditional= \
-         -Dsameregion= -Dparentptr= -Wall -Werror -g -pg \
+         -Dsameregion= -Dparentptr= -Wall -g -pg \
 	 -DREGION_PROFILE
 #
 else
 CFLAGS = -I$(engine_dir) -I$(region_dir) -Ddeletes= -Dtraditional= \
-         -Dsameregion= -Dparentptr= -Wall -Werror \
+         -Dsameregion= -Dparentptr= -Wall \
 	 -DREGION_PROFILE
 #
 endif

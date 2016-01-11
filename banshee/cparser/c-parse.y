@@ -575,7 +575,7 @@ primary:
 	IDENTIFIER
 		{ 
 		  if (yychar == YYEMPTY)
-		    yychar = YYLEX;
+		    yychar = yylex();
 		  $$ = make_identifier($1.location, $1.id, yychar == '('); 
 		}
 	| CONSTANT { $$ = CAST(expression, $1); }
