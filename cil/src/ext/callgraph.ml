@@ -1,9 +1,10 @@
 (*
  *
- * Copyright (c) 2001-2002, 
+ * Copyright (c) 2001-2007, 
  *  George C. Necula    <necula@cs.berkeley.edu>
  *  Scott McPeak        <smcpeak@cs.berkeley.edu>
  *  Wes Weimer          <weimer@cs.berkeley.edu>
+ *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -75,6 +76,15 @@ begin
     (Hashtbl.add table key data)
 end
 
+(* the set of all functions whose address is taken *)
+let fpHash: (string, varinfo) Hashtbl.t = Hashtbl.create 117
+class fpComputer = object(self)
+  inherit nopCilVisitor
+
+  method vfunc (f:fundec) : fundec visitAction =
+    if f.svar.vaddrof then Hashtbl.add fpHash f.svar.vname f.svar;
+    DoChildren
+end
 
 class cgComputer = object(self)
   inherit nopCilVisitor
@@ -145,8 +155,14 @@ class cgComputer = object(self)
             (add_if callee.cnCallers caller.cnInfo.vname caller)
           )
         | _ ->
+          (*
           (trace "callgraph" (P.dprintf "ignoring indirect call: %a\n"
                                         dn_instr i));
+          *)
+          Hashtbl.iter (fun s vi ->
+            let callee:callnode = (self#getNode vi) in
+            (add_if caller.cnCallees callee.cnInfo.vname callee);
+            (add_if callee.cnCallers caller.cnInfo.vname caller)) fpHash
       )
     | _ -> ());     (* ignore other kinds instructions *)
     DoChildren
@@ -155,7 +171,11 @@ end
 
 let computeGraph (f:file) : callgraph =
 begin
+  let o: fpComputer = new fpComputer in
   let obj:cgComputer = (new cgComputer) in
+
+  (* find all functions whose address is taken *)
+  (visitCilFileSameGlobals (o :> cilVisitor) f);
 
   (* visit the whole file, computing the graph *)
   (visitCilFileSameGlobals (obj :> cilVisitor) f);

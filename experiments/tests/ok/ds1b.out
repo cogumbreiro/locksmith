@@ -1,7 +1,22 @@
 ************************* STARTING *************************
 
-shared: alloc.other_data:ds1b.c:30
-        alloc.data:ds1b.c:18
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
+shared: alloc.data:ds1b.c:18
+        alloc.other_data:ds1b.c:30
 
 Warning: Possible data race: alloc.other_data:ds1b.c:30 is not protected!
  references:
@@ -21,33 +36,31 @@ Warning: Possible data race: alloc.other_data:ds1b.c:30 is not protected!
       <empty>
     in: FORK at ds1b.c:32 -> run ds1b.c:32
 
+  dereference at ds1b.c:24
+    locations possibly dereferenced: 
+      (*(shared.other)).other_data:ds1b.c:18
+      alloc.other_data:ds1b.c:30
+    locks acquired at dereference: 
+      <empty>
+    in: main at ds1b.c:27 -> run ds1b.c:33
+
+  dereference at ds1b.c:24
+    locations possibly dereferenced: 
+      (*(shared.other)).other_data:ds1b.c:18
+      alloc.other_data:ds1b.c:30
+    locks acquired at dereference: 
+      <empty>
+    in: main at ds1b.c:27 -> run ds1b.c:32
+
   dereference at ds1b.c:34
     locations possibly dereferenced: 
       (*(shared.other)).other_data:ds1b.c:18
       alloc.other_data:ds1b.c:30
     locks acquired at dereference: 
       <empty>
-    in: main at ds1b.c:35
-
-  dereference at ds1b.c:24
-    locations possibly dereferenced: 
-      (*(shared.other)).other_data:ds1b.c:18
-      alloc.other_data:ds1b.c:30
-    locks acquired at dereference: 
-      <empty>
-    in: main at ds1b.c:35 -> run ds1b.c:33
-
-  dereference at ds1b.c:24
-    locations possibly dereferenced: 
-      (*(shared.other)).other_data:ds1b.c:18
-      alloc.other_data:ds1b.c:30
-    locks acquired at dereference: 
-      <empty>
-    in: main at ds1b.c:35 -> run ds1b.c:32
+    in: main at ds1b.c:27
 
 alloc.data:ds1b.c:18 is protected by:
-  global_lock:ds1b.c:17
   concrete global_lock:ds1b.c:31
+  global_lock:ds1b.c:17
 *************************** DONE ***************************
-
-

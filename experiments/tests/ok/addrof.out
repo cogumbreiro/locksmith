@@ -1,10 +1,22 @@
-
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: &j:addrof.c:4
 &j:addrof.c:4 is protected by:
-  l:addrof.c:5
   concrete l:addrof.c:18
+  l:addrof.c:5
 *************************** DONE ***************************
-
-

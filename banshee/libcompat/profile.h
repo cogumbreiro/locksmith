@@ -69,5 +69,6 @@ region profile_newregion(char *file, int line);
 #endif
 
 void regprofile(void);
+long region_profile_total_mem(void);
 
 #endif

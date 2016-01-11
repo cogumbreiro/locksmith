@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -42,6 +42,7 @@ open Pretty
 
 let debug = ref false
 let no_linearity = ref false
+let no_semiunification = ref false
 
 let options = [
   "--debug-semiunification",
@@ -51,6 +52,10 @@ let options = [
   "--no-linearity",
      Arg.Set(no_linearity),
      "Disable linearity checking in semiunification";
+
+  "--no-semiunification",
+     Arg.Set(no_semiunification),
+     "Disable semiunification altogether";
 ]
 
 (*****************************
@@ -120,36 +125,38 @@ let empty_epsilon : epsilon =
 
 let all_epsilon : epsilon list ref = ref [ empty_epsilon ]
 
-let make_epsilon (k: epsilon_kind) (il: instantiation list) : epsilon = begin
-  assert (not !solved);
-  incr epsilon_no;
-  let e = {
-    e_id = !epsilon_no;
-    e_kind = k;
-    e_loc = !Cil.currentLoc;
-    e_solution = None;
-    e_inst = il;
-    e_unified = None;
-    e_flow_to = [];
-    e_flow_from = [];
-    e_filter_to = [];
-    e_inst_to = [];
-  } in
-  all_epsilon := e::!all_epsilon;
-  e
-end
+let make_epsilon (k: epsilon_kind) (il: instantiation list) : epsilon =
+  if !no_semiunification then empty_epsilon
+  else begin
+    assert (not !solved);
+    incr epsilon_no;
+    let e = {
+      e_id = !epsilon_no;
+      e_kind = k;
+      e_loc = !Cil.currentLoc;
+      e_solution = None;
+      e_inst = il;
+      e_unified = None;
+      e_flow_to = [];
+      e_flow_from = [];
+      e_filter_to = [];
+      e_inst_to = [];
+    } in
+    all_epsilon := e::!all_epsilon;
+    e
+  end
 
 let make_var_epsilon () : epsilon =
   make_epsilon EChi []
 
-let singletonmap : epsilon LH.t = LH.create 10
+let singletonmap : epsilon LockHT.t = LockHT.create 10
 let singleton (l: lock) : epsilon =
   assert(is_concrete_lock l);
   try
-    LH.find singletonmap l
+    LockHT.find singletonmap l
   with Not_found -> begin
     let e = make_epsilon (ESingleton l) [] in
-    LH.add singletonmap l e;
+    LockHT.add singletonmap l e;
     e
   end
 
@@ -249,80 +256,87 @@ let worklist : constr Q.t = Q.create ()
  * returns false if the constraint was already there
  *)
 let rec epsilon_flow (e: epsilon) (x: epsilon) : unit =
-  assert (not !solved);
-  let e = find_epsilon e in
-  let x = find_epsilon x in
-          (*ignore(E.log "flow %a to %a\n" d_epsilon e d_epsilon x);*)
-  if e == x then ()
-  else if x.e_kind = EEmpty then (
-    match e.e_kind with
-      EEmpty -> ()
-    | EUplus (e1, e2) ->
-        epsilon_flow e1 x;
-        epsilon_flow e2 x;
-    | ESingleton l -> 
-        if !debug then
-          ignore(E.log "lock %a is non linear\n" d_lock l);
-        set_nonlinear l
-    | EChi -> unify_epsilon e x
-        (*if not (List.exists (fun e' -> epsilon_equal e' x) e.e_flow_to)
-        then ( 
-          e.e_flow_to <- x::e.e_flow_to;
-          x.e_flow_from <- e::x.e_flow_from;
-          Q.add (Sub(e,x)) worklist
-        )*)
-  ) else (
-    if not (List.exists (fun e' -> epsilon_equal e' x) e.e_flow_to)
-    then ( 
-      e.e_flow_to <- x::e.e_flow_to;
-      x.e_flow_from <- e::x.e_flow_from;
-      Q.add (Sub(e,x)) worklist
+  if !no_semiunification then () else begin
+    assert (not !solved);
+    let e = find_epsilon e in
+    let x = find_epsilon x in
+            (*ignore(E.log "flow %a to %a\n" d_epsilon e d_epsilon x);*)
+    if e == x then ()
+    else if x.e_kind = EEmpty then (
+      match e.e_kind with
+        EEmpty -> ()
+      | EUplus (e1, e2) ->
+          epsilon_flow e1 x;
+          epsilon_flow e2 x;
+      | ESingleton l -> 
+          if !debug then
+            ignore(E.log "lock %a is non linear\n" d_lock l);
+          set_nonlinear l
+      | EChi -> unify_epsilon e x
+          (*if not (List.exists (fun e' -> epsilon_equal e' x) e.e_flow_to)
+          then ( 
+            e.e_flow_to <- x::e.e_flow_to;
+            x.e_flow_from <- e::x.e_flow_from;
+            Q.add (Sub(e,x)) worklist
+          )*)
+    ) else (
+      if not (List.exists (fun e' -> epsilon_equal e' x) e.e_flow_to)
+      then ( 
+        e.e_flow_to <- x::e.e_flow_to;
+        x.e_flow_from <- e::x.e_flow_from;
+        Q.add (Sub(e,x)) worklist
+      )
     )
-  )
+  end
 
 (* add a constraint e \leq_l x (down-rule)
  * returns false if the constraint was already there
  *)
 and epsilon_filter (e: epsilon) (l,r: labels) (x: epsilon) : unit =
-  assert (not !solved);
-  let e = find_epsilon e in
-  let x = find_epsilon x in
-  if !debug then ignore(E.log "down edge %a -> %a on %a\n" d_epsilon e d_epsilon x d_lockset l);
-  assert(x.e_kind = EEmpty);
-  begin
-    if not (LockSet.is_empty l || List.exists
-         (fun ((l',r'),e') ->
-           epsilon_equal e' x && LockSet.equal l l'
-           && RhoSet.equal r r')
-         e.e_filter_to)
-    then (
-      match e.e_kind with
-        EEmpty -> ()
-      | _ ->
-          e.e_filter_to <- ((l,r),x)::e.e_filter_to;
-          Q.add (Filter(e,(l,r),x)) worklist;
-    )
+  if !no_semiunification then () else begin
+    assert (not !solved);
+    let e = find_epsilon e in
+    let x = find_epsilon x in
+    if !debug then ignore(E.log "down edge %a -> %a on %a\n" d_epsilon e d_epsilon x d_lockset l);
+    assert(x.e_kind = EEmpty);
+    begin
+      if not (LockSet.is_empty l || List.exists
+           (fun ((l',r'),e') ->
+             epsilon_equal e' x && LockSet.equal l l'
+             && RhoSet.equal r r')
+           e.e_filter_to)
+      then (
+        match e.e_kind with
+          EEmpty -> ()
+        | _ ->
+            e.e_filter_to <- ((l,r),x)::e.e_filter_to;
+            Q.add (Filter(e,(l,r),x)) worklist;
+      )
+    end
   end
 
 and epsilon_inst (e: epsilon) (i: inst) (x: epsilon) : unit =
-  assert (not !solved);
-  let e = find_epsilon e in
-  let x = find_epsilon x in
-  if x == empty_epsilon then epsilon_flow e x else begin
-    assert (x.e_kind == EChi);
-    try
-      let (_, e') = List.find (fun (i',e') -> InstHT.equal i i') e.e_inst_to in
-      unify_epsilon e' x;
-    with Not_found -> begin
-      match e.e_kind with
-        EEmpty -> ()
-      | _ ->
-          e.e_inst_to <- (i,x)::e.e_inst_to;
-          Q.add (Inst(e,i,x)) worklist
-    end;
+  if !no_semiunification then () else begin
+    assert (not !solved);
+    let e = find_epsilon e in
+    let x = find_epsilon x in
+    if x == empty_epsilon then epsilon_flow e x else begin
+      assert (x.e_kind == EChi);
+      try
+        let (_, e') = List.find (fun (i',e') -> Inst.equal i i') e.e_inst_to in
+        unify_epsilon e' x;
+      with Not_found -> begin
+        match e.e_kind with
+          EEmpty -> ()
+        | _ ->
+            e.e_inst_to <- (i,x)::e.e_inst_to;
+            Q.add (Inst(e,i,x)) worklist
+      end;
+    end
   end
 
-and unify_epsilon (e1: epsilon) (e2: epsilon) : unit = begin
+and unify_epsilon (e1: epsilon) (e2: epsilon) : unit =
+  if !no_semiunification then () else begin
   assert (not !solved);
   let e1 = find_epsilon e1 in
   let e2 = find_epsilon e2 in
@@ -342,6 +356,7 @@ and unify_epsilon (e1: epsilon) (e2: epsilon) : unit = begin
 end
 
 let union (e1: epsilon) (e2: epsilon) : epsilon =
+  if !no_semiunification then empty_epsilon else
   if (e1 == empty_epsilon) then e2
   else if (e2 == empty_epsilon) then e1
   else begin
@@ -352,6 +367,7 @@ let union (e1: epsilon) (e2: epsilon) : epsilon =
   end
 
 let uplus (e1: epsilon) (e2: epsilon) : epsilon =
+  if !no_semiunification then empty_epsilon else
   if !no_linearity then union e1 e2
   else begin
     if (e1 == empty_epsilon) then e2
@@ -388,7 +404,7 @@ let clone_epsilon (e: epsilon) (i: inst) : epsilon =
     empty_epsilon
   end
   else try
-    let (_, e') = List.find (fun (i',e') -> InstHT.equal i i') e.e_inst_to in
+    let (_, e') = List.find (fun (i',e') -> Inst.equal i i') e.e_inst_to in
     e'
   with Not_found ->
     (*assert(not (List.mem i e.e_inst));*)
@@ -458,32 +474,33 @@ begin
   | EChi -> List.iter (fun e' -> epsilon_filter e' ls x) e.e_flow_from;
 end
 
-let solve () : unit = begin
-  assert (not !solved);
-  let i = ref 1 in
-  let rec loop () =
-    let c = Q.take worklist in begin
-      if !debug then ignore(E.log "iteration %d, worklist: %d\n" !i (Q.length worklist));
-      match c with
-        Sub (e, x) -> propagate_sub e x
-      | Filter (e, l, x) -> propagate_filter e l x
-      | Inst (e, i, x) -> propagate_inst e i x
-    end;
-    let name =(Printf.sprintf "graph%03d.dot" !i) in
-    if !debug then begin
-      Dotpretty.init_file name name;
-        print_graph !Dotpretty.outf;
-      Dotpretty.close_file ();
-    end;
-    incr i;
-    loop ()
-  in
-  try
-    loop ()
-  with Q.Empty -> ();
-  solved := true;
-  LH.clear singletonmap;
-end
+let solve () : unit =
+  if !no_semiunification then () else begin
+    assert (not !solved);
+    let i = ref 1 in
+    let rec loop () =
+      let c = Q.take worklist in begin
+        if !debug then ignore(E.log "iteration %d, worklist: %d\n" !i (Q.length worklist));
+        match c with
+          Sub (e, x) -> propagate_sub e x
+        | Filter (e, l, x) -> propagate_filter e l x
+        | Inst (e, i, x) -> propagate_inst e i x
+      end;
+      let name =(Printf.sprintf "graph%03d.dot" !i) in
+      if !debug then begin
+        Dotpretty.init_file name name;
+          print_graph !Dotpretty.outf;
+        Dotpretty.close_file ();
+      end;
+      incr i;
+      loop ()
+    in
+    try
+      loop ()
+    with Q.Empty -> ();
+    solved := true;
+    LockHT.clear singletonmap;
+  end
 
 let check_escapes () : unit = begin
   List.iter
@@ -534,9 +551,10 @@ let rec solution (e: epsilon) : lockSet =
      sol
 
 
-let check () : unit = begin
-  assert (!solved);
-  List.iter (fun e -> ignore(solution e)) !all_epsilon;
-  close_nonlinear();
-  check_escapes ();
-end
+let check () : unit =
+  if !no_semiunification then () else begin
+    assert (!solved);
+    List.iter (fun e -> ignore(solution e)) !all_epsilon;
+    close_nonlinear();
+    check_escapes ();
+  end

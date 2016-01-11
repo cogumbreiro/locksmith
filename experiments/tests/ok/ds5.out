@@ -1,127 +1,140 @@
 ************************* STARTING *************************
 
-shared: alloc.data:ds5.c:38
-        alloc.data:ds5.c:32
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
+shared: alloc.data:ds5.c:32
+        alloc.data:ds5.c:38
 
 Warning: Possible data race: alloc.data:ds5.c:38 is protected by non-linear or concrete lock(s):
   (*cur).lock:ds5.c:12
   (*new).lock:ds5.c:31
-  non linear concrete new->lock:ds5.c:34
   (*new___0).lock:ds5.c:38
+  non linear concrete new->lock:ds5.c:34
   non linear concrete new___0->lock:ds5.c:40
  references:
   dereference at ds5.c:19
     locations possibly dereferenced: 
       (*cur).data:ds5.c:12
-      alloc.data:ds5.c:38
       alloc.data:ds5.c:32
+      alloc.data:ds5.c:38
     locks acquired at dereference: 
       (*cur).lock:ds5.c:12
       (*new).lock:ds5.c:31
-      non linear concrete new->lock:ds5.c:34
       (*new___0).lock:ds5.c:38
+      non linear concrete new->lock:ds5.c:34
       non linear concrete new___0->lock:ds5.c:40
     in: FORK at ds5.c:44 -> run ds5.c:44
 
   dereference at ds5.c:19
     locations possibly dereferenced: 
       (*cur).data:ds5.c:12
-      alloc.data:ds5.c:38
       alloc.data:ds5.c:32
+      alloc.data:ds5.c:38
     locks acquired at dereference: 
       (*cur).lock:ds5.c:12
       (*new).lock:ds5.c:31
-      non linear concrete new->lock:ds5.c:34
       (*new___0).lock:ds5.c:38
+      non linear concrete new->lock:ds5.c:34
       non linear concrete new___0->lock:ds5.c:40
     in: FORK at ds5.c:43 -> run ds5.c:43
 
   dereference at ds5.c:19
     locations possibly dereferenced: 
       (*cur).data:ds5.c:12
-      alloc.data:ds5.c:38
       alloc.data:ds5.c:32
+      alloc.data:ds5.c:38
     locks acquired at dereference: 
       (*cur).lock:ds5.c:12
       (*new).lock:ds5.c:31
-      non linear concrete new->lock:ds5.c:34
       (*new___0).lock:ds5.c:38
+      non linear concrete new->lock:ds5.c:34
       non linear concrete new___0->lock:ds5.c:40
-    in: main at ds5.c:37 -> run ds5.c:44
+    in: main at ds5.c:26 -> run ds5.c:44
 
   dereference at ds5.c:19
     locations possibly dereferenced: 
       (*cur).data:ds5.c:12
-      alloc.data:ds5.c:38
       alloc.data:ds5.c:32
+      alloc.data:ds5.c:38
     locks acquired at dereference: 
       (*cur).lock:ds5.c:12
       (*new).lock:ds5.c:31
-      non linear concrete new->lock:ds5.c:34
       (*new___0).lock:ds5.c:38
+      non linear concrete new->lock:ds5.c:34
       non linear concrete new___0->lock:ds5.c:40
-    in: main at ds5.c:37 -> run ds5.c:43
+    in: main at ds5.c:26 -> run ds5.c:43
 
 
 Warning: Possible data race: alloc.data:ds5.c:32 is protected by non-linear or concrete lock(s):
   (*cur).lock:ds5.c:12
   (*new).lock:ds5.c:31
-  non linear concrete new->lock:ds5.c:34
   (*new___0).lock:ds5.c:38
+  non linear concrete new->lock:ds5.c:34
   non linear concrete new___0->lock:ds5.c:40
  references:
   dereference at ds5.c:19
     locations possibly dereferenced: 
       (*cur).data:ds5.c:12
-      alloc.data:ds5.c:38
       alloc.data:ds5.c:32
+      alloc.data:ds5.c:38
     locks acquired at dereference: 
       (*cur).lock:ds5.c:12
       (*new).lock:ds5.c:31
-      non linear concrete new->lock:ds5.c:34
       (*new___0).lock:ds5.c:38
+      non linear concrete new->lock:ds5.c:34
       non linear concrete new___0->lock:ds5.c:40
     in: FORK at ds5.c:44 -> run ds5.c:44
 
   dereference at ds5.c:19
     locations possibly dereferenced: 
       (*cur).data:ds5.c:12
-      alloc.data:ds5.c:38
       alloc.data:ds5.c:32
+      alloc.data:ds5.c:38
     locks acquired at dereference: 
       (*cur).lock:ds5.c:12
       (*new).lock:ds5.c:31
-      non linear concrete new->lock:ds5.c:34
       (*new___0).lock:ds5.c:38
+      non linear concrete new->lock:ds5.c:34
       non linear concrete new___0->lock:ds5.c:40
     in: FORK at ds5.c:43 -> run ds5.c:43
 
   dereference at ds5.c:19
     locations possibly dereferenced: 
       (*cur).data:ds5.c:12
-      alloc.data:ds5.c:38
       alloc.data:ds5.c:32
+      alloc.data:ds5.c:38
     locks acquired at dereference: 
       (*cur).lock:ds5.c:12
       (*new).lock:ds5.c:31
-      non linear concrete new->lock:ds5.c:34
       (*new___0).lock:ds5.c:38
+      non linear concrete new->lock:ds5.c:34
       non linear concrete new___0->lock:ds5.c:40
-    in: main at ds5.c:37 -> run ds5.c:44
+    in: main at ds5.c:26 -> run ds5.c:44
 
   dereference at ds5.c:19
     locations possibly dereferenced: 
       (*cur).data:ds5.c:12
-      alloc.data:ds5.c:38
       alloc.data:ds5.c:32
+      alloc.data:ds5.c:38
     locks acquired at dereference: 
       (*cur).lock:ds5.c:12
       (*new).lock:ds5.c:31
-      non linear concrete new->lock:ds5.c:34
       (*new___0).lock:ds5.c:38
+      non linear concrete new->lock:ds5.c:34
       non linear concrete new___0->lock:ds5.c:40
-    in: main at ds5.c:37 -> run ds5.c:43
+    in: main at ds5.c:26 -> run ds5.c:43
 
 *************************** DONE ***************************
-
-

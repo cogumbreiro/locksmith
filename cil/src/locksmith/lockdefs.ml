@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -36,3 +36,23 @@
  *)
 module Strset = Set.Make(String)
 module Strmap = Map.Make(String)
+module StrHT = Hashtbl.Make(
+  struct
+    type t = string
+    let equal s1 s2 = s1=s2
+    let hash s =
+      let len = String.length s in
+      let loop (h:int) (i:int) =
+        if i = len then h
+        else h*33 + (int_of_char (s.[i])) in
+      loop 5381 0
+        (* Hash function djb2 from http://www.cs.yorku.ca/~oz/hash.html *)
+  end)
+
+module type HashedOrderedType =
+  sig
+    type t
+    val equal : t -> t -> bool
+    val hash : t -> int
+    val compare : t -> t -> int
+  end

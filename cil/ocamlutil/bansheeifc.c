@@ -8,6 +8,15 @@
 #include <usage.h>
 #include <regions.h>
 #include <stdint.h>
+#include <signal.h>
+
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+#ifdef HAVE_MALLOC_MALLOC_H
+#include <malloc/malloc.h>
+#endif
+
 
 value banshee_make_tagged_node(value tag) {
   dyck_node d;
@@ -168,12 +177,33 @@ value banshee_reaches_pn_list(value node) {
   CAMLreturn(resultlist);
 }
 
-value print_usage(value ign) {
-  unsigned long l;
+value get_usage(value ign) {
+  long l;
   CAMLparam1(ign);
   l = get_memusage();
-  fprintf(stderr, "%lu", l); fflush(stderr);
-  CAMLreturn(Val_unit);
+  CAMLreturn(Val_long(l));
+}
+
+value get_profile_mem(value ign) {
+  long s;
+  CAMLparam1(ign);
+  s = region_profile_total_mem();
+  CAMLreturn(Val_long(s));
+}
+
+value get_usage2(value ign) {
+  CAMLparam1(ign);
+  long result = 0;
+#ifdef HAVE_MALLOC_ZONE_STATISTICS
+  malloc_statistics_t zstats;
+  struct mstats stats = mstats();
+  malloc_zone_statistics(NULL, &zstats);
+  result = zstats.size_in_use;
+#elif HAVE_MALLINFO
+  struct mallinfo info = mallinfo();
+  result = info.uordblks;
+#endif
+  CAMLreturn(Val_long(result));
 }
 
 value banshee_hash(value node) {

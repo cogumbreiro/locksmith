@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -39,8 +39,9 @@ open Labelflow
 open Lockstate
 open Controlflow
 
-module Q = Queue
+module BW = Controlflow.BackwardsWorklist
 module E = Errormsg
+module Lprof = Lockprofile
 
 
 (*****************************************************************************)
@@ -48,16 +49,35 @@ module E = Errormsg
 let do_print_guarded_by = ref false
 let debug = ref false
 let do_group_warnings = ref false
+let do_one_by_one = ref false
+let do_sort_derefs = ref false
+let do_count_phi_visits = ref false
+let do_hashcons = ref true
 
 type guard = { (* these are computed at solution time *)
   guard_id: int;
   guard_closed: bool; (* if true the acq set doesn't grow
                                * (it went through an exists instantiation) *)
-  guard_rhos : rhoSet;
-  guard_locks : lockSet;
-  guard_location: Cil.location;
-  mutable guard_contexts : instantiation list
+  guard_rhos : rhoSet;  (* pointers *)
+  guard_locks : lockSet; (* mutexes *)
+
+  guard_rhos_size : int; (* memoize set size *)
+  guard_locks_size : int; (* memoize set size *)
+
+  guard_location: Cil.location;  (* program location *)
+  guard_contexts : instantiation list  (* path of instantiations from dereference to main() or fork() *)
 }
+
+let guard_equals (g1: guard) (g2: guard) : bool =
+  if g1 == g2 then true
+  else if !do_hashcons then false
+  else begin
+    g1.guard_closed = g2.guard_closed
+      && g1.guard_locks_size = g2.guard_locks_size
+      && g1.guard_rhos_size = g2.guard_rhos_size
+      && (g1.guard_locks == g2.guard_locks || LockSet.equal g1.guard_locks g2.guard_locks)
+      && (g1.guard_rhos == g2.guard_rhos || RhoSet.equal g1.guard_rhos g2.guard_rhos)
+  end
 
 (* for reproducing "the bug" *)
 let comp1 g1 g2 = g1.guard_id - g2.guard_id
@@ -87,6 +107,22 @@ let options = [
   "--switch-gborder",
     Arg.Unit(switch_gborder),
     "Change the guarded-by ordering.";
+
+  "--do-one-by-one",
+    Arg.Set(do_one_by_one),
+    "Propagate one guarded-by at a time.";
+
+  "--do-sort-derefs",
+    Arg.Set(do_sort_derefs),
+    "Sort initial guarded-by worklist by postorder CFG traversal.";
+
+  "--count-phi-visits",
+     Arg.Set(do_count_phi_visits),
+     "Count how many times the guarded-by analysis visits every phi.";
+
+  "--no-hashcons",
+     Arg.Clear(do_hashcons),
+     "Don't use hashconsing to ID guarded-by structs.";
 ]
 
 exception CorrelationBug of string
@@ -97,15 +133,15 @@ module DerefH = Hashtbl.Make(
     type t = rho * phi * effect * Cil.location
 
     let equal (r1,p1,e1,l1) (r2,p2,e2,l2) =
-      (RhoHT.equal r1 r2)
-        && (PhiHT.equal p1 p2)
+      (Rho.equal r1 r2)
+        && (Phi.equal p1 p2)
         && (Effect.compare e1 e2 = 0)
         && (Cil.compareLoc l1 l2 = 0)
 
     let hash (r,p,_,_) =
       (* hopefully not all derefs will be at the same location
          and/or have the same effect *)
-      2 * (RhoHT.hash r) + (PhiHT.hash p)
+      2 * (Rho.hash r) + (Phi.hash p)
   end
  )
 
@@ -171,7 +207,49 @@ let d_guardset () gset : doc =
  * construction
  ***************)
 
-let id = ref 0
+exception Compare_lists_found of int
+let compare_lists (l1: 'a list) (l2: 'a list) (cmp: 'a -> 'a -> int) : int =
+  let n1 = List.length l1 in
+  let n2 = List.length l2 in
+  if n1 < n2 then -1
+  else if n2 < n1 then 1
+  else try
+    List.iter2
+      (fun x1 x2 ->
+        let c = cmp x1 x2 in
+        if c = 0 then ()
+        else raise (Compare_lists_found c))
+      l1 l2;
+      0
+  with Compare_lists_found c -> c
+
+module GBMap = Map.Make(
+  struct
+    type t = guard
+    let compare (g1: guard) (g2: guard) : int =
+      if g1 == g2 then 0
+      else if g1.guard_closed <> g2.guard_closed then
+        if g1.guard_closed then 1 else -1
+      else let l = LockSet.compare g1.guard_locks g2.guard_locks in
+      if l < 0 then -1 else if l > 0 then 1
+      else let r = RhoSet.compare g1.guard_rhos g2.guard_rhos in
+      if r < 0 then -1 else if r > 0 then 1
+      else 0
+        (*compare_lists g1.guard_contexts g2.guard_contexts (fun i1 i2 -> (Inst.hash i1) - (Inst.hash i2))*)
+  end
+ )
+
+let rec combine_inst_lists l1 l2 : instantiation list =
+  match l1, l2 with
+    [], [] -> []
+  | [], l
+  | l, [] -> l
+  | i1::tl1, i2::tl2 ->
+      if Inst.equal i1 i2 then i1::(combine_inst_lists tl1 tl2)
+      else l1 @ l2
+
+let all_guards = ref GBMap.empty
+let guard_no = ref 0
 (* create a correlation edge *)
 let make_guard (rs: rhoSet)
                (ls: lockSet)
@@ -180,16 +258,28 @@ let make_guard (rs: rhoSet)
                (il: instantiation list)
                : guard = begin
   assert (not (RhoSet.is_empty rs));
-  incr id;
+  incr guard_no;
+  let rr = close_rhoset_m rs in
+  let ll = close_lockset ls in
   let g = {
-    guard_id = !id;
+    guard_id = !guard_no;
     guard_closed = frompack;
-    guard_rhos = close_rhoset_m rs;
-    guard_locks = close_lockset ls;
+    guard_rhos = rr;
+    guard_locks = ll;
+    guard_rhos_size = RhoSet.cardinal rr;
+    guard_locks_size = LockSet.cardinal ll;
     guard_location = l;
     guard_contexts = il;
   } in
-  g
+  if !do_hashcons then begin
+    try
+      let g' = GBMap.find g !all_guards in
+      if !debug then ignore(E.log "make_guard: saved one\n");
+      decr guard_no;
+      g'
+    with Not_found ->
+      all_guards := GBMap.add g g !all_guards; g
+  end else g
 end
 
 
@@ -197,16 +287,16 @@ end
  * solution
  ***********)
 
-let inst_guard_map_in : (guard * guard) IH.t = IH.create 1000
-let inst_guard_map_out : (guard * guard) IH.t = IH.create 1000
+let inst_guard_map_in : (guard * guard) InstHT.t = InstHT.create 1000
+let inst_guard_map_out : (guard * guard) InstHT.t = InstHT.create 1000
 
 let is_global_guard (g: guard) : bool =
   (RhoSet.exists is_global_rho g.guard_rhos) &&
   (LockSet.exists is_global_lock g.guard_locks || LockSet.is_empty g.guard_locks)
 
 let clone_guard_out (i: instantiation) (g: guard) : guard option =
-  if List.exists (fun i' -> InstHT.equal i i') g.guard_contexts then Some g
-  else begin
+  (*if List.exists (fun i' -> Inst.equal i i') g.guard_contexts then Some g else*)
+  begin
     let r' = translate_rhoset_out i g.guard_rhos in
     let r = close_rhoset_m r' in
     let l = close_lockset (translate_lockset_out i g.guard_locks) in
@@ -223,15 +313,14 @@ let clone_guard_out (i: instantiation) (g: guard) : guard option =
       end;
       let gg = make_guard r l (g.guard_closed || is_pack i)
                           g.guard_location (i::g.guard_contexts) in
-      IH.add inst_guard_map_out i (g,gg);
+      InstHT.add inst_guard_map_out i (g,gg);
       if !debug then ignore(E.log "make_guard returned\n");
       Some gg
     end
   end
 
 let clone_guard_in (i: instantiation) (g: guard) : guard option =
-  if ( List.exists (fun i' -> InstHT.equal i i') g.guard_contexts) then None
-  else
+  (*if ( List.exists (fun i' -> Inst.equal i i') g.guard_contexts) then None else*)
   let r' = translate_rhoset_in i g.guard_rhos in
   let r = close_rhoset_m r' in
   let l = close_lockset (translate_lockset_in i g.guard_locks) in
@@ -240,94 +329,95 @@ let clone_guard_in (i: instantiation) (g: guard) : guard option =
       ignore(E.log "losing guard %a inwards through %a (rhoset becomes empty)\n"
         (d_guard nil) g d_instantiation i);
     None
-  end
-  else begin
+  end else begin
     if !debug then begin
       ignore(E.log "call make_guard for cloning a guard (in) through %a\n" d_instantiation i);
       if (is_pack i) then ignore(E.log "(pack)\n)");
     end;
     let gg = make_guard r l (g.guard_closed || is_pack i)
-                        g.guard_location g.guard_contexts in
-    IH.add inst_guard_map_in i (gg,g);
+                        g.guard_location (g.guard_contexts) in
+    InstHT.add inst_guard_map_in i (gg,g);
     if !debug then ignore(E.log "make_guard returned\n");
     Some gg
   end
 
-exception Compare_lists_found
-let compare_lists l1 l2 eq =
-  if ((List.length l1) <> (List.length l2)) then false
-  else
-  try
-    List.iter2 (fun x1 x2 ->
-      if (not (eq x1 x2))
-      then raise Compare_lists_found)
-      l1 l2;
-      true
-  with Compare_lists_found -> false
-
-let guard_equals (g1: guard) (g2: guard) : bool =
-  (*g1.guard_location = g2.guard_location &&*)
-  g1.guard_closed = g2.guard_closed &&
-  RhoSet.equal g1.guard_rhos g2.guard_rhos &&
-  LockSet.equal g1.guard_locks g2.guard_locks (*&&
-  compare_lists g1.guard_contexts g2.guard_contexts inst_equal*)
-
 let translate_guard_out (i: instantiation) (g: guard) : guard option =
   try
-    let guardmap = IH.find_all inst_guard_map_out i in
+    let guardmap = InstHT.find_all inst_guard_map_out i in
     let _,gg = List.find (fun (g1,_) -> guard_equals g g1) guardmap in
     Some gg
   with Not_found -> clone_guard_out i g
   
 let translate_guard_in (i: instantiation) (g: guard) : guard option =
   try
-    let guardmap = IH.find_all inst_guard_map_in i in
+    let guardmap = InstHT.find_all inst_guard_map_in i in
     let gg,_ = List.find (fun (_,g2) -> guard_equals g g2) guardmap in
     Some gg
   with Not_found -> clone_guard_in i g
 
-let protect_map : lockSet RH.t = RH.create 100
+let protect_map : lockSet RhoHT.t = RhoHT.create 100
 let empty_state = GBSet.empty
 
 module GBTransfer : BackwardsTransfer with type state = GBSet.t =
   struct
     type state = GBSet.t
-    let state_after_phi = PH.create 1000
+    let state_after_phi = PhiHT.create 1000
     let check_state _ _ = ()
     let starting_state _ = empty_state
-    let equal_state = GBSet.equal
+    let equal_state s1 s2 = ((GBSet.cardinal s1) = (GBSet.cardinal s2))
     let merge_state = GBSet.union
+    let is_relevant p =
+      try
+        ignore(get_phi_kind p);
+        true
+      with Not_found -> p == empty_phi
+
     let transfer_back p worklist gbset =
-      let k = get_phi_kind p in
-      match k with
-        PhiPack p' ->
-          let old =
-            try PH.find state_after_phi p'
-            with Not_found -> empty_state
-          in
-          PH.replace state_after_phi p' (merge_state old gbset);
-          Q.add p' worklist;
-          gbset
-      | PhiSplitCall(_, p', l) -> 
-          let (a) = get_split_state p' in
-          if !debug then ignore(E.log "going through split at %a, adding %a\n" Cil.d_loc l d_lockset a);
-          GBSet.fold
-            (fun g acc ->
-              GBSet.add 
-                (if g.guard_closed then g
-                  else { g with guard_locks = LockSet.union g.guard_locks a})
-                acc)
-            gbset
-            GBSet.empty
-      | PhiSplitReturn(_, p') ->
-          let old =
-            try PH.find state_after_phi p'
-            with Not_found -> empty_state
-          in
-          PH.replace state_after_phi p' (merge_state old gbset);
-          Q.add p' worklist;
-          empty_state
-      | _ -> gbset
+      if !debug then ignore(E.log "transfering %d / %d guards\n" (GBSet.cardinal gbset) !guard_no);
+      if p == empty_phi then GBSet.empty else begin
+        (*ignore(E.log "worklist size %d\n" (BW.length worklist));*)
+        let k = get_phi_kind p in
+        match k with
+          (*PhiPack p' ->
+            let old =
+              try PhiHT.find state_after_phi p'
+              with Not_found -> empty_state
+            in
+            let newstate = (merge_state old gbset) in
+            if not (equal_state old newstate) then begin
+              PhiHT.replace state_after_phi p' newstate;
+              BW.push p' worklist;
+            end;
+            gbset*)
+        | PhiSplitCall(_, p', l) -> 
+            let (a) = get_split_state p' in
+            if !debug then ignore(E.log "going through split at %a, adding %a\n" Cil.d_loc l d_lockset a);
+            GBSet.fold
+              (fun g acc ->
+                GBSet.add 
+                  (if g.guard_closed then g
+                    else
+                      let gl = LockSet.union g.guard_locks a in
+                      { g with guard_locks = gl;
+                               guard_locks_size = LockSet.cardinal gl; })
+                  acc)
+              gbset
+              GBSet.empty
+        | PhiSplitReturn(_, p') ->
+            let old =
+              try PhiHT.find state_after_phi p'
+              with Not_found -> empty_state
+            in
+            if p' != empty_phi then begin
+              let newstate = (merge_state old gbset) in
+              if not (equal_state old newstate) then begin
+                PhiHT.replace state_after_phi p' newstate;
+                BW.push p' worklist;
+              end;
+            end;
+            empty_state
+        | _ -> gbset
+      end
     let translate_state_out state inst =
       GBSet.fold
         (fun g s ->
@@ -354,17 +444,47 @@ module GBTransfer : BackwardsTransfer with type state = GBSet.t =
 
 module GBAnalysis = MakeBackwardsAnalysis(GBTransfer)
 
+(* Applies f on every phi in the graph, visiting all nodes reachable from
+ * starting_phis in post-order traversal (starting_phis are visited last)
+ *)
+(*let postorder_visit (f: phi -> unit) : unit =
+  let visited : phiSet ref = ref PhiSet.empty in
+  let rec visit (p: phi) : unit =
+    if PhiSet.mem p !visited then ()
+    else begin
+      visited := PhiSet.add p !visited;
+      let k =
+        try get_phi_kind p 
+        with Not_found -> PhiVar
+      in
+      let _ = match k with
+        PhiSplitCall(_,phi_ret,_) ->
+          visit phi_ret
+        | _ -> ()
+      in
+      List.iter
+        (fun p -> visit p)
+        (get_all_children p);
+      f p
+    end
+  in
+  List.iter visit !starting_phis
+*)
+
 let init_guards () : phi list = begin
-  (* traverse derefs in order by index to canonicalize race reporting *)
   if !debug then ignore(E.log "initializing guards\n");
-  PH.clear GBTransfer.state_after_phi;
+  (* reset fs-state *)
+  PhiHT.clear GBTransfer.state_after_phi;
+  (* traverse derefs in order by index to canonicalize race reporting *)
   let list_derefs =
     DerefH.fold
       (fun (r,p,e,l) idx rest -> (r,p,e,idx,l)::rest)
       all_derefs
       []
   in
+  (* throw away all_derefs, we don't need it any more *)
   let _ = DerefH.clear all_derefs in
+  (* sort the list by index *)
   let sorted_derefs =
     List.sort
       (fun (r1,p1,e1,idx1,l1) (r2,p2,e2,idx2,l2) ->
@@ -373,6 +493,8 @@ let init_guards () : phi list = begin
         else 1)
       list_derefs
   in
+  (* for every deref, if it's shared, add a starting guard at that phi *)
+  let initial_set = ref PhiSet.empty in
   List.iter
     (fun (r,p,e,idx,l) ->
       try
@@ -383,10 +505,12 @@ let init_guards () : phi list = begin
           let a = get_state_before p in (* acquired locks at p *)
           let g = make_guard (get_rho_p2set_m r) a false l [] in
           let gset = 
-            try PH.find GBTransfer.state_after_phi p
+            try PhiHT.find GBTransfer.state_after_phi p
             with Not_found -> empty_state
           in
-          PH.replace GBTransfer.state_after_phi p (GBSet.add g gset)
+          PhiHT.replace GBTransfer.state_after_phi p (GBSet.add g gset);
+          if !do_one_by_one then GBAnalysis.solve [p]
+          else initial_set := PhiSet.add p !initial_set;
         ) else (
           if !debug then
             ignore(E.log "not counting dereference at %a\n" Cil.d_loc l);
@@ -400,7 +524,21 @@ let init_guards () : phi list = begin
          *)
     )
     sorted_derefs;
-  List.map (fun (r,p,e,idx,l) -> p) list_derefs
+  (* the initial worklist is the list of all phi that have a guard *)
+  (*List.map (fun (r,p,e,idx,l) -> p) list_derefs*)
+  let sorted_list = ref [] in
+  if !do_sort_derefs then (
+    postorder_visit
+      (fun p ->
+        if PhiSet.mem p !initial_set
+        then (
+          initial_set := PhiSet.remove p !initial_set;
+          sorted_list := p::!sorted_list;
+        )
+      );
+    (*PhiSet.elements !initial_set*)
+    !sorted_list
+  ) else PhiSet.elements !initial_set
 end
 
 let fill_protection_map () : unit = begin
@@ -414,12 +552,12 @@ let fill_protection_map () : unit = begin
       *)
       RhoSet.iter
         (fun r ->
-          let old = try RH.find protect_map r with Not_found -> ls in
-          RH.replace protect_map r (LockSet.inter old ls)
+          let old = try RhoHT.find protect_map r with Not_found -> ls in
+          RhoHT.replace protect_map r (LockSet.inter old ls)
         )
         rs
     )
-    (try PH.find GBTransfer.state_after_phi p
+    (try PhiHT.find GBTransfer.state_after_phi p
     with Not_found -> GBSet.empty)
   in
   List.iter scanphi !starting_phis;
@@ -427,12 +565,23 @@ end
 
 let solve () : unit = begin
   let start_list = init_guards () in
+  Lprof.endtime "guarded-by:init-guards";
+  if !debug then ignore(E.log "phase-begin(solve-guarded-by)\n");
   GBAnalysis.solve start_list;
+  if !debug then ignore(E.log "phase-end(solve-guarded-by)\n");
+  Lprof.endtime "guarded-by:propagation";
+  (*List.iter (fun p -> ignore(E.log "phi: %a\n" d_phi p)) !all_phi;*)
+  if !do_count_phi_visits
+  then count_phi_visits
+    (fun p -> string_of_int (GBSet.cardinal
+      (try PhiHT.find GBTransfer.state_after_phi p
+      with Not_found -> GBSet.empty))
+    );
   fill_protection_map ();
 end
 
 let get_protection_set (r: rho) : lockSet =
-  try RH.find protect_map r
+  try RhoHT.find protect_map r
   with Not_found -> LockSet.empty
 
 let racefound : rhoSet ref = ref RhoSet.empty
@@ -440,28 +589,39 @@ let racefound : rhoSet ref = ref RhoSet.empty
 let d_rho_guards () (r: rho) : doc =
   (*let allgbset = List.fold_left
     (fun gs p -> GBSet.union gs
-      (try PH.find GBTransfer.state_after_phi p
+      (try PhiHT.find GBTransfer.state_after_phi p
       with Not_found -> GBSet.empty))
     GBSet.empty
     !starting_phis
   in*)
   let f d p =
-    GBSet.fold
-      (fun g d ->
+    let gset =
+      try PhiHT.find GBTransfer.state_after_phi p
+      with Not_found -> GBSet.empty
+    in
+    let sorted_guards =
+      List.sort
+        (fun g1 g2 -> 
+          if g1.guard_id = g2.guard_id then 0
+          else let r = (Cil.compareLoc g1.guard_location g2.guard_location) in
+          if r = 0 then !compfn g1 g2 else r)
+        (GBSet.elements gset)
+    in
+    List.fold_left
+      (fun d g ->
         if RhoSet.mem r g.guard_rhos
                   then d ++ (if d <> nil then line ++ line else nil) ++
                        (d_guard (d_phi () p)) () g
                   else d)
-      (try PH.find GBTransfer.state_after_phi p
-      with Not_found -> GBSet.empty)
       d
+      sorted_guards
   in
   align ++ (
     List.fold_left f nil !starting_phis
   ) ++ unalign
 
 let check_race (r: rho) : unit =
-  (*ignore(E.log "checking protection for %a\n" d_rho r);*)
+  if !debug then ignore(E.log "checking protection for %a\n" d_rho r);
   if !do_group_warnings && RhoSet.mem r !racefound then () else
   if Shared.is_ever_shared r then begin
     (*ignore(E.log " It is shared, check protection set\n");*)

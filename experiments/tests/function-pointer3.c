@@ -21,7 +21,7 @@ void main() {
   pthread_mutex_t t;
   int optval;
   int *tmp;
-  setfp();  // doesn't matter if this is called
+  //setfp();  // doesn't matter if this is called
   tmp = &optval;
   while (1) {
     optval = 1;

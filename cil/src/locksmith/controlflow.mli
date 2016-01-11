@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -42,12 +42,26 @@ val debug : bool ref
 (* program point *)
 type phi
 
+type phi_kind =
+  | PhiVar
+  | PhiForked
+  | PhiPack of phi
+  | PhiNewlock of Labelflow.lock
+  | PhiAcquire of Labelflow.lock
+  | PhiRelease of Labelflow.lock
+  | PhiDelete of Labelflow.lock
+  | PhiSplitCall of Labelflow.lock_effect * phi * Cil.location
+  | PhiSplitReturn of Labelflow.lock_effect * phi
+
+val set_phi_kind : phi -> phi_kind -> unit
+val get_phi_kind : phi -> phi_kind
+
+module Phi : Lockdefs.HashedOrderedType with type t = phi
 (* a hashtable from phi to 'a.
  * it is faster than (phi, 'a) Hashtbl.t,
  * because it uses phi_id to compare
  *)
-module PH : Hashtbl.S with type key = phi
-module PhiHT : Hashtbl.HashedType with type t = phi
+module PhiHT : Hashtbl.S with type key = phi
 module PhiSet : Set.S with type elt = phi
 type phiSet = PhiSet.t
 
@@ -95,9 +109,20 @@ val unify_phi : phi -> phi -> unit
 (* return a new phi to which both p1 and p2 flow *)
 val join_phi : phi -> phi -> phi
 
-(* reachability. if true, then the first program point is followed by
- * the second in control flow
+(*******************************************
+ * utilities for traversal of the phi graph 
+ *******************************************)
+
+(* return all the "next" phis starting from this.
+ * The returned list will include all next, open parenthesis
+ * and close parenthesis edges.
  *)
+(*
+ * POLYVIOS: I only expect the postorder traversal in
+ * correlation.ml to call this function.
+ *)
+val get_all_children : phi -> phi list
+val postorder_visit : (phi -> unit) -> unit
 
 (******************
  * pretty printing
@@ -111,11 +136,24 @@ val d_phiset : unit -> phiSet -> Pretty.doc
 
 val print_graph : out_channel -> (phi -> bool) -> unit
 
+module type PhiWorklist =
+  sig
+    type t
+    exception Empty
+    val create : unit -> t
+    val clear : t -> unit
+    val push : phi -> t -> unit
+    val pop : t -> phi
+    val is_empty : t -> bool
+  end
+
+module ForwardsWorklist : PhiWorklist
+
 module type ForwardsTransfer =
   sig
     type state
-    val state_before_phi : state PH.t
-    val transfer_fwd : phi -> phi Queue.t -> state -> state option
+    val state_before_phi : state PhiHT.t
+    val transfer_fwd : phi -> ForwardsWorklist.t -> state -> state option
     val starting_state : phi -> state option
     val merge_state: state -> state -> state
     val equal_state: state -> state -> bool
@@ -134,13 +172,37 @@ module type ForwardsAnalysis =
 module MakeForwardsAnalysis:
   functor (A: ForwardsTransfer) -> ForwardsAnalysis with type state = A.state
 
+module BackwardsWorklist : PhiWorklist
+
 module type BackwardsTransfer =
   sig
     type state
-    val state_after_phi : state PH.t
-    val transfer_back : phi -> phi Queue.t -> state -> state
+    val state_after_phi : state PhiHT.t
+    val transfer_back : phi -> BackwardsWorklist.t -> state -> state
+      (* The transfer function.  It is given the current phi, the worklist of phis
+       * and the current state before the phi.  It should return the state after
+       * the phi.  The worklist is given in case the transfer function affects other
+       * phis that are not directly related to this phi.  Usually it's ignored.
+       *)
+
+    val is_relevant : phi -> bool
+      (* A "filter" function.  We use this to simplify the control flow graph.
+       * Whenever there is a simple edge between two "irrelevant" phis, we
+       * unify them into one phi.  This is a prepass, before the actual
+       * fixpoint analysis is computed.
+       *)
+
     val starting_state : phi -> state
+      (* We use this function to set the initial state per phi.
+       * It usually should return top or bottom,  unless there's a special
+       * initial value for the given phi.
+       *)
+
     val merge_state: state -> state -> state
+      (* merge function.  It's given two states, and should return one that
+       * is their merge.
+       *)
+
     val equal_state: state -> state -> bool
     val translate_state_in: state -> Labelflow.instantiation -> state
     val translate_state_out: state -> Labelflow.instantiation -> state
@@ -148,6 +210,11 @@ module type BackwardsTransfer =
     val pretty : unit -> state -> Pretty.doc
   end
 
+(* This is the type you get back by calling MakeBackwardsAnalysis with
+ * some transfer module.  Calling solve computes the analysis fixpoint.
+ * In order to get the result, the caller should use the state_after_phi
+ * hashtable of the transfer-function module
+ *)
 module type BackwardsAnalysis =
   sig
     type state
@@ -157,3 +224,11 @@ module type BackwardsAnalysis =
 module MakeBackwardsAnalysis:
   functor (A: BackwardsTransfer) ->
     BackwardsAnalysis with type state = A.state
+
+(* Print how many times phi nodes have been visited during the analysis.
+ * Currently, only counts backwards analysis.  Intended to count how
+ * many times guarded-by visits every phi.
+ * It takes an argument, a function that returns whatever to be printed
+ * after the count per phi.
+ *)
+val count_phi_visits : (phi -> string) -> unit

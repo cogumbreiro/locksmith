@@ -1,21 +1,36 @@
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: &j:uniq2.c:4
         alloc:uniq2.c:13
 &j:uniq2.c:4 is protected by:
-  l:uniq2.c:5
   concrete l:uniq2.c:25
+  l:uniq2.c:5
 
 Warning: Possible data race: alloc:uniq2.c:13 is not protected!
  references:
   dereference at uniq2.c:17
     locations possibly dereferenced: 
+      alloc:uniq2.c:13
       j:uniq2.c:4
       k:uniq2.c:10
-      alloc:uniq2.c:13
     locks acquired at dereference: 
-      l:uniq2.c:5
       concrete l:uniq2.c:25
+      l:uniq2.c:5
     in: FORK at uniq2.c:28 -> dostuff uniq2.c:28
 
   dereference at uniq2.c:19
@@ -27,12 +42,12 @@ Warning: Possible data race: alloc:uniq2.c:13 is not protected!
 
   dereference at uniq2.c:17
     locations possibly dereferenced: 
+      alloc:uniq2.c:13
       j:uniq2.c:4
       k:uniq2.c:10
-      alloc:uniq2.c:13
     locks acquired at dereference: 
-      l:uniq2.c:5
       concrete l:uniq2.c:25
+      l:uniq2.c:5
     in: FORK at uniq2.c:27 -> dostuff uniq2.c:27
 
   dereference at uniq2.c:19
@@ -44,38 +59,36 @@ Warning: Possible data race: alloc:uniq2.c:13 is not protected!
 
   dereference at uniq2.c:17
     locations possibly dereferenced: 
+      alloc:uniq2.c:13
       j:uniq2.c:4
       k:uniq2.c:10
-      alloc:uniq2.c:13
     locks acquired at dereference: 
-      l:uniq2.c:5
       concrete l:uniq2.c:25
-    in: main at uniq2.c:29 -> dostuff uniq2.c:28
+      l:uniq2.c:5
+    in: main at uniq2.c:23 -> dostuff uniq2.c:28
 
   dereference at uniq2.c:17
     locations possibly dereferenced: 
+      alloc:uniq2.c:13
       j:uniq2.c:4
       k:uniq2.c:10
-      alloc:uniq2.c:13
     locks acquired at dereference: 
-      l:uniq2.c:5
       concrete l:uniq2.c:25
-    in: main at uniq2.c:29 -> dostuff uniq2.c:27
+      l:uniq2.c:5
+    in: main at uniq2.c:23 -> dostuff uniq2.c:27
 
   dereference at uniq2.c:19
     locations possibly dereferenced: 
       alloc:uniq2.c:13
     locks acquired at dereference: 
       <empty>
-    in: main at uniq2.c:29 -> dostuff uniq2.c:28
+    in: main at uniq2.c:23 -> dostuff uniq2.c:28
 
   dereference at uniq2.c:19
     locations possibly dereferenced: 
       alloc:uniq2.c:13
     locks acquired at dereference: 
       <empty>
-    in: main at uniq2.c:29 -> dostuff uniq2.c:27
+    in: main at uniq2.c:23 -> dostuff uniq2.c:27
 
 *************************** DONE ***************************
-
-

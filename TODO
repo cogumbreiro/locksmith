@@ -5,24 +5,13 @@ BUGS:
 
 - make sure we only treat semaphores initialized to 1 as locks.
 
-- fix memcpy, memset, free handlers to dereference all rhos in the
-  arguments.
-
 - Context-sensitive, flow-sensitive sharing
   - When I run with --flow-compare to see where context-sensitive
     sharing is a win, it appears that there many places in aget that
     think &nthreads is not shared, when it seems to me it should be.
     Is this a bug?
-  - smtprc never comes back.  Have done no real digging, although the
-    problem appears to do with the construction of the CFL sharing
-    graph because the huge lag occurs before we even solve the graph.
-    - check the DerefH hash function; is this a possible cause?
-      Doesn't include the effect at the deref point in the hash
-      calculation (but I suspect this is one-to-one with phi, so it
-      shouldn't matter).
 
 FEATURES:
-
 
 - Merge uniqueness analysis with liveness analysis to be able to
   remove 3 false alarms in knot.
@@ -30,10 +19,6 @@ FEATURES:
 - Dig further into scalability problems.
   - Apps to try: retawq, mt_daapd_nocodec, nsd_comb, clamd
   Ideas:
-  - lazy structs the problem?  Is there way to not expand a
-    struct within function (e.g., a param to it) if the fields are not
-    used within the function, even if they are present in a struct at
-    some of the callsites?
   - Can we try making things field insensitive for
     now?  That is, every struct have the same abstract location
     for a given field.
@@ -42,26 +27,10 @@ FEATURES:
     function for deciding we need more precision?  How would we
     implement improving precision on demand?  Can we estimate
     the value of doing this?
-  - David Wagner said that unifying struct instances assigned
-    to one another was a huge win for CQual.  Are we doing this?
-    How hard would it be to do?
-  - So far we only use "labeled" banshee nodes for everything, that
-    is, nodes annotated with a string identifier in banshee.  However, banshee
-    also has another kind of "unlabeled" nodes, that are more
-    memory-efficient, but have the drawback that they cannot be used to ask
-    queries.  Maybe there's some way to use un-labeled nodes everywhere (so
-    that banshee presumably uses less memory).
-    It's not clear to me which nodes will have to be labeled versus which ones
-    can be unlabeled, but i'm sure we can find cases where it's certain we
-    don't care about the points-to-set of a node.
 
 - Fix semi-unification infinite looping problem.
   - Add extended occurs check.
   - Look at drivers (e.g., wavelan) to understand this better.
-
-- Fix handling of memcpy to work with lazy structs.  E.g., have a lazy
-  memcpy edge when memcpy'ing structs so that we do proper aliasing
-  between only the lazily-generated fields.  Same thing for free()?
 
 - Improve the output.  
   - When printing of context-based results, if an instantiation path
@@ -82,3 +51,6 @@ FEATURES:
 - Try making malloc() context-sensitive.  Would save a lot of hassle
   when dealing with malloc wrappers, which are reasonably common.
 
+- forkloop2.c is imprecise
+  - we should be able to get rid of this race, assuming
+    we add liveness to the uniqueness results.

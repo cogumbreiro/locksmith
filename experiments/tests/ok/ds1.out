@@ -1,21 +1,34 @@
 ************************* STARTING *************************
 
-shared: alloc.other_data:ds1.c:37
-        alloc.other_data:ds1.c:19
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
+shared: alloc.data:ds1.c:16
         alloc.other:ds1.c:16
-        alloc.data:ds1.c:16
+        alloc.other_data:ds1.c:19
+        alloc.other_data:ds1.c:37
 alloc.other_data:ds1.c:37 is protected by:
-  global_lock:ds1.c:15
   concrete global_lock:ds1.c:38
+  global_lock:ds1.c:15
 alloc.other_data:ds1.c:19 is protected by:
-  global_lock:ds1.c:15
   concrete global_lock:ds1.c:38
+  global_lock:ds1.c:15
 alloc.other:ds1.c:16 is protected by:
-  global_lock:ds1.c:15
   concrete global_lock:ds1.c:38
+  global_lock:ds1.c:15
 alloc.data:ds1.c:16 is protected by:
-  global_lock:ds1.c:15
   concrete global_lock:ds1.c:38
+  global_lock:ds1.c:15
 *************************** DONE ***************************
-
-

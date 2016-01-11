@@ -50,7 +50,7 @@ parser.exe: $(OBJS) #../engine/libengine.a $(region_dir)/libregions.a
 #	$(CC) $(CFLAGS) -o parser_st.exe $(LDFLAGS) $(OBJS) ../andersen/andersen_terms_st.o ../andersen/andersen.o $(EXTRALIBS) -L$(region_dir) -L../engine -lengine -lregions -lm
 
 parser_ns.exe: $(OBJS) #../engine/libengine.a $(region_dir)/libregions.a
-	$(CC) $(CFLAGS) -DNONSPEC -o parser_ns.exe $(LDFLAGS) $(OBJS)  ../andersen/andersen_terms_nonspec.o ../andersen/andersen.o $(EXTRALIBS) -L$(region_dir) -L../engine -lregions -lnsengine -lm
+	$(CC) $(CFLAGS) -DNONSPEC -o parser_ns.exe $(LDFLAGS) $(OBJS)  ../andersen/andersen_terms_nonspec.o ../andersen/andersen.o $(EXTRALIBS) -L$(region_dir) -L../engine -lnsengine -lregions -lm
 
 parser_sg.exe: $(OBJS) #../engine/libengine.a $(region_dir)/libregions.a
 	$(CC) $(CFLAGS_SG) -o parser_sg.exe $(LDFLAGS) $(OBJS) ../steensgaard/steensgaard_terms.o ../steensgaard/steensgaard.o $(EXTRALIBS) -L$(region_dir) -L../engine -lengine -lregions -lm

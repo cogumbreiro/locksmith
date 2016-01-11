@@ -1,11 +1,25 @@
-
 ************************* STARTING *************************
 
-shared: &shared:simple2.c:4
-        &non_protected:simple2.c:5
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
+shared: &non_protected:simple2.c:5
+        &shared:simple2.c:4
 &shared:simple2.c:4 is protected by:
-  lock:simple2.c:3
   concrete lock:simple2.c:16
+  lock:simple2.c:3
 
 Warning: Possible data race: &non_protected:simple2.c:5 is not protected!
  references:
@@ -28,15 +42,13 @@ Warning: Possible data race: &non_protected:simple2.c:5 is not protected!
       &non_protected:simple2.c:5
     locks acquired at dereference: 
       <empty>
-    in: main at simple2.c:19 -> run simple2.c:18
+    in: main at simple2.c:14 -> run simple2.c:18
 
   dereference at simple2.c:8
     locations possibly dereferenced: 
       &non_protected:simple2.c:5
     locks acquired at dereference: 
       <empty>
-    in: main at simple2.c:19 -> run simple2.c:17
+    in: main at simple2.c:14 -> run simple2.c:17
 
 *************************** DONE ***************************
-
-

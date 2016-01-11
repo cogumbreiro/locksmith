@@ -1,6 +1,20 @@
-
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: alloc.data:1-field-shared.c:15
 
 Warning: Possible data race: alloc.data:1-field-shared.c:15 is not protected!
@@ -27,7 +41,7 @@ Warning: Possible data race: alloc.data:1-field-shared.c:15 is not protected!
       alloc.data:1-field-shared.c:15
     locks acquired at dereference: 
       <empty>
-    in: main at 1-field-shared.c:19 -> f 1-field-shared.c:18
+    in: main at 1-field-shared.c:13 -> f 1-field-shared.c:18
 
   dereference at 1-field-shared.c:9
     locations possibly dereferenced: 
@@ -35,8 +49,6 @@ Warning: Possible data race: alloc.data:1-field-shared.c:15 is not protected!
       alloc.data:1-field-shared.c:15
     locks acquired at dereference: 
       <empty>
-    in: main at 1-field-shared.c:19 -> f 1-field-shared.c:17
+    in: main at 1-field-shared.c:13 -> f 1-field-shared.c:17
 
 *************************** DONE ***************************
-
-

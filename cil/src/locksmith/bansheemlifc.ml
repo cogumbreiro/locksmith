@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -39,7 +39,8 @@ type instantiation = int
 
 let string_of_inst = string_of_int
 
-external make_node2 : string -> banshee_node = "banshee_make_tagged_node"
+external make_tagged_banshee_node : string -> banshee_node = "banshee_make_tagged_node"
+external make_untagged_banshee_node : string -> banshee_node = "banshee_make_untagged_node"
 external banshee_make_open_edge : banshee_node -> banshee_node -> int -> unit = "banshee_open_edge"
 external banshee_make_close_edge : banshee_node -> banshee_node -> int -> unit = "banshee_close_edge"
 external banshee_reaches_pn : banshee_node -> banshee_node -> bool = "banshee_reachespn"
@@ -88,6 +89,7 @@ let hash n = n.nid (* change compare below in Node, HasedType if this changes *)
 module Node =
   struct
     type t = node
+    let hash n = n.nid
     let compare n1 n2 =
       let h1 = hash n1 in  (* assumes unique hashing *)
       let h2 = hash n2 in
@@ -96,18 +98,13 @@ module Node =
       else -1
         (* jf -- not safe to subtract; e.g., integer overflow *)
         (* (hash n1) - (hash n2) *)
-  end
-module NodeSet = Set.Make(Node)
-
-module HashedType =
-  struct
-    type t = node
     let equal n1 n2 =
       let h1 = hash n1 in  (* assumes unique hashing *)
       let h2 = hash n2 in
       h1 == h2
-    let hash = hash
   end
+module NodeSet = Set.Make(Node)
+module NodeHT = Hashtbl.Make(Node)
 
 (* let concretes = ref NodeSet.empty *)
 
@@ -132,10 +129,12 @@ let fresh_inst () : instantiation =
   assert (not !done_inst);
   incr next_inst; !next_inst
 let next_id = ref 1
-let make_node (n: string) (c: bool) (l: Cil.location) : node = begin
+let make_node (n: string) (c: bool) (l: Cil.location) (tagged: bool) : node = begin
   let nn = {
     nid = !next_id;
-    nnode = make_node2 n;
+    nnode = if tagged
+            then make_tagged_banshee_node n
+            else make_untagged_banshee_node n;
     nname = n;
     nloc = l;
     nglob = false;
@@ -279,7 +278,7 @@ end
 
 
 
-let print_graph outf = begin
+let print_graph outf : NodeSet.t = begin
   let ns = ref NodeSet.empty in
   let dotstring_of_edge (e: edge) : string =
     match e with
@@ -311,6 +310,7 @@ let print_graph outf = begin
         Printf.fprintf outf "\"%s\" [peripheries=2]\n" (dotstring_of_node n);
     )
     !ns;
+  !ns
 end
 
 let _ = bansheeInit true

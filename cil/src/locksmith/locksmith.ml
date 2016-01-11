@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -43,13 +43,14 @@ module Lprof = Lockprofile
 
 let do_graph_out = ref false
 let do_cfgraph_out = ref false
-let debug = ref false
+let listphase = ref false
 
 (* subversion will substitute this *)
-let version = "$Rev: 1737 $"
+let version = "$Rev: 2817 $"
 
 let print_version () =
   output_string stdout ("LockSmith build #"^version)
+
 
 let feature : featureDescr = {
   fd_name = "locksmith";
@@ -63,8 +64,8 @@ let feature : featureDescr = {
          "Print locksmith version and exit.";
 
       "--debug-locksmith",
-         Arg.Set(debug),
-         "Print locksmith profiling information after each phase.";
+         Arg.Set(listphase),
+         "Print high-level progress info.";
 
       "--save-graph",
          Arg.Set(do_graph_out),
@@ -86,19 +87,19 @@ let feature : featureDescr = {
     @ Bansheemlifc.options
     @ Labelflow.options
     @ Lockpick.options
+    @ Lprof.options
     ;
   fd_doit =
   (function (f: file) -> begin
     ignore(E.log
       "\n************************* STARTING *************************\n\n");
-    if !debug then ignore(E.log "type program...\n");
-    let cstart = Lprof.starttime () in
+    ignore (Sys.signal Sys.sigusr1 (Sys.Signal_handle (fun (i: int) -> Lprof.endtime "killed"; exit 1)));
+    Lprof.endtime "start";
+    if !listphase then ignore(E.log "phase-begin(typing)\n");
     Locktype.generate_constraints f;
     Labelflow.done_adding_instantiations ();
-    let ctime = Lprof.endtime cstart in
-    if !debug then ignore(E.log "typing done: %s " (Lprof.to_string ctime));
-    if !debug then Lprof.print_mem_info ();
-    if !debug then ignore(E.log "\n");
+    Lprof.endtime "typing";
+    if !listphase then ignore(E.log "phase-end(typing)\n");
 
     if !do_cfgraph_out then begin
       Dotpretty.init_file "cf-graph.dot" "control flow graph";
@@ -114,27 +115,22 @@ let feature : featureDescr = {
       Dotpretty.close_file ();
     end;
 
-    if !debug then ignore(E.log "find shared\n");
-    let shstart = Lprof.starttime() in
+    if !listphase then ignore(E.log "phase-begin(shared)\n");
     Shared.solve (Locktype.get_global_var_rhos ());
-    let shtime = Lprof.endtime shstart in
-    if !debug then ignore(E.log "shared done: %s " (Lprof.to_string shtime));
-    if !debug then Lprof.print_mem_info ();
-    if !debug then ignore(E.log "\n");
-
+    Lprof.endtime "shared";
+    if !listphase then ignore(E.log "phase-end(shared)\n");
     if !Lockpick.do_lockpick then Lockpick.doit()
     else begin
 
-      if !debug then ignore(E.log "solve semi-unification (lock linearity)...\n");
+      if !listphase then ignore(E.log "phase-begin(linearity)\n");
       (*if !do_graph_out then begin
         Dotpretty.init_file "su.dot";
         Semiunification.print_graph !Dotpretty.outf;
         Dotpretty.close_file ();
       end;
       *)
-      let sustart = Lprof.starttime () in
       Semiunification.solve ();
-      let sutime = Lprof.endtime sustart in
+      Lprof.endtime "linearity";
       (*
       if !do_graph_out then begin
         Dotpretty.init_file "sus.dot";
@@ -142,39 +138,27 @@ let feature : featureDescr = {
         Dotpretty.close_file ();
       end;
       *)
-      if !debug then ignore(E.log "linearity done: %s " (Lprof.to_string sutime));
-      if !debug then Lprof.print_mem_info ();
-      if !debug then ignore(E.log "\n");
+      if !listphase then ignore(E.log "phase-end(linearity)\n");
 
-      if !debug then ignore(E.log "compute lock state...\n");
-      let lsstart = Lprof.starttime () in
+      if !listphase then ignore(E.log "phase-begin(lock-state)\n");
       Lockstate.solve ();
-      let lstime = Lprof.endtime lsstart in
-      if !debug then ignore(E.log "state done: %s " (Lprof.to_string lstime));
-      if !debug then Lprof.print_mem_info ();
-      if !debug then ignore(E.log "\n");
+      Lprof.endtime "lock-state";
+      if !listphase then ignore(E.log "phase-end(lock-state)\n");
 
-      if !debug then ignore(E.log "find guarded-by...\n");
-      let gbstart = Lprof.starttime () in
+      if !listphase then ignore(E.log "phase-begin(guarded-by)\n");
       Correlation.solve ();
-      let gbtime = Lprof.endtime gbstart in
-      if !debug then ignore(E.log "guardedby done: %s " (Lprof.to_string gbtime));
-      if !debug then Lprof.print_mem_info ();
-      if !debug then ignore(E.log "\n");
+      Lprof.endtime "guarded-by";
+      if !listphase then ignore(E.log "phase-end(guarded-by)\n");
 
-      if !debug then ignore(E.log "check escapes()...\n");
-      let escstart = Lprof.starttime () in
+      if !listphase then ignore(E.log "phase-begin(escapes)\n");
       Semiunification.check ();
-      let esctime = Lprof.endtime escstart in
-      if !debug then ignore(E.log "escapes done in %s " (Lprof.to_string esctime));
-      if !debug then Lprof.print_mem_info ();
-      if !debug then ignore(E.log "\n");
+      Lprof.endtime "escapes";
+      if !listphase then ignore(E.log "phase-end(escapes)\n");
 
 
-      if !debug then ignore(E.log "check for races...\n");
-      let rcstart = Lprof.starttime () in
+      if !listphase then ignore(E.log "phase-begin(races)\n");
       Correlation.check_races ();
-      let rctime = Lprof.endtime rcstart in
+      Lprof.endtime "races";
       if !do_graph_out then begin
         Dotpretty.init_file "graph.dot" "solved constraints";
         Labelflow.print_graph !Dotpretty.outf;
@@ -182,11 +166,10 @@ let feature : featureDescr = {
         Lockstate.print_graph !Dotpretty.outf;
         Dotpretty.close_file ();
       end;
-      if !debug then ignore(E.log "races done: %s " (Lprof.to_string rctime));
-      if !debug then Lprof.print_mem_info ();
-      if !debug then ignore(E.log "\n");
+      if !listphase then ignore(E.log "phase-end(races)\n");
     end;
 
+    Lprof.print_stats();
     ignore(E.log
       "*************************** DONE ***************************\n\n");
     ignore(E.log "LockSmith run for: %f seconds\n\n" (Sys.time()));

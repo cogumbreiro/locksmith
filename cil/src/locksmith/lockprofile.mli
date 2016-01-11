@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -34,16 +34,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *)
-type t (* timestamp *)
-type timerange
+(*type t*) (* timestamp *)
 
-val starttime : unit -> t
-val endtime : t -> timerange
-
-val to_string : timerange -> string
-
-val print_mem_info : unit -> unit (* dump memory usage on stderr *)
+(* give the name of the phase that just ended *)
+val endtime : string -> unit
 
 (* return a string containing the current proc time plus the delta
    since the last time timestamp was called *)
 val timestamp : unit -> string
+
+val options : (string * Arg.spec * string) list
+
+val print_stats : unit -> unit

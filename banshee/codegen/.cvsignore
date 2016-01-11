@@ -1,8 +1,0 @@
-*._bcdi
-*._d
-*.cmi
-*.cmo
-lexer.ml
-parser.ml
-parser.mli
-

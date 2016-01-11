@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -40,9 +40,10 @@ type instantiation
 val options : (string * Arg.spec * string) list
 
 module Node : Set.OrderedType with type t = node
-module HashedType : Hashtbl.HashedType with type t = node
+module NodeSet : Set.S with type elt = node
+module NodeHT : Hashtbl.S with type key = node
 
-val make_node : string -> bool -> Cil.location -> node
+val make_node : string -> bool -> Cil.location -> bool -> node
 val string_of_node : node -> string
 val dotstring_of_node : node -> string
 val fresh_inst : unit -> instantiation
@@ -56,7 +57,7 @@ val set_global : node -> unit
 val is_global : node -> bool
 (*val reaches_pn : node -> node -> bool*)
 val reaches_m : node -> node -> bool
-val print_graph : out_channel -> unit
+val print_graph : out_channel -> NodeSet.t
 val hash : node -> int
 val is_concrete : node -> bool
 val string_of_inst : instantiation -> string

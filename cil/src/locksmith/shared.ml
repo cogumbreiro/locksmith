@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -39,7 +39,8 @@ open Labelflow
 open Lockdefs
 module LS = Lockstate
 module E = Errormsg
-type phi = Controlflow.phi
+module CF = Controlflow
+type phi = CF.phi
 
 let do_sharedreads = ref false
 let do_list_shared = ref false
@@ -139,7 +140,7 @@ let add_fork (in_eff: effect)
   effect_flows fork_eff in_eff;
   (* We make this global to avoid needing a PN query later.  Could
      ditch this and ask PN queries to solve e instead. *)
-  let e = make_effect "e" in
+  let e = make_effect "e" true in
   effect_flows out_eff e;
   set_global_effect e EffectSet.empty;
   (* Add to the list of forks to process later *)
@@ -157,7 +158,7 @@ let add_fork (in_eff: effect)
 module SharingTransfer =
   struct
     type state = rhoSet
-    let state_before_phi = Controlflow.PH.create 1000 
+    let state_before_phi = CF.PhiHT.create 1000 
     let transfer_fwd (p: phi) worklist (shared: state) : state option = Some shared
     let starting_state (p: phi) : state option = Some RhoSet.empty
     let merge_state = RhoSet.union
@@ -169,10 +170,10 @@ module SharingTransfer =
       align ++ d_rhoset () s ++ unalign
   end
 
-module SS = Controlflow.MakeForwardsAnalysis(SharingTransfer)
+module SS = CF.MakeForwardsAnalysis(SharingTransfer)
 
-let get_state_before = Controlflow.PH.find SharingTransfer.state_before_phi
-let set_state_before = Controlflow.PH.replace SharingTransfer.state_before_phi
+let get_state_before = CF.PhiHT.find SharingTransfer.state_before_phi
+let set_state_before = CF.PhiHT.replace SharingTransfer.state_before_phi
 
 let all_shared_rho: rhoSet ref = ref RhoSet.empty
 
@@ -185,12 +186,12 @@ let set_shared (rs: rhoSet) (ps:phi list) (es:effect list): unit =
   if !flow_share then
     begin
       if !flow_effect then
-	List.iter (function (e:effect) ->
-	  RhoSet.iter (function r -> add_to_share_effect r e) crs)
-	  es;
+        List.iter (function (e:effect) ->
+          RhoSet.iter (function r -> add_to_share_effect r e) crs)
+          es;
       if not !flow_effect || !flow_compare then
-	List.iter (function (p:phi) ->
-	  set_state_before p crs; starting_phis := p::!starting_phis) ps
+        List.iter (function (p:phi) ->
+          set_state_before p crs; starting_phis := p::!starting_phis) ps
     end
 
 let forkn = ref 0
@@ -207,26 +208,26 @@ begin
   incr forkn; 
   let r1,w1 = solve_rw_effect_pn out_eff in
   if !debug then ignore(E.log "PARENT (%a) read: %a\nPARENT (%a) write: %a\n" 
-				Cil.d_loc loc d_rhoset r1 Cil.d_loc loc d_rhoset w1);
+                                Cil.d_loc loc d_rhoset r1 Cil.d_loc loc d_rhoset w1);
   let r2,w2 = 
    (* We intersect the pn-closed effect of the forked thread
      with the pn-closed fv(env) at that point. *)
     if !down_fork then 
       begin
-	let fr,fw = solve_rw_effect_pn fork_eff in
-	if !debug then ignore(E.log "FORK (%a) no filter read: %a\nFORK (%a) no filter write: %a\n" 
-				Cil.d_loc loc d_rhoset fr Cil.d_loc loc d_rhoset fw);
-	let local_lvs = Lazy.force llvs in
-	let closed_local_lvs = close_rhoset_pn local_lvs in
-	let lvs = RhoSet.union closed_local_lvs all_global_rho in
-	if !debug then 
-	  ignore(E.log "FV(Gamma) (%a): %a\n" Cil.d_loc loc d_rhoset lvs);
-	(RhoSet.inter fr lvs,RhoSet.inter fw lvs)
+        let fr,fw = solve_rw_effect_pn fork_eff in
+        if !debug then ignore(E.log "FORK (%a) no filter read: %a\nFORK (%a) no filter write: %a\n" 
+                                Cil.d_loc loc d_rhoset fr Cil.d_loc loc d_rhoset fw);
+        let local_lvs = Lazy.force llvs in
+        let closed_local_lvs = close_rhoset_pn local_lvs in
+        let lvs = RhoSet.union closed_local_lvs all_global_rho in
+        if !debug then 
+          ignore(E.log "FV(Gamma) (%a): %a\n" Cil.d_loc loc d_rhoset lvs);
+        (RhoSet.inter fr lvs,RhoSet.inter fw lvs)
       end
     else 
       solve_rw_effect_pn fork_eff in
   if !debug then ignore(E.log "FORK (%a) filtered read: %a\nFORK (%a) filtered write: %a\n"
-				Cil.d_loc loc d_rhoset r2 Cil.d_loc loc d_rhoset w2);
+                                Cil.d_loc loc d_rhoset r2 Cil.d_loc loc d_rhoset w2);
   let l1 = RhoSet.union r1 w1 in
   let l2 = RhoSet.union r2 w2 in
   let l3 =
@@ -236,7 +237,7 @@ begin
       let ls2 = (RhoSet.inter l2 w1) in
       let res = RhoSet.union ls1 ls2 in
       if !debug then ignore(E.log "FORK (%a) shared: %a\n\n"
-			      Cil.d_loc loc d_rhoset res);
+                              Cil.d_loc loc d_rhoset res);
       res
   in
   (* add this to hash (input_before) for both forked and cont *)
@@ -248,27 +249,27 @@ let dump_shared () : unit =
   assert (!solved);
   ignore(E.log "shared: %a\n" d_rhoset (concrete_rhoset !all_shared_rho))
 
-(* let memoized_shared_rho : bool RH.t = RH.create 1000 *)
+(* let memoized_shared_rho : bool RhoHT.t = RhoHT.create 1000 *)
 
 let is_ever_shared (r: rho) : bool =
    assert (!solved);
 (*    try  *)
-(*      RH.find memoized_shared_rho r *)
+(*      RhoHT.find memoized_shared_rho r *)
 (*    with Not_found -> *)
      let rs = get_rho_p2set_pn r in
      let res = not (RhoSet.is_empty (RhoSet.inter rs !all_shared_rho)) in
-(*      RH.add memoized_shared_rho r res; *)
+(*      RhoHT.add memoized_shared_rho r res; *)
      res
 
 (* module PhiRhoHT = *)
 (*   struct *)
 (*     type t = phi * rho *)
 (*     let equal ((x,r): t) ((y,q): t) : bool = *)
-(*       PhiHT.equal x y && RhoHT.equal r q *)
+(*       PhiHT.equal x y && Rho.equal r q *)
 (*     let hash ((x,r): t) : int =  *)
-(*       2 * (PhiHT.hash x) + (RhoHT.hash r) *)
+(*       2 * (PhiHT.hash x) + (Rho.hash r) *)
 (*   end *)
-(* module PRH = Hashtbl.Make(PhiRhoHT) *)
+(* module PRhoHT = Hashtbl.Make(PhiRhoHT) *)
 
 let is_shared (r: rho) (p: phi) (e:effect) : bool =
   assert (!solved);
@@ -286,23 +287,23 @@ let is_shared (r: rho) (p: phi) (e:effect) : bool =
       let res_eff = is_shared' r all_shared_eff in
       let res_noflow = is_shared' r !all_shared_rho in
       if (res != res_eff) then
-	begin
-	  assert(res = res_noflow);
-	  ignore(E.log "location %a (%a): CS/FS says %b while FS says %b\n"
-		   d_rho r Controlflow.d_phi p res_eff res);
-	  ignore(E.log "all_shared_eff: %a\nall_shared: %a\n"
-		   d_rhoset all_shared_eff d_rhoset all_shared)
-	end
+        begin
+          assert(res = res_noflow);
+          ignore(E.log "location %a (%a): CS/FS says %b while FS says %b\n"
+                   d_rho r CF.d_phi p res_eff res);
+          ignore(E.log "all_shared_eff: %a\nall_shared: %a\n"
+                   d_rhoset all_shared_eff d_rhoset all_shared)
+        end
       else if (res != res_noflow) then
-	ignore(E.log "location %a: non-FS says %b while FS says %b\n"
-		 d_rho r res_noflow res);
+        ignore(E.log "location %a: non-FS says %b while FS says %b\n"
+                 d_rho r res_noflow res);
       res_eff
     end
   else if !flow_share then
      begin
        let all_shared =
          if !flow_effect then
-	   solve_share_effect_pn e
+           solve_share_effect_pn e
          else
            get_state_before p in
        is_shared' r all_shared
@@ -320,12 +321,12 @@ let solve (rs: RhoSet.t) : unit = begin
   (* calculate flow sensitive sharing here *)
   if (!flow_share && not (!flow_effect)) || !flow_compare then 
     begin
-      (* let old = !Controlflow.debug in
-      if !debug then Controlflow.debug := true; *)
-      SS.solve (!Controlflow.starting_phis @ !starting_phis);
-      (* if !debug then Controlflow.debug := old *)
+      (* let old = !CF.debug in
+      if !debug then CF.debug := true; *)
+      SS.solve (!CF.starting_phis @ !starting_phis);
+      (* if !debug then CF.debug := old *)
     end;
-(*   RhoSet.iter (function rho -> RH.add memoized_shared_rho rho true)  *)
+(*   RhoSet.iter (function rho -> RhoHT.add memoized_shared_rho rho true)  *)
 (*     !all_shared_rho; *)
   if !do_list_shared then dump_shared ()
 end

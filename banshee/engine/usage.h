@@ -36,7 +36,7 @@
 EXTERN_C_BEGIN
 
 /* Return the memory used by the current process, in bytes */
-unsigned long get_memusage(void);
+long get_memusage(void);
 
 EXTERN_C_END
 

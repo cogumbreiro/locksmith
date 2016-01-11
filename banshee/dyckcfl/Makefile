@@ -45,7 +45,7 @@ banshee_exe = ../bin/banshee.exe
 
 DYCKCFL = dyckcfl
 
-TARGETS =  $(DYCKCFL).o mr_$(DYCKCFL).o $(DYCKCFL)_terms.h $(DYCKCFL)_spec.o $(DYCKCFL)_terms.o $(DYCKCFL)_terms.c dyckcfl-replay
+TARGETS =  $(DYCKCFL).o mr_$(DYCKCFL).o $(DYCKCFL)_terms.h $(DYCKCFL)_spec.o $(DYCKCFL)_terms.o $(DYCKCFL)_terms.c dyckcfl-replay.o dyckcfl-replay
 
 TAGFILES = $(wildcard *.c) $(wildcard *.h)
 
@@ -54,12 +54,12 @@ CC = gcc
 ifdef DEBUG
 CFLAGS = -I$(engine_dir) -I$(region_dir) -Ddeletes= -Dtraditional= \
          -Dsameregion= -Dparentptr= -Wall -Werror -g -pg \
-#	 -DREGION_PROFILE
+	 -DREGION_PROFILE
 #
 else
 CFLAGS = -I$(engine_dir) -I$(region_dir) -Ddeletes= -Dtraditional= \
          -Dsameregion= -Dparentptr= -Wall -Werror \
-#	 -DREGION_PROFILE
+	 -DREGION_PROFILE
 #
 endif
 

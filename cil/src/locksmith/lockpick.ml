@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -52,17 +52,17 @@ let print_version () =
   output_string stdout ("Lockpick build #"^version)
 
 let compute_dominates_graph (shared: rhoSet) (atomic_list: rhoSet list)
-    : rhoSet RH.t =
-  let dominates_hash = RH.create (RhoSet.cardinal shared) in
+    : rhoSet RhoHT.t =
+  let dominates_hash = RhoHT.create (RhoSet.cardinal shared) in
   let does_not_dominate r r' =
     if !debug then ignore(E.log "%a does not dominate %a\n" d_rho r d_rho r');
-    let tmp = RH.find dominates_hash r in
-    RH.replace dominates_hash r (RhoSet.remove r' tmp)
+    let tmp = RhoHT.find dominates_hash r in
+    RhoHT.replace dominates_hash r (RhoSet.remove r' tmp)
   in
   RhoSet.iter
     (fun r ->
       ignore(E.log "init %a\n" d_rho r);
-      RH.replace dominates_hash r shared)
+      RhoHT.replace dominates_hash r shared)
     shared;
   List.iter
     (fun atomic ->
@@ -73,16 +73,16 @@ let compute_dominates_graph (shared: rhoSet) (atomic_list: rhoSet list)
     atomic_list;
   dominates_hash
 
-let dump_dominates_graph (g: rhoSet RH.t) : unit =
-  RH.iter
+let dump_dominates_graph (g: rhoSet RhoHT.t) : unit =
+  RhoHT.iter
     (fun r d ->
       RhoSet.iter
         (fun r' -> ignore(E.log "%a dominates %a\n" d_rho r d_rho r'))
         d
     ) g
 
-let dump_solution (s: rho RH.t) : unit =
-  RH.iter
+let dump_solution (s: rho RhoHT.t) : unit =
+  RhoHT.iter
     (fun r r' ->
       ignore(E.log "%a is protected by %a\n" d_rho r d_rho r');
     )
@@ -118,22 +118,22 @@ let doit () : unit = begin
   if !debug then dump_dominates_graph dom;
 
   (* algorithm 2 in the paper: *)
-  let solution = RH.create (RhoSet.cardinal shared_atomic) in
-  RhoSet.iter (fun r -> RH.replace solution r r) shared_atomic;
-  RH.iter
+  let solution = RhoHT.create (RhoSet.cardinal shared_atomic) in
+  RhoSet.iter (fun r -> RhoHT.replace solution r r) shared_atomic;
+  RhoHT.iter
     (fun r dominated -> 
       RhoSet.iter
         (fun r' ->
-          let s = RH.find solution r in
-          RH.replace solution r' s;
-          RH.replace dom r' RhoSet.empty;
+          let s = RhoHT.find solution r in
+          RhoHT.replace solution r' s;
+          RhoHT.replace dom r' RhoSet.empty;
         )
         dominated
     )
     dom;
   if !debug then dump_solution solution;
 
-  let used = RH.fold
+  let used = RhoHT.fold
     (fun _ r d -> RhoSet.add r d)
     solution
     RhoSet.empty

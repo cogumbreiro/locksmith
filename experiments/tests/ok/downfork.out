@@ -4,24 +4,38 @@
 downfork.c:4: Warning: subtyping incompatible types:
 int
 (void)
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: &x:downfork.c:11
 
 Warning: Possible data race: &x:downfork.c:11 is not protected!
  references:
-  dereference at downfork.c:13
-    locations possibly dereferenced: 
-      &x:downfork.c:11
-    locks acquired at dereference: 
-      <empty>
-    in: main at downfork.c:14
-
   dereference at downfork.c:4
     locations possibly dereferenced: 
       &x:downfork.c:11
       dofork.y:downfork.c:12
     locks acquired at dereference: 
       <empty>
-    in: main at downfork.c:14 -> dofork downfork.c:12 -> doit downfork.c:8
+    in: main at downfork.c:10 -> dofork downfork.c:12 -> doit downfork.c:8
+
+  dereference at downfork.c:13
+    locations possibly dereferenced: 
+      &x:downfork.c:11
+    locks acquired at dereference: 
+      <empty>
+    in: main at downfork.c:10
 
 *************************** DONE ***************************
-

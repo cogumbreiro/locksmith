@@ -59,10 +59,8 @@ dyck_node nodes[NUMNODES];
 
 int main() {
   FILE *fp;
-  char *line = NULL;
+  char line[100];
   char buf[20];
-  size_t len = 0;
-  ssize_t read;
   int n1, n2, i, j;
   region r;
   double t1, t2;
@@ -77,7 +75,7 @@ int main() {
   t1 = gettime();
   fp = fopen("graph.txt", "r");
   if (fp == NULL) exit(EXIT_FAILURE);
-  while ((read = getline(&line, &len, fp)) != -1) {
+  while ((fgets(line, 100, fp)) != NULL) {
     if (j % 1000 == 0) {
       t2 = gettime();
       //printf("1000 lines in %f seconds: ", t2 - t1); fflush(stdout);

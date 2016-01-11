@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -40,23 +40,59 @@ open Labelname
 module E = Errormsg
 
 let debug = ref false
-let do_canonical = ref false
 let flow_effect = ref false (* set by options in shared.ml *)
+let no_effects = ref false
+let use_untagged = ref false
 
 let options = [
-  "--debug-effects",
+  "--debug-labelflow",
      Arg.Set(debug),
-     "Print a dot for every banshee query when solving for effects.";
+     "Extra output from the labelflow module";
 
-  "--canonicalize",
-     Arg.Set(do_canonical),
-     "Give a different printable name to each generated label (used for debugging & regression testing.)";
+  "--no-continuation-effects",
+     Arg.Set(no_effects),
+     "Don't allocate any banshee labels for continuation effects";
 
+  "--use-untagged-nodes",
+     Arg.Set(use_untagged),
+     "Attempt to use untagged nodes for non-fork effects in banshee";
 ]
 
 exception LabelFlowBug of string
 
-module CFL = (* choose one: *)
+module type CFLT =
+  sig
+    type node
+    type instantiation
+
+    module Node : Set.OrderedType with type t = node
+    module NodeSet : Set.S with type elt = node
+    module NodeHT : Hashtbl.S with type key = node
+
+    val options : (string * Arg.spec * string) list
+
+    val make_node : string -> bool -> Cil.location -> bool -> node
+    val string_of_node : node -> string
+    val dotstring_of_node : node -> string
+    val fresh_inst : unit -> instantiation
+    val make_inst_edge : node -> node -> bool -> instantiation -> unit
+    val make_sub_edge : node -> node -> unit
+    val set_global : node -> unit
+    val is_global : node -> bool
+    val reaches_m : node -> node -> bool
+    val print_graph : out_channel -> NodeSet.t
+    val hash : node -> int
+    val is_concrete : node -> bool
+    val string_of_inst : instantiation -> string
+    val total_nodes : unit -> int
+    val get_all_that_reach_m : node -> (node -> 'a) ->
+                               ('a -> 'b -> 'b) -> 'b -> 'b
+    val get_all_that_reach_pn : node -> (node -> 'a) ->
+                               ('a -> 'b -> 'b) -> 'b -> 'b
+    val done_adding : unit -> unit
+  end
+
+module CFL : CFLT = (* choose one: *)
   (*Falsecfl*)
   Bansheemlifc
   (*Mycfl*)
@@ -102,23 +138,29 @@ and rho = {
   (** special struct used to print better error messages *)
 }
 
-module Rho : Set.OrderedType with type t = rho =
+module Rho : Lockdefs.HashedOrderedType with type t = rho =
   struct
     type t = rho
     let compare (x: t) (y: t) : int =
       CFL.Node.compare x.rho_cfl_node y.rho_cfl_node
+    let equal (x: t) (y: t) : bool =
+      (CFL.Node.compare x.rho_cfl_node y.rho_cfl_node = 0)
+    let hash (x: t) : int = CFL.hash x.rho_cfl_node
   end
+module RhoHT = Hashtbl.Make(Rho)
 module RhoSet = Set.Make(Rho)
 type rhoSet = RhoSet.t
 
-(*module Rhomap = Map.Make(Rho)*)
-
-module Lock : Set.OrderedType with type t = lock =
+module Lock =
   struct
     type t = lock
     let compare (x: t) (y: t) : int =
       CFL.Node.compare x.lock_cfl_node y.lock_cfl_node
+    let equal (x: t) (y: t) : bool = 
+      (CFL.Node.compare x.lock_cfl_node y.lock_cfl_node = 0)
+    let hash (x: t) : int = CFL.hash x.lock_cfl_node
   end
+module LockHT = Hashtbl.Make(Lock)
 module LockSet = Set.Make(Lock)
 type lockSet = LockSet.t
 
@@ -148,39 +190,15 @@ type effectSet = EffectSet.t
 let inst_equal (i1: instantiation) (i2: instantiation) : bool =
   (i1.inst_id = i2.inst_id)
 
-let lock_equal (x: lock) (y: lock) : bool =
-  (CFL.Node.compare x.lock_cfl_node y.lock_cfl_node = 0)
-
-let rho_equal (x: rho) (y: rho) : bool =
-  (CFL.Node.compare x.rho_cfl_node y.rho_cfl_node = 0)
-
-module InstHT : Hashtbl.HashedType with type t = instantiation =
+module Inst =
   struct
     type t = instantiation
     let equal : t -> t -> bool = inst_equal
     let hash (i: t) = Hashtbl.hash (i.inst_id)
   end
-module IH = Hashtbl.Make(InstHT)
+module InstHT = Hashtbl.Make(Inst)
 
-(* a (faster than (lock,'a) Hashtbl.t) hashtable from locks to 'a *)
-module LockHT =
-  struct
-    type t = lock
-    let equal : t -> t -> bool = lock_equal
-    let hash (x: t) : int = CFL.hash x.lock_cfl_node
-  end
-module LH = Hashtbl.Make(LockHT)
-
-(* a (faster than (rho,'a) Hashtbl.t) hashtable from rhos to 'a *)
-module RhoHT =
-  struct
-    type t = rho
-    let equal : t -> t -> bool = rho_equal
-    let hash (x: t) : int = CFL.hash x.rho_cfl_node
-  end
-module RH = Hashtbl.Make(RhoHT)
-
-module NodeHT = Hashtbl.Make(CFL.HashedType)
+module NodeHT = CFL.NodeHT
 
 (* instantiations *)
 let all_inst : instantiation list ref = ref []
@@ -200,82 +218,47 @@ let all_concrete_locks : lockSet ref = ref LockSet.empty
 (* all effect nodes *)
 let all_effects : effect list ref = ref []
 
-(* memoization of the banshee results.
- * points-to sets for rhos and locks.
- *)
-(*
-let rho_prev: rhoSet RH.t = RH.create 1000
-let lock_prev: lockSet LH.t = LH.create 1000
-*)
-
-
 (******************
  * pretty printing
  ******************)
-let dotstring_of_inst i = CFL.string_of_inst i.inst_id
-
-(*
-let string_of_lock lock = 
-    (if lock.lock_linear then "" else "non-linear-") ^
-    (if CFL.is_concrete lock.lock_cfl_node then "C" else "") ^
-    (List.fold_left
-      (fun c i -> c ^ (CFL.string_of_inst i) ^ "/")
-      ""
-      lock.lock_path) ^
-    (CFL.dotstring_of_node lock.lock_cfl_node)
-*)
-
-(*let string_of_rho rho = (CFL.string_of_node rho.rho_cfl_node)
-let string_of_read_effect e = CFL.string_of_node e.effect_read_node
-let string_of_write_effect e = CFL.string_of_node e.effect_write_node
-let string_of_lock_effect e = CFL.string_of_node e.lock_cfl_node
-*)
 
 (* dot-string. format in a way that's best for "dot" graph drawing *)
+let dotstring_of_inst i = CFL.string_of_inst i.inst_id
 let dotstring_of_lock lock = CFL.dotstring_of_node lock.lock_cfl_node
-let dotstring_of_rho rho = (CFL.dotstring_of_node rho.rho_cfl_node)
+let dotstring_of_rho rho = CFL.dotstring_of_node rho.rho_cfl_node
 let dotstring_of_lock_effect e = CFL.dotstring_of_node e.lock_cfl_node
 let dotstring_of_write_effect e = CFL.dotstring_of_node e.effect_write_node
 let dotstring_of_read_effect e = CFL.dotstring_of_node e.effect_read_node
 
 (* instantiation formatting. use string_of_inst if you just want the index *)
 let d_instantiation () (i: instantiation) : doc =
-  (if !do_canonical then
-    text (CFL.string_of_inst i.inst_id)
-  else
     text (if i.inst_is_pack then "pack " else (i.inst_fun_name^" "))
-  )
-  ++ (Cil.d_loc () i.inst_loc)
+      ++ Cil.d_loc () i.inst_loc
 
 (* lock *)
 let d_lock () lock =
-  if !do_canonical then text (
-    (if lock.lock_linear then "" else "non-linear-") ^
-    (if CFL.is_concrete lock.lock_cfl_node then "C" else "") ^
-    (List.fold_left
-      (fun c i -> c ^ (CFL.string_of_inst i.inst_id) ^ "/")
-      ""
-      lock.lock_path) ^
-    (CFL.dotstring_of_node lock.lock_cfl_node)
-  )
-  else
-    text (if lock.lock_linear then "" else "non linear ") ++
-    text (if CFL.is_concrete lock.lock_cfl_node then "concrete " else "") ++
-    (List.fold_left
-      (fun c i -> c ++ text " -> " ++ d_instantiation () i)
-      (d_label_name () lock.lock_label_name ++
-       text (CFL.string_of_node lock.lock_cfl_node))
-      lock.lock_path)
+  text (if lock.lock_linear then "" else "non linear ") ++
+  text (if CFL.is_concrete lock.lock_cfl_node then "concrete " else "") ++
+  (List.fold_left
+    (fun c i -> c ++ text " -> " ++ d_instantiation () i)
+    (d_label_name () lock.lock_label_name ++
+     text (CFL.string_of_node lock.lock_cfl_node))
+    lock.lock_path)
 
 
 (* lockSet formatting *)
 let d_lockset () (l: lockSet) : doc = 
   if LockSet.is_empty l then text "<empty>" else
-  align ++
-    LockSet.fold
+  let slist = LockSet.fold
+    (fun x d -> let s = sprint 80 (d_lock () x) in s::d)
+    l [] in
+  let slist = List.sort Pervasives.compare slist in
+  align ++ List.fold_left (fun d s -> d ++ (if d = nil then nil else line) ++ text s) nil slist ++
+    (*LockSet.fold
       (fun x d -> d ++ (if d <> nil then line else nil) ++ d_lock () x)
       l
       nil ++
+      *)
   unalign
 (*
   let locks = List.map (fun x -> string_of_lock x) (LockSet.elements l) in
@@ -294,20 +277,25 @@ let sort_rholist (l:rho list) =
 *)
 
 let d_rho () rho =
-  if !do_canonical
-  then (text (CFL.dotstring_of_node rho.rho_cfl_node))
-  else
-    dprintf "%a%s" d_label_name rho.rho_label_name
-      (CFL.string_of_node rho.rho_cfl_node)
+  dprintf "%a%s" d_label_name rho.rho_label_name
+    (if !debug then (CFL.dotstring_of_node rho.rho_cfl_node)
+    else (CFL.string_of_node rho.rho_cfl_node))
 
 (* rhoSet formatting *)
 let d_rhoset () (rs: rhoSet) : doc =
   if RhoSet.is_empty rs then text "<empty>" else
-  align ++
-    RhoSet.fold
+  let slist = RhoSet.fold
+    (fun x d ->
+      let t = sprint 80 (d_rho () x) in
+      t::d)
+    rs []
+  in
+  let slist = List.sort Pervasives.compare slist in
+  align ++ List.fold_left (fun d s -> d ++ (if d = nil then nil else line) ++ text s) nil slist ++
+    (*RhoSet.fold
       (fun x d -> d ++ (if d <> nil then line else nil) ++ d_rho () x)
       rs
-      nil ++
+      nil ++*)
   unalign
 
 (* effect formatting *)
@@ -316,8 +304,8 @@ let d_effect () (e: effect) : doc =
     text ((CFL.dotstring_of_node e.effect_read_node) ^ ",\n") ++
     text ((CFL.dotstring_of_node e.effect_write_node) ^ ",\n") ++
     text ((CFL.dotstring_of_node e.effect_share_node) ^ ",\n") ++
-    (*text ((CFL.dotstring_of_node e.effect_lock_node) ^ ")") ++*)
-    unalign
+    (*text ((CFL.dotstring_of_node e.effect_lock_node)) ++*)
+    unalign ++ text ")"
 
 (* effectSet formatting *)
 let d_effectset () (es: effectSet) : doc =
@@ -339,8 +327,8 @@ let done_adding_instantiations () : unit =
 (* create a simple CFL node. it's marked as concrete if concrete=true.
  * the new node is tagged by "name"
  *)
-let make_node (name: string) (concrete: bool) : node =
-  let n = CFL.make_node name concrete !Cil.currentLoc in
+let make_node (name: string) (concrete: bool) (tagged: bool) : node =
+  let n = CFL.make_node name concrete !Cil.currentLoc tagged in
   (*ignore(E.log "creating %s\n" (CFL.string_of_node n));*)
   n
 
@@ -379,9 +367,8 @@ let rho_no = ref 0
  *)
 let make_rho (n: label_name) (concrete: bool) : rho =
   incr rho_no;
-  (*let s = if !do_canonical then (s^(string_of_int !rho_no)) else s in*)
   let r = {
-    rho_cfl_node = make_node "" concrete;
+    rho_cfl_node = make_node "" concrete true;
     rho_label_name = n;
   } in
   if concrete then all_concrete_rho := RhoSet.add r !all_concrete_rho;
@@ -400,8 +387,8 @@ let unknown_rho : rho = make_rho (Const "unknown") false
 
 (* create a subtyping edge from r1 to r2 *)
 let rho_flows r1 r2 = begin
-  if Rho.compare r1 unknown_rho = 0 then ()
-  else if Rho.compare r2 unknown_rho = 0 then ()
+  if Rho.equal r1 unknown_rho then ()
+  else if Rho.equal r2 unknown_rho then ()
   else CFL.make_sub_edge r1.rho_cfl_node r2.rho_cfl_node
 end
 
@@ -409,7 +396,7 @@ end
  * is equivalent with two subtyping constraints
  *)
 let unify_rho (x: rho) (y: rho) : unit =
-  if x == y then ()
+  if Rho.equal x y then ()
   else begin
     rho_flows x y;
     rho_flows y x;
@@ -459,7 +446,7 @@ let lock_no = ref 0
 let make_lock (n: label_name) (concrete: bool) : lock = begin
   incr lock_no;
   let l = {
-    lock_cfl_node = make_node "" concrete;
+    lock_cfl_node = make_node "" concrete true;
     lock_label_name = n;
     lock_linear = true;
     lock_path = [];
@@ -469,19 +456,12 @@ let make_lock (n: label_name) (concrete: bool) : lock = begin
   l
 end
 
-let print_stats () : unit = begin
-  ignore(E.log "stats\n");
-  ignore(E.log "locks       :  %d\n" !lock_no);
-  ignore(E.log "locations   :  %d\n" !rho_no);
-  ignore(E.log "labels(all) :  %d\n" (CFL.total_nodes()));
-end
-
 (* unknown lock.  used to denote locks not visible in the current context *)
 let unknown_lock : lock = make_lock (Const "unknown") false
 
 let lock_flows l1 l2 = begin
-  if Lock.compare l1 unknown_lock = 0 then ()
-  else if Lock.compare l2 unknown_lock = 0 then ()
+  if Lock.equal l1 unknown_lock then ()
+  else if Lock.equal l2 unknown_lock then ()
   else CFL.make_sub_edge l1.lock_cfl_node l2.lock_cfl_node
 end
 
@@ -502,30 +482,29 @@ end
 
 (* unify two lock variables *)
 let unify_locks (l1: lock) (l2: lock) : unit =
-  if l1 == l2 then ()
+  if Lock.equal l1 l2 then ()
   else (
     CFL.make_sub_edge l1.lock_cfl_node l2.lock_cfl_node;
     CFL.make_sub_edge l2.lock_cfl_node l1.lock_cfl_node;
   )
 
-module CloneHT : Hashtbl.HashedType with type t = (lock * instantiation) =
+(* mark a lock as non-linear *)
+let set_nonlinear (l: lock) : unit =
+  l.lock_linear <- false
+
+let is_concrete_lock (l: lock) : bool =
+  CFL.is_concrete l.lock_cfl_node
+
+module CH = Hashtbl.Make(
   struct
     type t = (lock * instantiation)
     let equal (l1,i1 : t) (l2,i2 : t) : bool =
       (CFL.Node.compare l1.lock_cfl_node l2.lock_cfl_node = 0)
       && (i1.inst_id = i2.inst_id)
-    let hash (l,i : t) = CFL.hash l.lock_cfl_node + Hashtbl.hash (i.inst_id)
-  end
-module CH = Hashtbl.Make(CloneHT)
-
-(* mark a lock as non-linear *)
-let set_nonlinear (l: lock) : unit =
-  l.lock_linear <- false
+    let hash (l,i : t) = 2 * (CFL.hash l.lock_cfl_node) + Hashtbl.hash i.inst_id
+  end)
 
 let clone_map = CH.create 10
-
-let is_concrete_lock (l: lock) : bool =
-  CFL.is_concrete l.lock_cfl_node
 
 let clone_lock (l: lock) (i: instantiation) =
   assert(CFL.is_concrete l.lock_cfl_node);
@@ -542,7 +521,7 @@ let clone_lock (l: lock) (i: instantiation) =
     end
     else begin
       let ll = {
-        lock_cfl_node = make_node "" true;
+        lock_cfl_node = make_node "" true true;
         lock_label_name = l.lock_label_name;
         lock_linear = true;
         lock_path = i::l.lock_path;
@@ -550,10 +529,6 @@ let clone_lock (l: lock) (i: instantiation) =
       inst_lock l ll i;
       all_concrete_locks := LockSet.add ll !all_concrete_locks;
       NodeHT.add all_locks (ll.lock_cfl_node) ll;
-      (*
-      RH.clear rho_prev;
-      LH.clear lock_prev;
-      *)
       CH.add clone_map (l,i) ll;
       ll
     end
@@ -570,33 +545,53 @@ let is_global_rho (r: rho) : bool =
 
 (* effects *)
 
+let effect_no = ref 0
+
 let make_share_effect_node =
-  let dummye = make_node "Es_dummy" false in
+  incr effect_no;
+  let dummye = make_node "Es_dummy" false true in
   function (s:string) ->
-    if !flow_effect then
-      make_node ("Es_"^s) false
+    if !flow_effect then begin
+      incr effect_no;
+      make_node ("Es_"^s) false true
+    end
     else
       dummye
+
+let dummy_node = make_node "DUMMY" false true
 
 (* create an effect variable \varepsilon.  it captures the read and write
  * effects and the locks that are "touched".
  *)
-let make_effect (s: string) : effect =
+let make_effect (s: string) (tagged: bool) : effect = begin
+  incr effect_no;
+  incr effect_no;
+  let tag =
+    if !use_untagged then tagged else true in
   let e = {
-    effect_read_node = make_node ("Er_"^s) false;
-    effect_write_node = make_node ("Ew_"^s) false;
-    effect_share_node = make_share_effect_node s;
+    effect_read_node = if !no_effects then dummy_node else make_node ("Er_"^s) false tag;
+    effect_write_node = if !no_effects then dummy_node else make_node ("Ew_"^s) false tag;
+    effect_share_node = if !no_effects then dummy_node else make_share_effect_node s;
     (*effect_lock_node = make_node ("El_"^s) false;*)
   } in
   all_effects := e::!all_effects;
   e
+end
 
+(* empty effect.  used to type effect-less expressions. Bug will be raised
+ * if something is effected in it
+ *)
+let empty_effect : effect = make_effect "empty" false
+
+
+let chi_no = ref 0
 let all_chi = ref []
 let all_atomic_chi = ref []
 let make_chi (s: string) : chi =
+  incr chi_no;
   let e = {
-    chi_read_node = make_node ("Xr_"^s) false;
-    chi_write_node = make_node ("Xw_"^s) false;
+    chi_read_node = make_node ("Xr_"^s) false true;
+    chi_write_node = make_node ("Xw_"^s) false true;
   } in
   all_chi := e::!all_chi;
   e
@@ -616,10 +611,11 @@ let add_to_write_chi r x =
 let set_global_chi x =
   CFL.set_global x.chi_read_node;
   CFL.set_global x.chi_write_node
-let chi_flows x1 x2 = begin
-  CFL.make_sub_edge x1.chi_read_node x2.chi_read_node;
-  CFL.make_sub_edge x1.chi_write_node x2.chi_write_node;
-end
+let chi_flows x1 x2 : unit =
+  if x1 == x2 then () else begin
+    CFL.make_sub_edge x1.chi_read_node x2.chi_read_node;
+    CFL.make_sub_edge x1.chi_write_node x2.chi_write_node;
+  end
 
 let make_lock_effect () = make_lock (Const "lock effect") false
 
@@ -628,11 +624,6 @@ let inst_lock_effect labs linst polarity i = begin
   CFL.make_inst_edge labs.lock_cfl_node linst.lock_cfl_node polarity i.inst_id;
 end
 let lock_effect_flows = lock_flows
-
-(* empty effect.  used to type effect-less expressions. Bug will be raised
- * if something is effected in it
- *)
-let empty_effect : effect = make_effect "empty"
 
 (* marks global effect (e.g. effect of global function ptr),
  * unless e is in the set qs
@@ -650,13 +641,14 @@ let set_global_effect (e: effect) (qs: effectSet) : unit =
  * or: the solution of e2 includes e1.  Sharing effects are
  * standard.
  *)
-let effect_flows e1 e2 = begin
-  CFL.make_sub_edge (e1.effect_read_node) (e2.effect_read_node);
-  CFL.make_sub_edge (e1.effect_write_node) (e2.effect_write_node);
-  if !flow_effect then
-    CFL.make_sub_edge (e2.effect_share_node) (e1.effect_share_node);
-  (*CFL.make_sub_edge (e1.effect_lock_node) (e2.effect_lock_node);*)
-end
+let effect_flows e1 e2 = 
+  if Effect.compare e1 e2 = 0 then () else begin
+    CFL.make_sub_edge (e1.effect_read_node) (e2.effect_read_node);
+    CFL.make_sub_edge (e1.effect_write_node) (e2.effect_write_node);
+    if !flow_effect then
+      CFL.make_sub_edge (e2.effect_share_node) (e1.effect_share_node);
+    (*CFL.make_sub_edge (e1.effect_lock_node) (e2.effect_lock_node);*)
+  end
 
 (* instantiation effect eabs to einst with polarity "polarity" at
  * instantiation site i
@@ -671,7 +663,7 @@ end
 
 (* create an "effect-membership" edge: loc is read in ef *)
 let add_to_read_effect (loc: rho) (ef: effect) : unit =
-  if ef == empty_effect
+  if Effect.compare ef empty_effect = 0
   then ();
     (*raise (LabelFlowBug "cannot add variables to the empty effect");*)
   (* UPDATE: reading in the empty effect is ok.  we need it *)
@@ -680,14 +672,14 @@ let add_to_read_effect (loc: rho) (ef: effect) : unit =
 
 (* create an "effect-membership" edge: loc is written in ef *)
 let add_to_write_effect (loc: rho) (ef: effect) : unit =
-  if ef == empty_effect
+  if Effect.compare ef empty_effect = 0
   then raise (LabelFlowBug "cannot add variables to the empty effect");
   if Rho.compare loc unknown_rho = 0 then ()
   else CFL.make_sub_edge loc.rho_cfl_node ef.effect_write_node
 
 (* create an "effect-membership" edge: loc is written in ef *)
 let add_to_share_effect (loc: rho) (ef: effect) : unit =
-  if ef == empty_effect
+  if Effect.compare ef empty_effect = 0
   then raise (LabelFlowBug "cannot add variables to the empty sharing effect");
   if Rho.compare loc unknown_rho = 0 then ()
   else CFL.make_sub_edge loc.rho_cfl_node ef.effect_share_node
@@ -707,9 +699,9 @@ end
  * this works backwards, the result flows to both inputs
  *)
 let join_effects (e1: effect) (e2: effect) : effect =
-  if e1 == e2 then e1
+  if Effect.compare e1 e2 = 0 then e1
   else begin
-    let eff = make_effect "join" in
+    let eff = make_effect "join" false in
     effect_flows eff e1;
     effect_flows eff e2;
     eff
@@ -717,7 +709,7 @@ let join_effects (e1: effect) (e2: effect) : effect =
 
 (* unify two effect variables *)
 let unify_effects (e1: effect) (e2: effect) : unit =
-  if e1 == e2 then ()
+  if Effect.compare e1 e2 = 0 then ()
   else begin
     effect_flows e2 e1;
     effect_flows e1 e2;
@@ -1053,5 +1045,31 @@ let random_colorstr () : string =
 *)
 
 let print_graph (outf: out_channel) : unit = begin
-  CFL.print_graph outf;
+  let ns = CFL.print_graph outf in
+  CFL.NodeSet.iter
+    (fun n ->
+      try
+        let rho = NodeHT.find all_rho n in
+        Printf.fprintf outf "\"%s\" [label=\"%s\\n%s\"]\n"
+          (CFL.dotstring_of_node rho.rho_cfl_node)
+          (string_of_label_name rho.rho_label_name)
+          (CFL.dotstring_of_node rho.rho_cfl_node)
+      with Not_found -> ())
+    ns;
+  CFL.NodeSet.iter
+    (fun n ->
+      try
+        let lock = NodeHT.find all_locks n in
+        Printf.fprintf outf "\"%s\" [label=\"%s\\n%s\"]\n"
+          (CFL.dotstring_of_node lock.lock_cfl_node)
+          (string_of_label_name lock.lock_label_name)
+          (CFL.dotstring_of_node lock.lock_cfl_node)
+      with Not_found -> ())
+    ns;
 end
+
+let get_stats () : string = begin
+  (* locks, locations, effects, chi, total *)
+  Printf.sprintf "%d %d %d %d %d" !lock_no !rho_no (!effect_no) (!chi_no * 2) (CFL.total_nodes())
+end
+

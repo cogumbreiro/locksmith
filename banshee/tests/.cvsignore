@@ -1,8 +1,0 @@
-*.out
-tmpfile
-.gdb_history
-*.gmon
-data
-offsets
-extras
-statics

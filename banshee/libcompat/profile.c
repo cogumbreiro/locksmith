@@ -78,7 +78,7 @@ void pfail(const char *s)
  *                                                                        *
  **************************************************************************/
 
-static int registered_exit = 0;
+static int registered_exit = 1;//0;
 
 static ainfo find_ainfo(char *file, int line, region r)
 {
@@ -121,7 +121,7 @@ static ainfo find_ainfo(char *file, int line, region r)
  *                                                                        *
  **************************************************************************/
 
-#define REGION_PROFILE_DEPTH 3
+#define REGION_PROFILE_DEPTH 0
 #undef TRACE_STACK
 #if defined(__GNUC__) && REGION_PROFILE_DEPTH > 1
 #define TRACE_STACK
@@ -409,6 +409,17 @@ static int finfo_cmp(const void *a, const void *b)
   finfo *afi = (finfo *) a;
   finfo *bfi = (finfo *) b;
   return (*afi)->size - (*bfi)->size;  /* Reverse order */
+}
+
+long region_profile_total_mem(void) {
+  long size = 0;
+  ainfo ai;
+
+  for (ai = ainfos; ai; ai = ai->next) {
+    size += ai->size;
+  }
+  //fprintf(stderr, "returning %lu\n", size); fflush(stderr);
+  return size;
 }
 
 static void print_finfos(void)

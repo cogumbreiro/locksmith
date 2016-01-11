@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -59,11 +59,11 @@ type lockSet = LockSet.t
 type effectSet = EffectSet.t
 
 (*module Rhomap : Map.S with type key = rho*)
-module LH : Hashtbl.S with type key = lock
-module RH : Hashtbl.S with type key = rho
-module RhoHT : Hashtbl.HashedType with type t = rho
-module InstHT : Hashtbl.HashedType with type t = instantiation
-module IH : Hashtbl.S with type key = instantiation
+module LockHT : Hashtbl.S with type key = lock
+module RhoHT : Hashtbl.S with type key = rho
+module Rho : Hashtbl.HashedType with type t = rho
+module Inst : Hashtbl.HashedType with type t = instantiation
+module InstHT : Hashtbl.S with type key = instantiation
 
 (*********************
  * graph construction
@@ -86,7 +86,7 @@ val done_adding_instantiations : unit -> unit
 val make_instantiation : bool -> string -> instantiation
 
 (* graph construction statistics *)
-val print_stats : unit -> unit
+val get_stats: unit -> string
 
 (* rhos *)
 
@@ -178,7 +178,7 @@ val add_to_write_chi : rho -> chi -> unit
 (* create an effect variable \varepsilon.  it captures the read and write
  * effects and the locks that are "touched".
  *)
-val make_effect : string -> effect
+val make_effect : string -> bool(* set to true to use tagged node *) -> effect
 val make_lock_effect : unit -> lock_effect
 val inst_lock_effect : lock_effect -> lock_effect -> bool -> instantiation -> unit
 val lock_effect_flows : lock_effect -> lock_effect -> unit
@@ -236,8 +236,8 @@ val is_global_lock : lock -> bool
 
 val is_global_rho : rho -> bool
 
-val lock_equal : lock -> lock -> bool
-val rho_equal : rho -> rho -> bool
+(*val lock_equal : lock -> lock -> bool*)
+(*val rho_equal : rho -> rho -> bool*)
 val inst_equal : instantiation -> instantiation -> bool
 
 (* return a set of locks that the argument might point to *)

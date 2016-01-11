@@ -1,8 +1,0 @@
-- pool.c and state.c seem to have two problems
-  - .data is not reported as shared, even though
-    it aliases .cur, which is shared
-  - the local object lock is not considered non-linear
-
-- forkloop2.c is imprecise
-  - we should be able to get rid of this race, assuming
-    we add liveness to the uniqueness results.

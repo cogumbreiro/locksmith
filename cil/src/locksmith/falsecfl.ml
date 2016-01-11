@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -37,28 +37,35 @@
 type node = int
 type instantiation = int
 
-module Node : Set.OrderedType with type t = node =
+module Node =
   struct
     type t = node
     let compare = (-)
+    let equal = (=)
+    let hash i = i
   end
+module NodeSet = Set.Make(Node)
+module NodeHT = Hashtbl.Make(Node)
+
+let options = []
 let next_id = ref 1
-let make_node a b c =
+let make_node a b c d =
   let r = !next_id in incr next_id; r
 let string_of_node node = "a"
 let dotstring_of_node node = "a"
 let fresh_inst () = 1
-let make_open_edge node1 node2 instantiation = ()
-let make_close_edge node1 node2 instantiation = ()
+let make_inst_edge node1 node2 polarity instantiation = ()
 let make_sub_edge node node = ()
 let set_global node = ()
 let is_global node = true
 let reaches node1 node2 = true
-let reachesm node1 node2 = true
-let print_s_edges out_channel = ()
-let print_edges out_channel = ()
+let reaches_m node1 node2 = true
+let print_graph out_channel = NodeSet.empty
 let hash node = 1
 let is_concrete node = true
 let doFullCFL () = ()
 let string_of_inst instantiation = "i"
 let total_nodes () = 1
+let get_all_that_reach_m _ _ _ b = b
+let get_all_that_reach_pn _ _ _ b = b
+let done_adding () = ()

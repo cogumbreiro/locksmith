@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -78,7 +78,7 @@ let lexer = Genlex.make_lexer [
 ]
 
 
-module Strmap = Map.Make(String)
+module Strmap = Lockdefs.Strmap
 open Genlex
 
 let lock_type_names : string list ref = ref ["spinlock_t"; "pthread_mutex_t"; "sem_t"]

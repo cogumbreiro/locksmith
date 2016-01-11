@@ -1,10 +1,23 @@
-
 ************************* STARTING *************************
 
 functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
   printf
 shared: &shared:simple1.c:4
 &shared:simple1.c:4 is protected by:
-  lock:simple1.c:3
   concrete lock:simple1.c:17
+  lock:simple1.c:3
 *************************** DONE ***************************

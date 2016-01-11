@@ -5,8 +5,10 @@ The CIL software is Copyright (c) 2001-2004,
  Ben Liblit          <liblit@cs.berkeley.edu>
 All rights reserved.
 
-The LockSmith Race Detection module is Copyright (c) 2004-2005
+The LockSmith Race Detection modules are Copyright (c) 2004-2007
  Polyvios Pratikakis <polyvios@cs.umd.edu>
+ Jeffrey Foster <jfoster@cs.umd.edu>
+ Michael Hicks <mwh@cs.umd.edu>
  The University of Maryland
 All rights reserved.
 

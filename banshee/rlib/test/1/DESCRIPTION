@@ -1,1 +1,0 @@
-This test allocates a linked list of pairs.  The list is long enough to require a region with multiple pages.

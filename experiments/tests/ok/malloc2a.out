@@ -1,42 +1,55 @@
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: alloc:malloc2a.c:13
 
 Warning: Possible data race: alloc:malloc2a.c:13 is not protected!
  references:
   dereference at malloc2a.c:9
     locations possibly dereferenced: 
-      i:malloc2a.c:13
-      tmp::-1
       *a:malloc2a.c:14
       *tmp___0::-1
       alloc:malloc2a.c:13
+      i:malloc2a.c:13
+      tmp::-1
     locks acquired at dereference: 
       <empty>
     in: FORK at malloc2a.c:16 -> dostuff malloc2a.c:16
 
-  dereference at malloc2a.c:17
-    locations possibly dereferenced: 
-      i:malloc2a.c:13
-      tmp::-1
-      *a:malloc2a.c:14
-      *tmp___0::-1
-      alloc:malloc2a.c:13
-    locks acquired at dereference: 
-      <empty>
-    in: main at malloc2a.c:18
-
   dereference at malloc2a.c:9
     locations possibly dereferenced: 
-      i:malloc2a.c:13
-      tmp::-1
       *a:malloc2a.c:14
       *tmp___0::-1
       alloc:malloc2a.c:13
+      i:malloc2a.c:13
+      tmp::-1
     locks acquired at dereference: 
       <empty>
-    in: main at malloc2a.c:18 -> dostuff malloc2a.c:16
+    in: main at malloc2a.c:12 -> dostuff malloc2a.c:16
+
+  dereference at malloc2a.c:17
+    locations possibly dereferenced: 
+      *a:malloc2a.c:14
+      *tmp___0::-1
+      alloc:malloc2a.c:13
+      i:malloc2a.c:13
+      tmp::-1
+    locks acquired at dereference: 
+      <empty>
+    in: main at malloc2a.c:12
 
 *************************** DONE ***************************
-
-

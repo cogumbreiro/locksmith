@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -34,25 +34,67 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *)
-external print_memusage : unit -> unit = "print_usage"
+external get_mem_usage: unit -> int = "get_usage"
+external get_mem_usage2: unit -> int = "get_usage2"
+external get_banshee_mem: unit -> int = "get_profile_mem"
 module E = Errormsg
 
+let print_mem_usage = ref false
+let save_mem_usage = ref false
+let mem_usage_file = ref stdout
+let stop_after = ref ""
+
+let options = [
+      "--profile-locksmith",
+         Arg.Set(print_mem_usage),
+         "Print time and memory usage for each phase.";
+
+      "--save-profile-data",
+         Arg.String(fun s ->
+           save_mem_usage := true;
+           mem_usage_file := open_out s),
+         "Takes 1 argument (filename). Write profiling information to the specified file.";
+
+      "--stop-after",
+         Arg.String(fun s -> stop_after := s),
+         "Stop after the given phase."
+]
+
 type t = float
-type timerange = float
 
-let starttime () : t =
-  Sys.time ()
+let get_mem_info () : string = begin
+    let s: Gc.stat = Gc.stat () in
+    let ocamlmem = (s.Gc.live_words * 4) / 1048576 in
+    let kernelmem = (get_mem_usage ()) / 1048576 in
+    (*let kernelmem2 = (get_mem_usage2 ()) / 1048576 in*)
+    let bansheemem = (get_banshee_mem ()) / 1048576 in
+    Printf.sprintf "%s %d %d %d"
+      (Labelflow.get_stats ()) kernelmem (*kernelmem2*) bansheemem ocamlmem
+end
 
-let endtime (s: t) : timerange =
-  (Sys.time()) -. s
+let starttime = Sys.time ()
+let endtimes = ref [] (*("cil-start", starttime, get_mem_info ())*)
 
-let to_string (r: timerange ) : string =
-  (string_of_float r) ^ "sec"
+let string_of_time (r: float) : string =
+  let t = int_of_float (r *. 100.0) in
+  let point = t mod 100 in
+  let t = t / 100 in
+  let s = t mod 60 in
+  let m = (t mod 3600) / 60 in
+  let h = t / 3600 in
+  Printf.sprintf "%02d:%02d:%02d.%02d" h m s point
 
-let print_mem_info () : unit = begin
-  print_memusage ();
-  let s: Gc.stat = Gc.stat () in
-  ignore(E.log "/%d words" s.Gc.heap_words);
+let endtime (phase: string) : unit = begin
+  let mem =  get_mem_info () in
+  let t = Sys.time () in
+  endtimes := (phase, t, mem)::!endtimes;
+  if !print_mem_usage then
+    ignore(E.log "profile-data(%s) %s %s\n" phase (string_of_time t) mem);
+  if !save_mem_usage then begin
+    Printf.fprintf !mem_usage_file "%s %s %f %s\n" phase (string_of_time t) t mem;
+    flush !mem_usage_file;
+  end;
+  if !stop_after = phase then exit 0;
 end
 
 let last_timestamp = ref 0
@@ -70,3 +112,14 @@ let timestamp () =
     last_timestamp := t;
     "(" ^ (abs_time_to_string t) ^ " [+" ^ (abs_time_to_string d) ^ "])"
   end
+
+let print_stats () : unit = begin
+  if !save_mem_usage then begin
+    let outf = !mem_usage_file in
+    (*List.iter (fun (s,t,mem) ->
+      Printf.fprintf outf "%s %s %f %s\n" s (string_of_time t) t mem;
+    ) (List.rev !endtimes);*)
+    close_out outf;
+    mem_usage_file := stdout;
+  end
+end

@@ -1,5 +1,20 @@
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: &j:function-pointer1.c:4
 
 Warning: Possible data race: &j:function-pointer1.c:4 is not protected!
@@ -11,20 +26,18 @@ Warning: Possible data race: &j:function-pointer1.c:4 is not protected!
       <empty>
     in: FORK at function-pointer1.c:32 -> dostuff function-pointer1.c:32
 
-  dereference at function-pointer1.c:33
-    locations possibly dereferenced: 
-      &j:function-pointer1.c:4
-    locks acquired at dereference: 
-      <empty>
-    in: main at function-pointer1.c:34
-
   dereference at function-pointer1.c:23
     locations possibly dereferenced: 
       &j:function-pointer1.c:4
     locks acquired at dereference: 
       <empty>
-    in: main at function-pointer1.c:34 -> dostuff function-pointer1.c:32
+    in: main at function-pointer1.c:27 -> dostuff function-pointer1.c:32
+
+  dereference at function-pointer1.c:33
+    locations possibly dereferenced: 
+      &j:function-pointer1.c:4
+    locks acquired at dereference: 
+      <empty>
+    in: main at function-pointer1.c:27
 
 *************************** DONE ***************************
-
-

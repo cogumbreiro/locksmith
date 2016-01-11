@@ -4,6 +4,21 @@
 effects.c:15: Warning: subtyping incompatible types:
 int
 (void)
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: &i:effects.c:21
 
 Warning: Possible data race: &i:effects.c:21 is not protected!
@@ -16,21 +31,19 @@ Warning: Possible data race: &i:effects.c:21 is not protected!
       <empty>
     in: FORK at effects.c:23 -> dostuff effects.c:23
 
-  dereference at effects.c:24
-    locations possibly dereferenced: 
-      &i:effects.c:21
-    locks acquired at dereference: 
-      <empty>
-    in: main at effects.c:25
-
   dereference at effects.c:15
     locations possibly dereferenced: 
       &i:effects.c:21
       dostuff.a:effects.c:23
     locks acquired at dereference: 
       <empty>
-    in: main at effects.c:25 -> dostuff effects.c:23
+    in: main at effects.c:19 -> dostuff effects.c:23
+
+  dereference at effects.c:24
+    locations possibly dereferenced: 
+      &i:effects.c:21
+    locks acquired at dereference: 
+      <empty>
+    in: main at effects.c:19
 
 *************************** DONE ***************************
-
-

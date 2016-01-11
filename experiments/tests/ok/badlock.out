@@ -1,44 +1,56 @@
-
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: &shared:badlock.c:6
 
 Warning: Possible data race: &shared:badlock.c:6 is protected by non-linear or concrete lock(s):
   lock:badlock.c:5
-  non linear concrete lock:badlock.c:16
-  non linear concrete lock::-1 -> doit badlock.c:23
   non linear concrete lock::-1 -> doit badlock.c:22
+  non linear concrete lock::-1 -> doit badlock.c:23
+  non linear concrete lock:badlock.c:16
  references:
   dereference at badlock.c:10
     locations possibly dereferenced: 
       &shared:badlock.c:6
     locks acquired at dereference: 
       lock:badlock.c:5
-      non linear concrete lock:badlock.c:16
-      non linear concrete lock::-1 -> doit badlock.c:23
       non linear concrete lock::-1 -> doit badlock.c:22
-    in: main at badlock.c:24 -> doit badlock.c:23 -> run badlock.c:17
+      non linear concrete lock::-1 -> doit badlock.c:23
+      non linear concrete lock:badlock.c:16
+    in: main at badlock.c:20 -> doit badlock.c:23 -> run badlock.c:17
 
   dereference at badlock.c:10
     locations possibly dereferenced: 
       &shared:badlock.c:6
     locks acquired at dereference: 
       lock:badlock.c:5
-      non linear concrete lock:badlock.c:16
-      non linear concrete lock::-1 -> doit badlock.c:23
       non linear concrete lock::-1 -> doit badlock.c:22
-    in: main at badlock.c:24 -> doit badlock.c:22 -> run badlock.c:17
+      non linear concrete lock::-1 -> doit badlock.c:23
+      non linear concrete lock:badlock.c:16
+    in: main at badlock.c:20 -> doit badlock.c:22 -> run badlock.c:17
 
   dereference at badlock.c:10
     locations possibly dereferenced: 
       &shared:badlock.c:6
     locks acquired at dereference: 
       lock:badlock.c:5
-      non linear concrete lock:badlock.c:16
-      non linear concrete lock::-1 -> doit badlock.c:23
       non linear concrete lock::-1 -> doit badlock.c:22
+      non linear concrete lock::-1 -> doit badlock.c:23
+      non linear concrete lock:badlock.c:16
     in: FORK at badlock.c:17 -> run badlock.c:17
 
 *************************** DONE ***************************
-
-

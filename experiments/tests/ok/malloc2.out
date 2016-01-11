@@ -1,5 +1,20 @@
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: alloc:malloc2.c:16
         alloc:malloc2.c:17
 
@@ -7,39 +22,39 @@ Warning: Possible data race: alloc:malloc2.c:16 is not protected!
  references:
   dereference at malloc2.c:9
     locations possibly dereferenced: 
-      i:malloc2.c:16
-      tmp::-1
       *a:malloc2.c:17
+      *id.a:malloc2.c:20
       *tmp___0::-1
       alloc:malloc2.c:16
-      *id.a:malloc2.c:20
+      i:malloc2.c:16
+      tmp::-1
     locks acquired at dereference: 
       <empty>
     in: FORK at malloc2.c:19 -> dostuff malloc2.c:19
 
   dereference at malloc2.c:9
     locations possibly dereferenced: 
-      i:malloc2.c:16
-      tmp::-1
       *a:malloc2.c:17
+      *id.a:malloc2.c:20
       *tmp___0::-1
       alloc:malloc2.c:16
-      *id.a:malloc2.c:20
+      i:malloc2.c:16
+      tmp::-1
     locks acquired at dereference: 
       <empty>
-    in: main at malloc2.c:21 -> dostuff malloc2.c:19
+    in: main at malloc2.c:15 -> dostuff malloc2.c:19
 
   dereference at malloc2.c:13
     locations possibly dereferenced: 
-      i:malloc2.c:16
-      tmp::-1
       *a:malloc2.c:17
+      *id.a:malloc2.c:20
       *tmp___0::-1
       alloc:malloc2.c:16
-      *id.a:malloc2.c:20
+      i:malloc2.c:16
+      tmp::-1
     locks acquired at dereference: 
       <empty>
-    in: main at malloc2.c:21 -> id malloc2.c:20
+    in: main at malloc2.c:15 -> id malloc2.c:20
 
 
 Warning: Possible data race: alloc:malloc2.c:17 is not protected!
@@ -47,9 +62,9 @@ Warning: Possible data race: alloc:malloc2.c:17 is not protected!
   dereference at malloc2.c:9
     locations possibly dereferenced: 
       a:malloc2.c:17
-      tmp___0::-1
       alloc:malloc2.c:17
       dostuff.a:malloc2.c:19
+      tmp___0::-1
     locks acquired at dereference: 
       <empty>
     in: FORK at malloc2.c:19 -> dostuff malloc2.c:19
@@ -57,24 +72,22 @@ Warning: Possible data race: alloc:malloc2.c:17 is not protected!
   dereference at malloc2.c:9
     locations possibly dereferenced: 
       a:malloc2.c:17
-      tmp___0::-1
       alloc:malloc2.c:17
       dostuff.a:malloc2.c:19
+      tmp___0::-1
     locks acquired at dereference: 
       <empty>
-    in: main at malloc2.c:21 -> dostuff malloc2.c:19
+    in: main at malloc2.c:15 -> dostuff malloc2.c:19
 
   dereference at malloc2.c:13
     locations possibly dereferenced: 
       a:malloc2.c:17
-      tmp___0::-1
       alloc:malloc2.c:17
       dostuff.a:malloc2.c:19
       id.a:malloc2.c:20
+      tmp___0::-1
     locks acquired at dereference: 
       <empty>
-    in: main at malloc2.c:21 -> id malloc2.c:20
+    in: main at malloc2.c:15 -> id malloc2.c:20
 
 *************************** DONE ***************************
-
-

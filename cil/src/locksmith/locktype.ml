@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -41,19 +41,8 @@ module Lprof = Lockprofile
 module Uniq = Uniqueness
 module LV = Livevars
 module LN = Labelname
-
-module StrH = Hashtbl.Make(
-  struct
-    type t = string
-    let equal s1 s2 = s1=s2
-    let hash s =
-      let len = String.length s in
-      let loop (h:int) (i:int) =
-        if i = len then h
-        else h*33 + (int_of_char (s.[i])) in
-      loop 5381 0
-        (* Hash function djb2 from http://www.cs.yorku.ca/~oz/hash.html *)
-  end)
+module CG = Callgraph
+module LF = Labelflow
 
 open Cil
 open Printf
@@ -68,8 +57,11 @@ open Locksettings
 module S = Semiunification
 
 module CF = Controlflow
+open Controlflow
+(*
 type phi = CF.phi
 module PhiSet = CF.PhiSet
+*)
 type phiSet = PhiSet.t
 
 let string_of_doc d = Pretty.sprint 800 d
@@ -85,18 +77,21 @@ let string_of_exp e = string_of_doc (d_exp () e)
 (* wrappers *)
 let join_phi (p1: phi) (p2: phi) (k: phi_kind) : phi =
   if p1 == p2 then p1 else begin
-    let p = CF.join_phi p1 p2 in
+    let p = join_phi p1 p2 in
     set_phi_kind p k;
     p
   end
 
 let make_phi (s: string) (k: phi_kind) : phi =
-  let p = CF.make_phi s in
+  let p = make_phi s in
   set_phi_kind p k;
   p
 
 (* user interface *)
 let debug = ref false
+let debug_void = ref false
+let debug_one_effect = ref false
+
 let do_void_conflate = ref false
 let do_void_single = ref false
 let do_uniq = ref true
@@ -104,6 +99,8 @@ let do_existentials = ref true
 let do_down = ref true
 let do_ignore_casts = ref true
 let do_compact_structs = ref false
+let do_one_effect = ref true
+let do_context_insensitive = ref false
 
 let options = [
   "--debug-typing",
@@ -118,6 +115,10 @@ let options = [
      Arg.Set(do_void_single),
      "Conflate at void* casts for more than 1 types";
 
+  "--debug-void",
+     Arg.Set(debug_void),
+     "Print debugging status information about void* and struct-field computation";
+
   "--no-uniqueness",
      Arg.Clear(do_uniq),
      "Don't use uniqueness analysis";
@@ -130,10 +131,21 @@ let options = [
      Arg.Clear(do_down),
      "Don't apply [down] (loop bodies for alloc effects, and forks for cont. effects)";
 
-  "--dont-ignore-casts",
+  "--no-ignore-casts",
      Arg.Clear(do_ignore_casts),
      "Create subtyping constraints for each cast, rather than ignoring them";
+  
+  "--no-use-one-effect",
+     Arg.Clear(do_one_effect),
+     "Don't use only one effect variable for the whole body of non-forking functions";
 
+  "--debug-one-effect",
+     Arg.Set(debug_one_effect),
+     "Use only one effect variable for the whole body of non-forking functions";
+
+  "--context-insensitive",
+     Arg.Set(do_context_insensitive),
+     "Use normal flow for rhos instead of instantiation";
 (*
   "--compact-structs",
      Arg.Set(do_compact_structs),
@@ -143,12 +155,46 @@ let options = [
 
 exception TypingBug of string
 
-let currentFunction = ref Cil.dummyFunDec
-let current_chi = ref (make_chi "X")
-let pragmaKeyword = "existential"
+let current_function : fundec ref = ref Cil.dummyFunDec
+let current_chi: chi ref = ref (make_chi "X")
+let pragmaKeyword : string = "existential"
 
+(*****************************************************************************)
+(* THIS IS VERY UGLY AND SHOULD GO AWAY:
+ * Override to do nothing when lockpick isn't enabled.
+ * It saves some chi labels from getting into banshee when not necessary... *)
+let make_chi, chi_flows, set_atomic_chi, add_to_read_chi, add_to_write_chi,
+    set_global_chi, inst_chi =
+  if !Lockpick.do_lockpick then
+    make_chi, chi_flows, set_atomic_chi, add_to_read_chi, add_to_write_chi,
+    set_global_chi, inst_chi
+  else
+    let f1 _ = () in
+    let f2 _ _ = () in
+    let f4 _ _ _ _ = () in
+    (fun _ -> !current_chi), f2, f1, f2, f2, f1, f4
 
-let typenames : (string, Cil.typ) Hashtbl.t = Hashtbl.create 100
+let forced_effect: effect option ref = ref None
+let force_effect (e: effect) : unit = begin
+  assert (!forced_effect = None);
+  forced_effect := Some e;
+end
+let unforce_effect () : unit = begin
+  assert (!forced_effect <> None);
+  forced_effect := None;
+end
+let make_effect x t =
+  if Util.isSome !forced_effect
+  then Util.getSome !forced_effect
+  else LF.make_effect x t
+
+let d_instantiation () i =
+  LF.d_instantiation () i ++
+    (if !debug then dprintf "(%s)" (dotstring_of_inst i) else nil)
+(*****************************************************************************)
+
+let functions_that_call_fork : (string, unit) Hashtbl.t = Hashtbl.create 117
+let typenames : (string, Cil.typ) Hashtbl.t = Hashtbl.create 117
 let locktypes : Cil.typ list ref = ref []
 let locktypesigs : Cil.typsig list ref = ref []
 
@@ -201,8 +247,6 @@ type tau_t =
   | ITLock of lock
 
   (* universal type.  can safely assume tau is a ITFun type.
-     the three last lists are the "globals" that should be
-     self-looped upon every instantiation.
    *)
   | ITAbs of tau ref
 
@@ -212,8 +256,8 @@ and tau = {
   t: tau_t;    (* the actual type structure *)
   ts: tau_sig; (* summary used as a hash *)
   tid: int;    (* unique identifier used to compare in O(1) *)
-  tau_free_rho: rho option;
-  tau_free_lock: lock option;
+  tau_free_rho: rho option;  (* obsolete, used to lazily compute the free labels of a type *)
+  tau_free_lock: lock option; (* obsolete, ditto *)
 }
 
   (* existential types. tau usually is a ITComp, but so far I think
@@ -242,7 +286,7 @@ and fdinfo = {
   fd_chi: chi;
 }
 
-and field_set = (rho * tau) StrH.t
+and field_set = (rho * tau) StrHT.t
 
 and compdata = {
   cinfo_id: int;
@@ -261,8 +305,8 @@ and compdata = {
 
   mutable cinfo_known: (tau_sig * tau) list;
   mutable cinfo_alloc: Cil.location list;
-  mutable cinfo_inst_in_edges: cinfo IH.t;
-  mutable cinfo_inst_out_edges: cinfo IH.t;
+  mutable cinfo_inst_in_edges: cinfo InstHT.t;
+  mutable cinfo_inst_out_edges: cinfo InstHT.t;
 }
 
 and voiddata_t =
@@ -277,8 +321,8 @@ and voiddata = {
     mutable vinfo_loc: Cil.location;
     mutable vinfo_known: (tau_sig * tau) list;
     mutable vinfo_alloc: Cil.location list;
-    mutable vinfo_inst_in_edges: vinfo IH.t;
-    mutable vinfo_inst_out_edges: vinfo IH.t;
+    mutable vinfo_inst_in_edges: vinfo InstHT.t;
+    mutable vinfo_inst_out_edges: vinfo InstHT.t;
 
     mutable vinfo_types: voiddata_t;  (* types this void stands for *)
 }
@@ -357,7 +401,7 @@ module CinfoInst : Hashtbl.HashedType with type t = (cinfo*instantiation) =
   struct
     type t = cinfo*instantiation
     let equal (c1,i1) (c2,i2) =
-      (U.deref c1).cinfo_id = (U.deref c2).cinfo_id && (InstHT.equal i1 i2)
+      (U.deref c1).cinfo_id = (U.deref c2).cinfo_id && (Inst.equal i1 i2)
     let hash (t,i) = (U.deref t).cinfo_id
   end
 module CinfoInstHash = Hashtbl.Make(CinfoInst)
@@ -366,7 +410,7 @@ module VinfoInst : Hashtbl.HashedType with type t = (vinfo*instantiation) =
   struct
     type t = vinfo*instantiation
     let equal (c1,i1) (c2,i2) =
-      (U.deref c1).vinfo_id = (U.deref c2).vinfo_id && (InstHT.equal i1 i2)
+      (U.deref c1).vinfo_id = (U.deref c2).vinfo_id && (Inst.equal i1 i2)
     let hash (t,i) = (U.deref t).vinfo_id
   end
 module VinfoInstHash = Hashtbl.Make(VinfoInst)
@@ -481,7 +525,7 @@ let fill_thread_local (env: env) : unit = begin
             match !t.t with
             | ITComp ci ->
                 let c = U.deref ci in
-                StrH.fold
+                StrHT.fold
                   (fun fn (r,t) rs -> RhoSet.add r rs)
                   c.cinfo_fields
                   RhoSet.empty
@@ -498,7 +542,7 @@ let fill_thread_local (env: env) : unit = begin
         | ITLock _ -> RhoSet.empty
         | ITComp ci ->
             let c = U.deref ci in
-            StrH.fold
+            StrHT.fold
               (fun fn (r,t) rs -> RhoSet.add r rs)
               c.cinfo_fields
               RhoSet.empty
@@ -606,7 +650,11 @@ let done_typing () =
 (*****************************************************************************)
 (* pretty-printing *)
 
-let string_of_cinfo (c: cinfo) = (U.deref c).compinfo.cname
+let string_of_cinfo (c: cinfo) =
+  (U.deref c).compinfo.cname ^
+  (if !debug_void then 
+    "#" ^ string_of_int (U.deref c).cinfo_id
+  else "") 
 
 let rec d_sig () (ts: tau_sig) : doc =
   match ts with
@@ -649,23 +697,22 @@ let rec d_short_tau () (t: tau) : doc =
   | ITExists ei -> text "exists " ++ d_short_tau () ei.exist_tau
 
 let field_set_to_fieldlist (f: field_set) =
-    let l = StrH.fold (fun fld v a -> (fld,v)::a) f [] in
+    let l = StrHT.fold (fun fld v a -> (fld,v)::a) f [] in
     List.sort (fun (f1, _) (f2, _) -> (String.compare f1 f2)) l
 
 let rec d_arglist (al: (string * tau) list) (known: TauSet.t) : doc =
   match al with
     [] -> nil
-  | (n,h)::[] -> text n ++ d_tau_r h known
-  | (n,h)::tl -> text n ++ d_tau_r h known ++ text ",\n" ++ d_arglist tl known
+  | (n,h)::[] -> text (n^": ") ++ d_tau_r h known
+  | (n,h)::tl -> text (n^": ") ++ d_tau_r h known ++ text ",\n" ++ d_arglist tl known
 
 and d_fieldlist (fl: (string * (rho * tau)) list) (known: TauSet.t) : doc =
   match fl with
     [] -> nil
   | (n, (r,t))::[] ->
-      line ++ align ++ dprintf "  <%a> %s: " d_rho r n ++ line ++ text "  " ++ unalign
+      dprintf "  <%a> %s: " d_rho r n ++ d_tau_r t known ++ line
   | (n, (r,t))::tl ->
-      line ++ align ++ dprintf "  <%a> %s: " d_rho r n ++ line ++ text "  " ++ line ++
-      unalign ++ d_fieldlist tl known
+      dprintf "  <%a> %s: " d_rho r n ++ d_tau_r t known ++ line ++ d_fieldlist tl known
 (*
   | (n, (r,t))::[] ->
       line ++ align ++ dprintf "  <%s> %s: " d_rho r n ++ line ++ text "  " ++
@@ -711,7 +758,10 @@ and d_tau_r (t:tau) (known: TauSet.t) : doc =
   if TauSet.mem t known then d_sig () t.ts else
   match t.t with
   | ITVoid None  -> text "void"
-  | ITVoid (Some _)  -> text "(void)"
+  | ITVoid (Some vr)  ->
+      let v = U.deref vr in
+      if !debug then dprintf "(void#%d)" v.vinfo_id
+      else text "(void)"
   | ITInt _ -> text "int"
   | ITFloat -> text "float"
   | ITTrylockInt(l,b) ->
@@ -737,9 +787,9 @@ and d_tau_r (t:tau) (known: TauSet.t) : doc =
           unalign ++
         unalign
   | ITComp(c) ->
-      if TauSet.mem t known then dprintf "struct %s" (string_of_cinfo c)
+      if TauSet.mem t known then assert false (*dprintf "struct#%d %s" (U.deref c) .(string_of_cinfo c)*)
       else
-        align ++ dprintf "struct %s {" (string_of_cinfo c) ++
+        align ++ dprintf "struct %s {" (string_of_cinfo c) ++ line ++
           align ++
           d_fieldlist
             (field_set_to_fieldlist (U.deref c).cinfo_fields)
@@ -819,15 +869,19 @@ let rec typsig_to_tau_sig (t: Cil.typsig) : tau_sig =
 let typ_tau_sig (t: Cil.typ) : tau_sig =
   typsig_to_tau_sig (typeSigWithAttrs (fun x -> x) t)
 
+(*
 let make_optional_rho (name: LN.label_name) (concrete: bool): rho option =
   if !do_void_conflate || !do_void_single
-  then Some (make_rho name concrete) else None
+  then Some (make_rho name concrete)
+  else None
+*)
 
 let make_optional_phi_var (name: string): phi option =
   if !do_void_conflate || !do_void_single
   then Some (make_phi name PhiVar) else None
 
 let make_vinfo (r_opt: rho option): vinfo = 
+  if !debug_void then ignore(E.log "make_vinfo: #%d at %a\n" !next_info d_loc !Cil.currentLoc);
   let vd = U.uref {
     vinfo_id = !next_info;
     vinfo_rho = r_opt;
@@ -836,8 +890,8 @@ let make_vinfo (r_opt: rho option): vinfo =
     vinfo_loc = !Cil.currentLoc;
     vinfo_known = [];
     vinfo_alloc = [];
-    vinfo_inst_in_edges = IH.create 1;
-    vinfo_inst_out_edges = IH.create 1;
+    vinfo_inst_in_edges = InstHT.create 1;
+    vinfo_inst_out_edges = InstHT.create 1;
     vinfo_types = if !do_void_conflate then ConflatedRho else ListTypes [];
   } in
   incr next_info;
@@ -846,18 +900,19 @@ let make_vinfo (r_opt: rho option): vinfo =
   vd
 
 let make_cinfo (r: rho) (c: compinfo) (name: LN.label_name) =
+  if !debug_void then ignore(E.log "make_cinfo: #%d at %a\n" !next_info d_loc !Cil.currentLoc);
   let ci = U.uref {
     compinfo = c;
     cinfo_label_name = LN.List(U.uref [name]);
-    cinfo_fields = StrH.create 0; (* assume many are empty *)
+    cinfo_fields = StrHT.create 0; (* assume many are empty *)
     cinfo_id = !next_info;
     cinfo_loc = !Cil.currentLoc;
     cinfo_known = [];
     cinfo_from_rho = None;
     cinfo_to_rho = None;
     cinfo_alloc = [];
-    cinfo_inst_in_edges = IH.create 1;
-    cinfo_inst_out_edges = IH.create 1;
+    cinfo_inst_in_edges = InstHT.create 1;
+    cinfo_inst_out_edges = InstHT.create 1;
   } in
   incr next_info;
   all_cinfo := ci::!all_cinfo;
@@ -867,7 +922,7 @@ let make_cinfo (r: rho) (c: compinfo) (name: LN.label_name) =
 let mkEmptyExist ts : tau =
   let e = {
     exist_tau = integer_tau;
-    exist_effect = make_effect "exists";
+    exist_effect = LF.make_effect "exists" true;
     exist_phi = make_phi "exists" PhiVar;
     exist_abs = [];
     exist_rhoset = RhoSet.empty;
@@ -974,7 +1029,7 @@ let rec set_global_tau_r (t: tau)
   | ITComp(ci) ->
       TauHT.add known_globals t ();
       let xd = U.deref ci in
-      StrH.iter
+      StrHT.iter
         (fun f (r,u) ->
           mark_global_rho r k qr;
           set_global_tau_r u k quantified_labels)
@@ -1057,10 +1112,11 @@ let rec allocate (t: tau) : unit = begin
   | ITBuiltin_va_list _ -> ()
   | ITVoid None
   | ITTrylockInt _ 
-  | ITAbs _
-  | ITExists _ ->
-      ignore(E.warn "trying to allocate existential type, aborting.");
+  | ITAbs _ ->
       assert false (* these should never happen *)
+  | ITExists _ ->
+      let d = dprintf "%a: trying to allocate existential type" Cil.d_loc !Cil.currentLoc in
+      raise (TypingBug (string_of_doc d))
   | ITVoid (Some ur) ->
       let u = (U.deref ur) in
       u.vinfo_alloc <- !Cil.currentLoc ::u.vinfo_alloc;
@@ -1074,21 +1130,23 @@ let rec allocate (t: tau) : unit = begin
       c.cinfo_alloc <- !Cil.currentLoc::c.cinfo_alloc;
 end
 
-let rec write_concrete_tau phi eff uniq t : unit = begin
+let rec visit_concrete_tau (f: rho -> unit) (t: tau) : unit = begin
   match t.t with
   | ITBuiltin_va_list _ -> ()
   | ITVoid None
   | ITTrylockInt _ 
-  | ITAbs _
-  | ITExists _ -> assert false (* these should never happen *)
+  | ITAbs _ -> assert false (* these should never happen *)
+  | ITExists _ ->
+      let d = dprintf "%a: dereference of existential labels outside unpack" Cil.d_loc !Cil.currentLoc in
+      raise (TypingBug (string_of_doc d))
   | ITVoid (Some ur) ->
       defer
         (fun () ->
           let u = (U.deref ur) in
           match u.vinfo_types with
-            ConflatedRho -> write_rho (getSome u.vinfo_rho) phi eff uniq
+            ConflatedRho -> f (getSome u.vinfo_rho)
           | ListTypes tl ->
-              List.iter (fun (_,t) -> write_concrete_tau phi eff uniq t) tl
+              List.iter (fun (_,t) -> visit_concrete_tau f t) tl
         )
   | ITInt b -> assert (not b)
   | ITFloat -> ()
@@ -1099,10 +1157,10 @@ let rec write_concrete_tau phi eff uniq t : unit = begin
       defer
         (fun () ->
           let c = (U.deref ci) in
-          StrH.iter
+          StrHT.iter
             (fun s (r,t) ->
-              write_rho r phi eff uniq;
-              write_concrete_tau phi eff uniq t)
+              f r;
+              visit_concrete_tau f t)
             c.cinfo_fields 
         )
 end
@@ -1163,7 +1221,7 @@ let rec get_free_vars t free_vars known =
     end
   | ITComp ci ->
       let c = U.deref ci in
-      StrH.fold
+      StrHT.fold
         (fun _ (r,t') (fl,fr) ->
           get_free_vars t' (fl,RhoSet.add r fr) (TauSet.add t known))
         c.cinfo_fields
@@ -1266,8 +1324,8 @@ and set_goto_target (e: env) (p: phi) (eff: effect) (s: stmt) : unit =
     effect_flows eff' eff;
     CF.phi_flows p p';
   with Not_found -> begin
-    let p' = make_phi "p" PhiVar in
-    let eff' = make_effect "e" in
+    let p' = make_phi "label" PhiVar in
+    let eff' = make_effect "e" false in
     Hashtbl.add e.goto_tbl s (e, p', eff');
     effect_flows eff' eff;
     CF.phi_flows p p';
@@ -1305,23 +1363,23 @@ and reannotate (t: tau)
         | _ ->
             let newtref = ref (make_tau (ITInt false) (!tref).ts) in
             let newptrt = make_tau (ITPtr(newtref, make_rho name false)) t.ts in
-            newtref := reannotate !tref ((t.ts, newptrt)::known) (LN.Deref name);
+            newtref := reannotate !tref ((*(t.ts, newptrt)::*)known) (LN.Deref name);
             newptrt
       end
     | ITInt b -> assert (not b); t
     | ITFloat -> t
     | ITTrylockInt _ -> assert false (* never happens *)
     | ITFun fi ->
-        let inphi = make_phi "p" PhiVar in
-        let ineff = make_effect "reannot-in" in
+        let inphi = make_phi "in" PhiVar in
+        let ineff = LF.make_effect "reannot-in" false in
         let newfi = {
           fd_arg_tau_list = [];
           fd_lock_effect = make_lock_effect ();
           fd_input_phi = inphi;
           fd_input_effect = ineff;
           fd_output_tau = make_tau (ITInt false) fi.fd_output_tau.ts;
-          fd_output_phi = make_phi "p" PhiVar;
-          fd_output_effect = make_effect "reannot-out";
+          fd_output_phi = make_phi "out" PhiVar;
+          fd_output_effect = LF.make_effect "reannot-out" false;
           fd_epsilon = S.make_var_epsilon ();
           fd_chi = make_chi "X";
         } in
@@ -1329,12 +1387,12 @@ and reannotate (t: tau)
         let argtypes =
           List.map
             (fun (argname, argt) ->
-              let t = reannotate argt ((t.ts,newt)::known) (LN.Field (name, argname)) in
+              let t = reannotate argt ((*(t.ts,newt)::*)known) (LN.Field (name, argname)) in
               let r = (argname, t) in r)
             fi.fd_arg_tau_list
         in
         let newret =
-          reannotate fi.fd_output_tau ((t.ts,newt)::known) (LN.Field (name,"return")) in
+          reannotate fi.fd_output_tau ((*(t.ts,newt)::*)known) (LN.Field (name,"return")) in
         newfi.fd_output_tau <- newret;
         newfi.fd_arg_tau_list <- argtypes;
         newt
@@ -1433,7 +1491,7 @@ and annotate (t: typ)
             let rtptr = make_tau (ITInt false) tsptr in
             let rtref = ref rtptr in
             let rt = make_tau (ITPtr(rtref, make_rho name false)) ts in
-            rtref := annotate tptd ((ts, rt)::known) (LN.Deref name);
+            rtref := annotate tptd ((*(ts, rt)::*)known) (LN.Deref name);
             rt
       end
   end
@@ -1443,11 +1501,11 @@ and annotate (t: typ)
       let fi = {
         fd_arg_tau_list = [];
         fd_lock_effect = make_lock_effect ();
-        fd_input_phi = make_phi "p" PhiVar;
-        fd_input_effect = make_effect "inputeffect";
+        fd_input_phi = make_phi "in" PhiVar;
+        fd_input_effect = LF.make_effect "inputeffect" false;
         fd_output_tau = make_tau (ITInt false) (typ_tau_sig tret);
-        fd_output_phi = make_phi "p" PhiVar;
-        fd_output_effect = make_effect "outputeffect";
+        fd_output_phi = make_phi "out" PhiVar;
+        fd_output_effect = LF.make_effect "outputeffect" false;
         fd_epsilon = S.make_var_epsilon ();
         fd_chi = make_chi "X";
       } in
@@ -1460,7 +1518,7 @@ and annotate (t: typ)
       let arglist =
         if b then arglist@[("",TBuiltin_va_list([]),[])] else arglist
       in
-      let known = (ts, fun_tau)::known in
+      (*let known = (ts, fun_tau)::known in*)
       let i = ref 1 in
       let argtypes =
         List.map
@@ -1505,6 +1563,7 @@ and inst_vinfo (vi1: vinfo) (vi2: vinfo) (i: instantiation) : unit =
   begin
     let v1 = U.deref vi1 in
     let v2 = U.deref vi2 in
+    if !debug_void then ignore(E.log "inst_vinfo: #%d to #%d on %a\n" v1.vinfo_id v2.vinfo_id d_instantiation i);
     if !do_void_conflate || !do_void_single then begin
       inst_rho (getSome v1.vinfo_rho) (getSome v2.vinfo_rho) true i;
       inst_rho (getSome v1.vinfo_rho) (getSome v2.vinfo_rho) false i;
@@ -1514,13 +1573,13 @@ and inst_vinfo (vi1: vinfo) (vi2: vinfo) (i: instantiation) : unit =
       CF.inst_phi (getSome v1.vinfo_phi_out) (getSome v2.vinfo_phi_out) false i;
     end;
     try
-      let v = IH.find v1.vinfo_inst_out_edges i in
+      let v = InstHT.find v1.vinfo_inst_out_edges i in
       U.unify unify_vinfo (vi2, v)
-    with Not_found -> IH.add v1.vinfo_inst_out_edges i vi2;
+    with Not_found -> InstHT.add v1.vinfo_inst_out_edges i vi2;
     try
-      let v = IH.find v2.vinfo_inst_in_edges i in
+      let v = InstHT.find v2.vinfo_inst_in_edges i in
       U.unify unify_vinfo (vi1, v)
-    with Not_found -> IH.add v2.vinfo_inst_in_edges i vi1;
+    with Not_found -> InstHT.add v2.vinfo_inst_in_edges i vi1;
   end
 
 (*****************************************************************************)
@@ -1530,27 +1589,28 @@ and unify_vinfo (src, tgt: voiddata*voiddata) : voiddata =
   in
   if (src.vinfo_id = tgt.vinfo_id) then src
   else begin
+  if !debug_void then ignore(E.log "unify_vinfo: #%d with #%d\n" src.vinfo_id tgt.vinfo_id);
   (*
     let src, tgt =
       if (List.length x.vinfo_types < List.length y.vinfo_types) then x,y else y,x
     in
   *)
-    IH.iter
+    InstHT.iter
       (fun i vi ->
         try
-          let v = IH.find tgt.vinfo_inst_in_edges i in
+          let v = InstHT.find tgt.vinfo_inst_in_edges i in
           U.unify unify_vinfo (vi, v)
-        with Not_found -> IH.add tgt.vinfo_inst_in_edges i vi)
+        with Not_found -> InstHT.add tgt.vinfo_inst_in_edges i vi)
       src.vinfo_inst_in_edges;
-    IH.iter
+    InstHT.iter
       (fun i vi ->
         try
-          let v = IH.find tgt.vinfo_inst_out_edges i in
+          let v = InstHT.find tgt.vinfo_inst_out_edges i in
           U.unify unify_vinfo (vi, v)
-        with Not_found -> IH.add tgt.vinfo_inst_out_edges i vi)
+        with Not_found -> InstHT.add tgt.vinfo_inst_out_edges i vi)
       src.vinfo_inst_out_edges;
-    IH.clear src.vinfo_inst_in_edges;
-    IH.clear src.vinfo_inst_out_edges;
+    InstHT.clear src.vinfo_inst_in_edges;
+    InstHT.clear src.vinfo_inst_out_edges;
     tgt.vinfo_alloc <- src.vinfo_alloc @ tgt.vinfo_alloc;
 
     if !do_void_conflate || !do_void_single then begin
@@ -1564,7 +1624,7 @@ and unify_vinfo (src, tgt: voiddata*voiddata) : voiddata =
       List.iter
         (fun (ts, t) ->
           let tgtlist = (get_vinfo_types tgt.vinfo_types) in
-          if !do_void_single then assert (List.length tgtlist = 1);
+          (if !do_void_single then assert (List.length tgtlist <= 1));
           try
             let t2 = List.assoc ts tgtlist in
             unify_types t t2
@@ -1581,38 +1641,40 @@ and inst_cinfo (ci1: cinfo) (ci2: cinfo) (i: instantiation) : unit =
   begin
     let c1 = U.deref ci1 in
     let c2 = U.deref ci2 in
+    if !debug_void then ignore(E.log "inst_cinfo: #%d to #%d on %a\n" c1.cinfo_id c2.cinfo_id d_instantiation i);
     try
-      let c = IH.find c1.cinfo_inst_out_edges i in
+      let c = InstHT.find c1.cinfo_inst_out_edges i in
       U.unify unify_cinfo (ci2, c)
-    with Not_found -> IH.add c1.cinfo_inst_out_edges i ci2;
+    with Not_found -> InstHT.add c1.cinfo_inst_out_edges i ci2;
     try
-      let c = IH.find c2.cinfo_inst_in_edges i in
+      let c = InstHT.find c2.cinfo_inst_in_edges i in
       U.unify unify_cinfo (ci1, c)
-    with Not_found -> IH.add c2.cinfo_inst_in_edges i ci1;
+    with Not_found -> InstHT.add c2.cinfo_inst_in_edges i ci1;
   end
 
 and unify_cinfo (x, y: compdata*compdata) : compdata =
+  if !debug_void then ignore(E.log "unify_cinfo: #%d with #%d\n" x.cinfo_id y.cinfo_id);
   assert (x.compinfo == y.compinfo);
   if (x.cinfo_id = y.cinfo_id) then x
   else begin
     let src,tgt = if (x.cinfo_id < y.cinfo_id) then y,x else x,y in
     (*let x,y = (0,0) in (* don't use x, y below here! *)*)
-    IH.iter
+    InstHT.iter
       (fun i ci ->
         try
-          let c = IH.find tgt.cinfo_inst_in_edges i in
+          let c = InstHT.find tgt.cinfo_inst_in_edges i in
           U.unify unify_cinfo (ci, c)
-        with Not_found -> IH.add tgt.cinfo_inst_in_edges i ci)
+        with Not_found -> InstHT.add tgt.cinfo_inst_in_edges i ci)
       src.cinfo_inst_in_edges;
-    IH.iter
+    InstHT.iter
       (fun i ci ->
         try
-          let c = IH.find tgt.cinfo_inst_out_edges i in
+          let c = InstHT.find tgt.cinfo_inst_out_edges i in
           U.unify unify_cinfo (ci, c)
-        with Not_found -> IH.add tgt.cinfo_inst_out_edges i ci)
+        with Not_found -> InstHT.add tgt.cinfo_inst_out_edges i ci)
       src.cinfo_inst_out_edges;
-    IH.clear src.cinfo_inst_in_edges;
-    IH.clear src.cinfo_inst_out_edges;
+    InstHT.clear src.cinfo_inst_in_edges;
+    InstHT.clear src.cinfo_inst_out_edges;
     tgt.cinfo_known <- src.cinfo_known @ tgt.cinfo_known;
     tgt.cinfo_alloc <- src.cinfo_alloc @ tgt.cinfo_alloc;
     src.cinfo_known <- [];
@@ -1633,14 +1695,14 @@ and unify_cinfo (x, y: compdata*compdata) : compdata =
       | None, Some r -> tgt.cinfo_from_rho <- Some r
       | Some r1, Some r2 -> unify_rho r1 r2
     end;
-    StrH.iter
+    StrHT.iter
       (fun f (r,t) ->
         try
-          let (r2,t2) = StrH.find tgt.cinfo_fields f in
+          let (r2,t2) = StrHT.find tgt.cinfo_fields f in
           unify_types t t2;
           unify_rho r r2;
         with Not_found -> begin
-          StrH.add tgt.cinfo_fields f (r,t);
+          StrHT.add tgt.cinfo_fields f (r,t);
         end
       ) src.cinfo_fields;
     tgt
@@ -1648,10 +1710,10 @@ and unify_cinfo (x, y: compdata*compdata) : compdata =
 
 and unify_cinfo_inst (x, y: field_set*field_set) : field_set =
   (* Put entries from small table into large *)
-  let small,large = if StrH.length x < StrH.length y then x,y else y,x in
+  let small,large = if StrHT.length x < StrHT.length y then x,y else y,x in
   begin
-    StrH.iter 
-      (fun fld v -> (StrH.replace large fld v))
+    StrHT.iter 
+      (fun fld v -> (StrHT.replace large fld v))
       small;
     large
   end
@@ -1843,12 +1905,14 @@ and conflate_from (src: rho)
       let c = U.deref ci in
       let r = 
         match c.cinfo_from_rho with
-          None -> (*XXX--was doing ``make_rho "r" false'' before *)
-            StrH.iter
-              (fun _ (r',t') ->
-                rho_flows src r';
-                conflate_from src t' phi_in phi_out (TauSet.add t known))
-              c.cinfo_fields;
+          None ->
+            defer (fun () ->
+              StrHT.iter
+                (fun _ (r',t') ->
+                  rho_flows src r';
+                  conflate_from src t' phi_in phi_out (TauSet.add t known))
+                c.cinfo_fields
+            );
             src
         | Some r -> r
       in
@@ -1903,11 +1967,12 @@ and conflate_to (t: tau)
       let r = 
         match c.cinfo_to_rho with
           None ->
-            StrH.iter
-              (fun _ (r',t') ->
-                rho_flows r' tgt;
-                conflate_to t' tgt phi_in phi_out (TauSet.add t known))
-              c.cinfo_fields;
+            defer (fun () ->
+              StrHT.iter
+                (fun _ (r',t') ->
+                  rho_flows r' tgt;
+                  conflate_to t' tgt phi_in phi_out (TauSet.add t known))
+                c.cinfo_fields);
             tgt
         | Some r -> r
       in
@@ -1931,28 +1996,46 @@ and unify_types (s1: tau) (s2: tau) : unit =
         sub_tau s1 s2;
         sub_tau s2 s1;
 
+(* this is used only with --single-void
+ *)
+and conflate_vinfo (v: voiddata) : unit = begin
+  match v.vinfo_types with
+    ConflatedRho -> ()
+  | ListTypes [(_,t)] -> begin
+      let r = getSome v.vinfo_rho in
+      let phi_in = getSome v.vinfo_phi_in in
+      let phi_out = getSome v.vinfo_phi_out in
+      conflate t r phi_in phi_out TauSet.empty;
+      v.vinfo_types <- ConflatedRho
+    end
+  | ListTypes [] ->
+      v.vinfo_types <- ConflatedRho
+  | _ -> assert false
+end
+
 and add_type_to_vinfo (s: tau) (v: voiddata) : unit = begin
+  if !debug_void then ignore(E.log "add_type_to_vinfo: add %a to #%d\n" d_tau s v.vinfo_id);
   match v.vinfo_types with
     ConflatedRho ->
+      if !debug_void then ignore(E.log "conflated\n");
       let r = getSome v.vinfo_rho in
       let phi_in = getSome v.vinfo_phi_in in
       let phi_out = getSome v.vinfo_phi_out in
       conflate s r phi_in phi_out TauSet.empty;
-  | ListTypes tl ->
-    try
-      let t = List.assoc s.ts tl in
-      unify_types s t
-    with Not_found -> 
-      if !do_void_single then begin
-        v.vinfo_types <- ConflatedRho;
-        add_type_to_vinfo s v;
-        match tl with
-        | [] -> ()
-        | [(_,st)] -> add_type_to_vinfo st v;
-        | _ -> assert false
-      end else begin
-        v.vinfo_types <- ListTypes ((s.ts,s)::tl)
+  | ListTypes tl -> begin
+      try
+        let t = List.assoc s.ts tl in
+        unify_types s t
+      with Not_found -> begin
+        if !debug_void then ignore(E.log "conflating list\n");
+        if !do_void_single && (tl <> []) then begin
+          conflate_vinfo v;
+          add_type_to_vinfo s v;
+        end else begin
+          v.vinfo_types <- ListTypes ((s.ts,s)::tl)
+        end
       end
+    end
 end
 
 and get_cinfo_field (fi: fieldinfo) (ci: cinfo)
@@ -1964,7 +2047,7 @@ and get_cinfo_field (fi: fieldinfo) (ci: cinfo)
   let compdata = U.deref ci in
   assert (compdata.compinfo == fi.fcomp);
   try
-    StrH.find compdata.cinfo_fields fi.fname
+    StrHT.find compdata.cinfo_fields fi.fname
   with Not_found -> begin
     let storeloc = !Cil.currentLoc in
     Cil.currentLoc := compdata.cinfo_loc;
@@ -1977,6 +2060,7 @@ and get_cinfo_field (fi: fieldinfo) (ci: cinfo)
         (LN.Field (name, fi.fname)) in
     (* why was this commented out?  seems necessary *)
     (*XXX these phis are not completely sound *)
+    if !debug_void then ignore(E.log "get_cinfo_field: add %s:%a to #%d\n" fi.fname d_tau s compdata.cinfo_id);
     let phi_in = make_phi "conflated_in" PhiVar in
     let phi_out = make_phi "conflated_out" PhiVar in
     begin
@@ -1989,7 +2073,7 @@ and get_cinfo_field (fi: fieldinfo) (ci: cinfo)
         None -> ()
       | Some r' -> conflate_from r' s phi_in phi_out TauSet.empty; rho_flows r' r
     end;
-    StrH.add compdata.cinfo_fields fi.fname (r,s);
+    StrHT.add compdata.cinfo_fields fi.fname (r,s);
     Cil.currentLoc := storeloc;
     (r,s)
   end
@@ -2185,10 +2269,20 @@ and type_var (var: varinfo)     (* name of variable typed *)
     | ITAbs tref -> (
         match (!tref).t with
           ITFun fi ->
-            let i = make_instantiation false var.vname in
-            let tinst = reannotate !tref [] (LN.Const var.vname) in
-            instantiate !tref tinst true i;
-            tinst
+            if !do_context_insensitive then (
+              !tref
+            ) else (
+              let i = make_instantiation false var.vname in
+              let tinst = reannotate !tref [] (LN.Const var.vname) in
+              if !debug then
+                ignore(E.log "instantiating %s on %a\n   %a\n   %a\n"
+                             var.vname
+                             d_instantiation i
+                             d_tau !tref
+                             d_tau tinst);
+              instantiate !tref tinst true i;
+              tinst
+            )
         | _ -> assert false;
       )
     | _ -> s
@@ -2282,8 +2376,9 @@ and type_host (h: lhost)
             read_rho r exp_phi exp_effect exp_uniq;
             ((!s1, r, uniq_deref exp_uniq), exp_env, exp_phi, exp_effect)
         | _ ->
-          ignore(E.log "%a\n" d_exp e);
-          raise (TypingBug "dereferencing non-pointer")
+          ignore(E.log "%a: dereferencing non-pointer: %a : %a\n" Cil.d_loc !Cil.currentLoc d_exp e d_tau exp_type);
+          ((integer_tau, unknown_rho, exp_uniq), exp_env, exp_phi, exp_effect)
+          (*raise (TypingBug (string_of_doc d))*)
       end
 
 and type_ref (lv: lval)
@@ -2470,7 +2565,7 @@ let handle_newlock (el: exp list)
       let lt = make_tau (ITLock nl) STLock in
       let pt = make_tau (ITPtr(ref lt, make_rho (LN.AddrOf name) false)) (STPtr STLock) in
       sub_tau pt h;
-      let out_phi = make_phi "nl" (PhiNewlock nl) in
+      let out_phi = make_phi "newlock" (PhiNewlock nl) in
       CF.phi_flows input_phi out_phi;
       (input_env, out_phi, input_effect), S.singleton nl
 
@@ -2539,7 +2634,7 @@ let handle_acquire (el: exp list)
       match (!tref).t with
         ITLock(l) ->
           add_to_lock_effect l input_lock_effect;
-          let out_phi = make_phi "ap" (PhiAcquire l) in
+          let out_phi = make_phi "acquire" (PhiAcquire l) in
           CF.phi_flows input_phi out_phi;
           (input_env, out_phi, input_effect), S.empty_epsilon
       | _ ->
@@ -2547,7 +2642,7 @@ let handle_acquire (el: exp list)
           let locktype = make_tau (ITLock(l)) STLock in
           sub_tau !tref locktype;
           add_to_lock_effect l input_lock_effect;
-          let out_phi = make_phi "ap" (PhiAcquire l) in
+          let out_phi = make_phi "acquire" (PhiAcquire l) in
           CF.phi_flows input_phi out_phi;
           (input_env, out_phi, input_effect), S.empty_epsilon
     end
@@ -2574,7 +2669,7 @@ let handle_release (el: exp list)
       match (!tref).t with
         ITLock(l) ->
           add_to_lock_effect l input_lock_effect;
-          let out_phi = make_phi "rp" (PhiRelease l) in
+          let out_phi = make_phi "release" (PhiRelease l) in
           CF.phi_flows input_phi out_phi;
           (input_env, out_phi, input_effect), S.empty_epsilon
       | _ ->
@@ -2582,7 +2677,7 @@ let handle_release (el: exp list)
           let locktype = make_tau (ITLock(l)) STLock in
           sub_tau !tref locktype;
           add_to_lock_effect l input_lock_effect;
-          let out_phi = make_phi "rp" (PhiRelease l) in
+          let out_phi = make_phi "release" (PhiRelease l) in
           CF.phi_flows input_phi out_phi;
           (input_env, out_phi, input_effect), S.empty_epsilon
     end
@@ -2606,7 +2701,7 @@ let handle_destroylock (el: exp list)
       match (!tref).t with
         ITLock(l) ->
           add_to_lock_effect l input_lock_effect;
-          let out_phi = make_phi "dp" (PhiDelete l) in
+          let out_phi = make_phi "delete" (PhiDelete l) in
           CF.phi_flows input_phi out_phi;
           (input_env, out_phi, input_effect), S.empty_epsilon
       | _ ->
@@ -2614,7 +2709,7 @@ let handle_destroylock (el: exp list)
           let locktype = make_tau (ITLock(l)) STLock in
           sub_tau !tref locktype;
           add_to_lock_effect l input_lock_effect;
-          let out_phi = make_phi "dp" (PhiDelete l) in
+          let out_phi = make_phi "delete" (PhiDelete l) in
           CF.phi_flows input_phi  out_phi;
           (input_env, out_phi, input_effect), S.empty_epsilon
     end
@@ -2628,7 +2723,7 @@ let handle_exit (_: exp list)
                 (input_effect: effect)
                 (input_lock_effect: lock_effect)
                 : gamma * S.epsilon =
-  (input_env, CF.empty_phi, make_effect "exit-effect"), S.empty_epsilon
+  (input_env, CF.empty_phi, LF.make_effect "exit-effect" false), S.empty_epsilon
 
 let handle_fork (_: exp list)
                 (_: lval option)
@@ -2660,8 +2755,9 @@ let handle_fork (_: exp list)
         | _ -> raise (TypingBug "bad fork")
       end;
       (* both continuation and forked thread effects flow to input effect *)
-      let eff_after = make_effect "forkeffect" in
-      let eff_forked = fi.fd_input_effect in
+      let eff_after = LF.make_effect "fork-effect" true in
+      let eff_forked = LF.make_effect "forked-effect" true in
+      effect_flows fi.fd_input_effect eff_forked;
       effect_flows eff_after input_effect;
       chi_flows fi.fd_chi !current_chi;
 
@@ -2669,7 +2765,7 @@ let handle_fork (_: exp list)
          both follow after phi_before *)
       let phi_before = input_phi in
       let phi_forked = make_phi "FORK" PhiForked in
-      let phi_after = make_phi "p" PhiVar in
+      let phi_after = make_phi "afterfork" PhiVar in
       CF.starting_phis := phi_forked::!CF.starting_phis;
       CF.phi_flows phi_forked fi.fd_input_phi;
       CF.phi_flows phi_before phi_after;
@@ -2716,6 +2812,8 @@ let handle_memcpy (_: exp list)
       sub_tau !s2 !s1;
       write_rho r1 input_phi input_effect u1;
       read_rho r2 input_phi input_effect u2;
+      visit_concrete_tau (fun r -> write_rho r input_phi input_effect u1) !s1;
+      visit_concrete_tau (fun r -> read_rho r input_phi input_effect u2) !s2;
       (input_env, input_phi, input_effect), S.empty_epsilon
   | _ -> raise (TypingBug "calling memcpy with bad arguments")
 
@@ -2805,8 +2903,9 @@ let handle_start_unpack (el: exp list)
                        (STPtr ei.exist_tau.ts)
             in
             let unpack_phi = make_phi "unpack" (PhiPack ei.exist_phi) in
+            CF.phi_flows ei.exist_phi unpack_phi;
             CF.phi_flows unpack_phi input_phi;
-            let eff = make_effect "unpack" in
+            let eff = LF.make_effect "unpack" true in
             effect_flows eff ei.exist_effect;
             effect_flows eff input_effect;
             let e2 = env_add_unpack_ei input_env vi.vname ei (newt, var_rho) in
@@ -2882,6 +2981,7 @@ let handle_pack (el: exp list) (* arguments to pack, should be singleton list *)
         let et = mkEmptyExist tabs.ts in
         fillExist et tabs;
         let pack_phi = make_phi "pack" (PhiPack input_phi)  in
+        CF.phi_flows input_phi pack_phi;
         (match et.t with
           ITExists ei ->
             CF.inst_phi ei.exist_phi pack_phi false i;
@@ -2951,7 +3051,7 @@ let handle_free (_: exp list)
   match args with
     ({t=(ITPtr(s,r))},u)::_ ->
       write_rho r input_phi input_effect u;
-      (*write_concrete_tau input_phi input_effect u !s;*)
+      visit_concrete_tau (fun r -> write_rho r input_phi input_effect u) !s;
       (input_env, input_phi, input_effect), S.empty_epsilon
   | _ -> raise (TypingBug "calling free with bad arguments")
 
@@ -3133,7 +3233,7 @@ and type_stmt (env, phi, eff) input_lock_effect stmt : gamma * S.epsilon =
           None -> ((void_tau,NotUnq), env, phi, eff)
         | Some(e1) -> type_exp e1 env phi eff
       in
-      let (t,r) = env_lookup (!currentFunction).svar.vname env in begin
+      let (t,r) = env_lookup (!current_function).svar.vname env in begin
         match t.t with
           ITAbs(tref) -> begin
             match !tref.t with
@@ -3151,17 +3251,17 @@ and type_stmt (env, phi, eff) input_lock_effect stmt : gamma * S.epsilon =
                    there could be a merge with some "live" path later on
                 *)
                 (* phi, *)
-                make_effect "after-return"),
+                make_effect "after-return" false),
                  S.empty_epsilon
-            | _ -> raise (TypingBug "type of currentFunction must be ITFun")
+            | _ -> raise (TypingBug "type of current_function must be ITFun")
           end
-        | _ -> raise (TypingBug "type of currentFunction must be ITFun")
+        | _ -> raise (TypingBug "type of current_function must be ITFun")
       end
   | Goto(stmt_ref, loc) ->
       currentLoc := loc;
       (*let x = S.make_var_epsilon () in*)
       set_goto_target env phi eff !stmt_ref;
-      (env, CF.empty_phi, make_effect "goto-effect"), S.empty_epsilon
+      (env, CF.empty_phi, make_effect "goto-effect" false), S.empty_epsilon
   | If(cond_exp, block1, block2, loc) ->
       currentLoc := loc;
       let ((cond_type,_), env, phi, eff) =
@@ -3169,11 +3269,11 @@ and type_stmt (env, phi, eff) input_lock_effect stmt : gamma * S.epsilon =
       let true_phi,false_phi =
         match cond_type.t with
           ITTrylockInt(l,true) ->
-            let acqphi = make_phi "pa" (PhiAcquire l) in
+            let acqphi = make_phi "acquire" (PhiAcquire l) in
             CF.phi_flows phi acqphi;
             acqphi, phi
         | ITTrylockInt(l,false) ->
-            let acqphi = make_phi "pa" (PhiAcquire l) in
+            let acqphi = make_phi "acquire" (PhiAcquire l) in
             CF.phi_flows phi acqphi;
             phi, acqphi
         | _ -> phi, phi
@@ -3188,7 +3288,7 @@ and type_stmt (env, phi, eff) input_lock_effect stmt : gamma * S.epsilon =
       let x =  join_gamma g1 g2 in x, S.union e1 e2
   | Loop(b, loc, Some(_), Some(_)) ->
       currentLoc := loc;
-      let begin_phi = make_phi "p" PhiVar in
+      let begin_phi = make_phi "beginloop" PhiVar in
       CF.phi_flows phi begin_phi;
       let (env2,p2,ef2),e =
         (* this typing will side-effect the current_liveness ref.
@@ -3203,7 +3303,7 @@ and type_stmt (env, phi, eff) input_lock_effect stmt : gamma * S.epsilon =
        * last statement typed. (see above comment)
        *)
       let live_vars = LV.get_stmt_live_vars stmt in
-      down e env live_vars S.empty_epsilon;
+      defer (fun () -> down e env live_vars S.empty_epsilon);
       (*S.epsilon_flow e S.empty_epsilon;*)
       (env2, p2, ef2), S.empty_epsilon
   | Block(b) ->
@@ -3249,20 +3349,36 @@ let addvars (varlist: varinfo list) env : (string * tau) list * env =
 
 let addfun (fd: fundec) : unit = begin
   if !debug then ignore (E.log "typing function %s %s\n" fd.svar.vname (Lprof.timestamp ()));
+  let location1 = !Cil.currentLoc in
   LV.compute_live_vars fd;
+  let location2 = !Cil.currentLoc in
   if !do_uniq then Uniq.compute_uniqueness fd;
   if !debug then ignore (E.log "uniqueness done %s\n" (Lprof.timestamp ()));
+
+  (* if the function doesn't fork, we can reuse one single
+   * effect variable for the whole body. *)
+  let use_one_effect = !do_one_effect
+    && not (Hashtbl.mem functions_that_call_fork fd.svar.vname)
+  in
+  if use_one_effect then begin
+    if !debug_one_effect then ignore(E.log "function %s doesn't call fork\n" fd.svar.vname);
+    let e = LF.make_effect (fd.svar.vname^"-singleton") false in
+    force_effect e;
+  end
+  else if !debug_one_effect then ignore(E.log "function %s calls fork\n" fd.svar.vname);
+
+  (* actual work *)
+  begin
   match fd.svar.vtype with
     TFun(tret,_,b,_) ->
-      currentFunction := fd;
+      current_function := fd;
+      Cil.currentLoc := location1;
       let name = LN.Const fd.svar.vname in
       let ret_type = annotate tret [] name in
-      let in_phi = make_phi fd.svar.vname PhiVar in
+      let in_phi = make_phi (fd.svar.vname) PhiVar in
       if fd.svar.vname = "main" then
         CF.starting_phis := in_phi::!CF.starting_phis;
-      let out_phi = make_phi "p" PhiVar in
-      let in_eff = make_effect (fd.svar.vname^"-input") in
-      let out_eff = make_effect (fd.svar.vname^"-output") in
+      let in_eff = make_effect (fd.svar.vname^"-input") false in
       let start_env = fresh_env () in
       let epsilon = S.make_var_epsilon () in
       let (arg_types, arg_env) = addvars fd.sformals start_env in
@@ -3278,6 +3394,9 @@ let addfun (fd: fundec) : unit = begin
       let input_lock_effect = make_lock_effect () in
       current_chi := make_chi "X";
       if is_atomic fd.svar then set_atomic_chi !current_chi;
+      Cil.currentLoc := location2;
+      let out_phi = make_phi (fd.svar.vname^"_out") PhiVar in
+      let out_eff = make_effect (fd.svar.vname^"-output") false in
       let fun_type = make_tau (ITFun {
         fd_arg_tau_list = arg_types;
         fd_lock_effect = input_lock_effect;
@@ -3313,9 +3432,14 @@ let addfun (fd: fundec) : unit = begin
       effect_flows out_eff eff_stmt;
       CF.phi_flows phi_stmt out_phi;
       S.epsilon_flow e epsilon;
-      currentFunction := Cil.dummyFunDec;
+      current_function := Cil.dummyFunDec;
       if !debug then ignore (E.log "function %s: %a\n" fd.svar.vname d_tau fun_abs_type);
   | _ -> assert false
+  end;
+
+  (* if we had forced one effect for the whole function,
+   * then restore to using flow-sensitive effects again *)
+  if use_one_effect then unforce_effect ();
 end
 
 let propagate_vinfo_i (vi1: vinfo)
@@ -3324,6 +3448,7 @@ let propagate_vinfo_i (vi1: vinfo)
                       : unit =
   let v1 = U.deref vi1 in
   let v2 = U.deref vi2 in
+  if !debug_void then ignore(E.log "propagate_vinfo_i: #%d to #%d through %a\n" v1.vinfo_id v2.vinfo_id d_instantiation i);
   if !do_void_conflate || !do_void_single then begin
     inst_rho (getSome v1.vinfo_rho) (getSome v2.vinfo_rho) true i;
     inst_rho (getSome v1.vinfo_rho) (getSome v2.vinfo_rho) false i;
@@ -3331,19 +3456,24 @@ let propagate_vinfo_i (vi1: vinfo)
     CF.inst_phi (getSome v1.vinfo_phi_in) (getSome v2.vinfo_phi_in) false i;
     CF.inst_phi (getSome v1.vinfo_phi_out) (getSome v2.vinfo_phi_out) true i;
     CF.inst_phi (getSome v1.vinfo_phi_out) (getSome v2.vinfo_phi_out) false i;
+  end else ();
+  if !do_void_single && (v1.vinfo_types = ConflatedRho || v2.vinfo_types = ConflatedRho) then begin
+    conflate_vinfo v1;
+    conflate_vinfo v2;
   end;
   let name = LN.Const "void" in (* TODO: make this an input *)
   begin
     List.iter
       (fun (ts, t1) ->
-        let tl2 = get_vinfo_types v2.vinfo_types in
         try
+          let tl2 = get_vinfo_types v2.vinfo_types in
           let t2 = List.assoc ts tl2 in
           instantiate t1 t2 true i;
           instantiate t1 t2 false i;
         with Not_found -> begin
           Cil.currentLoc := v2.vinfo_loc;
           let t2 = reannotate t1 v2.vinfo_known name in
+          if !debug_void then ignore (E.log "void: adding %a to v%d\n" d_tau t2 v2.vinfo_id);
           Cil.currentLoc := locUnknown;
           instantiate t1 t2 true i;
           instantiate t1 t2 false i;
@@ -3353,8 +3483,8 @@ let propagate_vinfo_i (vi1: vinfo)
       (get_vinfo_types v1.vinfo_types);
     List.iter
       (fun (ts, t2) ->
-        let tl1 = get_vinfo_types v1.vinfo_types in
         try
+          let tl1 = get_vinfo_types v1.vinfo_types in
           (* if it's there, it was instantiated above, so no need to do anything *)
           let _ = List.assoc ts tl1 in ()
         with Not_found -> begin
@@ -3372,33 +3502,36 @@ let propagate_vinfo_i (vi1: vinfo)
 let propagate_cinfo_i (ci1: cinfo) (ci2: cinfo) (i: instantiation): unit =
   let c1 = U.deref ci1 in
   let c2 = U.deref ci2 in
-  StrH.iter
+  StrHT.iter
     (fun f (r1,t1) ->
       try
-        let (r2,t2) = StrH.find c2.cinfo_fields f in
+        let (r2,t2) = StrHT.find c2.cinfo_fields f in
         instantiate t1 t2 true i;
         instantiate t1 t2 false i;
         inst_rho r1 r2 true i;
         inst_rho r1 r2 false i;
       with Not_found -> begin
+        if !debug_void then ignore(E.log "cinfo: adding %s to %d\n" f c2.cinfo_id);
         Cil.currentLoc := c2.cinfo_loc;
         let t2 = reannotate t1 c2.cinfo_known (LN.Field (c2.cinfo_label_name, f)) in
         let r2 = make_rho (LN.Field (c2.cinfo_label_name, f)) false in
         Cil.currentLoc := locUnknown;
         inst_rho r1 r2 true i;
         inst_rho r1 r2 false i;
+    if !debug_void then ignore(E.log "propagate_cinfo_i: instantiate %s on %a:\n   %a\n   %a\n" f d_instantiation i d_tau t1 d_tau t2);
         instantiate t1 t2 true i;
         instantiate t1 t2 false i;
-        StrH.add c2.cinfo_fields f (r2,t2);
+        StrHT.add c2.cinfo_fields f (r2,t2);
         Q.add ci2 worklist_cinfo;
       end
     ) c1.cinfo_fields;
-  StrH.iter
+  StrHT.iter
     (fun f (r2,t2) ->
       try
         (*if it's there, it was instantiated above, so no need to do anything*)
-        let _ = StrH.find c1.cinfo_fields f in ()
+        let _ = StrHT.find c1.cinfo_fields f in ()
       with Not_found -> begin
+        if !debug_void then ignore(E.log "adding %s to %d\n" f c1.cinfo_id);
         Cil.currentLoc := c1.cinfo_loc;
         let name = (LN.Field (c1.cinfo_label_name, f)) in
         let t1 = reannotate t2 c1.cinfo_known name in
@@ -3408,7 +3541,7 @@ let propagate_cinfo_i (ci1: cinfo) (ci2: cinfo) (i: instantiation): unit =
         inst_rho r1 r2 false i;
         instantiate t1 t2 true i;
         instantiate t1 t2 false i;
-        StrH.add c1.cinfo_fields f (r1,t1);
+        StrHT.add c1.cinfo_fields f (r1,t1);
         Q.add ci1 worklist_cinfo;
       end
     ) c2.cinfo_fields;
@@ -3440,7 +3573,7 @@ let dump_cinfo_stats () : unit =
       let cd = U.deref c in
       (t+1,
       tf + (List.length cd.compinfo.cfields),
-      uf+(StrH.length cd.cinfo_fields)))
+      uf+(StrHT.length cd.cinfo_fields)))
     (0,0,0)
     !all_cinfo
   in
@@ -3451,6 +3584,7 @@ let dump_cinfo_stats () : unit =
   ignore(E.log "\n")
 
 let solve_vinfo_cinfo_constraints () : unit =
+  if !debug_void then ignore(E.log "solve vinfo/cinfo\n");
   (* Step 1:  Solve all vinfo and cinfo constraints simultaneously.
      propagate_X_i will add new edges to the worklist, as will any calls
      to make_X done during resolution *)
@@ -3460,20 +3594,22 @@ let solve_vinfo_cinfo_constraints () : unit =
     if (not (Q.is_empty worklist_vinfo)) then
       let vi1 = Q.take worklist_vinfo in
       begin
-        IH.iter
+        if !debug_void then ignore(E.log "worklist vinfo: %d\n" (U.deref vi1).vinfo_id);
+        InstHT.iter
           (fun i vi2 -> propagate_vinfo_i vi1 vi2 i)
           (U.deref vi1).vinfo_inst_out_edges;
-        IH.iter
+        InstHT.iter
           (fun i vi0 -> propagate_vinfo_i vi0 vi1 i)
           (U.deref vi1).vinfo_inst_in_edges;
       end
     else if (not (Q.is_empty worklist_cinfo)) then
       let ci1 = Q.take worklist_cinfo in
       begin
-        IH.iter
+        if !debug_void then ignore(E.log "worklist cinfo: %d\n" (U.deref ci1).cinfo_id);
+        InstHT.iter
           (fun i ci2 -> propagate_cinfo_i ci1 ci2 i)
           (U.deref ci1).cinfo_inst_out_edges;
-        IH.iter
+        InstHT.iter
           (fun i ci0 -> propagate_cinfo_i ci0 ci1 i)
           (U.deref ci1).cinfo_inst_in_edges;
       end
@@ -3502,7 +3638,7 @@ let solve_vinfo_cinfo_constraints () : unit =
         scanned := xd::!scanned;
         List.iter 
           (fun loc ->
-            StrH.iter
+            StrHT.iter
               (fun f (r,t) ->
                 let name = (LN.Field (LN.Const "alloc", f)) in
                 Cil.currentLoc := loc;
@@ -3649,7 +3785,6 @@ let handle_undef_function (name: string) : unit =
           CF.phi_flows fi.fd_input_phi fi.fd_output_phi;
           (*CF.phi_flows fi.fd_output_phi fi.fd_input_phi;*)
           effect_flows fi.fd_output_effect fi.fd_input_effect;
-          if !debug then Lprof.print_mem_info ();
           (*effect_flows fi.fd_input_effect fi.fd_output_effect;*)
           (*fd_arg_tau_list: (string * tau) list;
           mutable fd_output_tau: tau;*)
@@ -3682,56 +3817,66 @@ let init f : unit = begin
                  isva, [])) in
           let ts = typ_tau_sig t in
           let tau = make_tau (ITAbs (ref(annotate t [] (LN.Const name)))) ts in
+          if not (Strmap.mem name !special_functions)
+          then undef_functions := name::!undef_functions;
           Strmap.add name (tau,unknown_rho) h)
         Cil.gccBuiltins Strmap.empty;
     unpacked_map = Strmap.empty; 
-  }
+  };
+
+  (* find all functions that call fork *)
+  if !debug then ignore(E.log "find what calls fork\n");
+  let rec dfs (node: CG.callnode) : unit =
+    if not (Hashtbl.mem functions_that_call_fork node.CG.cnInfo.vname) then begin
+      Hashtbl.add functions_that_call_fork node.CG.cnInfo.vname ();
+      Hashtbl.iter (fun _ n -> dfs n) node.CG.cnCallers;
+    end
+  in
+  let graph: CG.callgraph = (CG.computeGraph f) in
+  (*Hashtbl.clear functions_that_call_fork;*)
+  Hashtbl.iter
+    (fun s n ->
+      try
+        if (Strmap.find s !special_functions) = Fork
+        then dfs n
+        else ()
+      with Not_found -> ())
+    graph;
+  (*if !debug_one_effect then 
+    Hashtbl.iter (fun s _ -> ignore(E.log "function %s calls fork\n" s)) functions_that_call_fork;*)
+  if !debug then ignore(E.log "found what calls fork\n");
 end
 
 let generate_constraints (f: file) : unit = begin
   init f;
 
-  if !debug then ignore(E.log "type program\n");
-  let tstart = Lprof.starttime () in
+  if !debug then ignore(E.log "typing-parsing\n");
   let cv = new constraintVisitor in visitCilFileSameGlobals cv f;
-  let ttime = Lprof.endtime tstart in
-  if !debug then ignore(E.log "typing done in %s\n" (Lprof.to_string ttime));
-  if !debug then Lprof.print_mem_info ();
-  if !debug then print_stats();
-  if !debug then ignore(E.log "-------------------\n\n");
+  Lprof.endtime "typing-parsing";
+  if !debug then ignore(E.log "typing-parsing done\n");
   Cil.currentLoc := locUnknown;
 
   if !debug then ignore(E.log "solve void* and lazy-struct-field constraints\n");
-  let vlstart = Lprof.starttime () in
   solve_vinfo_cinfo_constraints ();
-  let vltime = Lprof.endtime vlstart in
-  if !debug then ignore(E.log "solved in %s\n" (Lprof.to_string vltime));
-  if !debug then Lprof.print_mem_info ();
-  if !debug then print_stats();
-  if !debug then ignore(E.log "-------------------\n\n");
+  Lprof.endtime "typing-void*";
+  if !debug then ignore(E.log "solve void* and lazy-struct-field constraints done\n");
 
-  if !debug then ignore(E.log "set globals (will update CFL graph)\n");
-  let cstart = Lprof.starttime () in
+  if !debug then ignore(E.log "set globals\n");
   set_globals ();
-  let ctime = Lprof.endtime cstart in
-  if !debug then ignore(E.log "finished in %s\n" (Lprof.to_string ctime));
-  if !debug then Lprof.print_mem_info ();
-  if !debug then print_stats();
-  if !debug then ignore(E.log "-------------------\n\n");
+  Lprof.endtime "typing-globals";
+  if !debug then ignore(E.log "set globals done\n");
 
-  if !debug then ignore(E.log "applying (down)\n");
-  let cstart = Lprof.starttime () in
+  if !debug then ignore(E.log "applying down\n");
   done_typing();
   (*apply_down ();*)
-  let ctime = Lprof.endtime cstart in
-  if !debug then ignore(E.log "finished in %s\n" (Lprof.to_string ctime));
-  if !debug then Lprof.print_mem_info ();
-  if !debug then print_stats();
-  if !debug then ignore(E.log "-------------------\n\n");
+  Lprof.endtime "typing-down";
+  if !debug then ignore(E.log "applying down done\n");
 
   if !debug then ignore(E.log "constraint generation done\n");
+
   if (List.length !undef_functions) > 0 then
     ignore(E.log "functions declared but not defined:\n");
+  undef_functions := List.sort Pervasives.compare !undef_functions;
   List.iter
     (fun s -> ignore(E.log "  %s\n" s); handle_undef_function s)
     !undef_functions;

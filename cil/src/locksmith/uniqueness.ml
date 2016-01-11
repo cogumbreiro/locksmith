@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -108,8 +108,8 @@ let rec set_shared_exp (t: state) (e:exp) : state =
   | UnOp (_,e,_) -> set_shared_exp t e
   | BinOp (b,e1,e2,_) ->
       (match b with 
-	PlusA | PlusPI | IndexPI | MinusA | MinusPI | MinusPP ->
-	  set_shared_exp (set_shared_exp t e1) e2
+        PlusA | PlusPI | IndexPI | MinusA | MinusPI | MinusPP ->
+          set_shared_exp (set_shared_exp t e1) e2
       | _ -> t)
   | CastE (_,e) -> set_shared_exp t e
   | AddrOf (Var(v),_) -> set_shared v.vname t
@@ -156,13 +156,13 @@ module UT = struct
         let t = typeOf e in
         let al = typeAttrs t in
         if hasAttribute "unique" al then 
-	  (if !debug then
-	    ignore(E.log "assigning to %s a unique-attributed exp %a\n" v.vname d_exp e);
-	  DF.Done(state))
+          (if !debug then
+            ignore(E.log "assigning to %s a unique-attributed exp %a\n" v.vname d_exp e);
+          DF.Done(state))
         else 
-	  let s' = set_shared v.vname state in
-	  let s'' = set_shared_exp s' e in
-	  DF.Done(s'')
+          let s' = set_shared v.vname state in
+          let s'' = set_shared_exp s' e in
+          DF.Done(s'')
     | Call(Some((Var(v),NoOffset)), e, el, _) ->
         let t = typeOf e in
         let s' = match unrollTypeDeep t with

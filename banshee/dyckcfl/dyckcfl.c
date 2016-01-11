@@ -484,7 +484,6 @@ void dyck_finished_adding()
 /*static int query_count = 0;*/
 #define MAX_QUERIES 50
 
-void memusage(void);
 void regprofile(void);
 void inc_queries(void) {
   /*

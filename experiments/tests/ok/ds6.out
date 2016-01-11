@@ -1,5 +1,20 @@
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: alloc.data:ds6.c:40
         alloc.next:ds6.c:40
 
@@ -36,7 +51,7 @@ Warning: Possible data race: alloc.data:ds6.c:40 is protected by non-linear or c
       (*cur).lock:ds6.c:14
       (*new).lock:ds6.c:40
       non linear concrete new->lock:ds6.c:42
-    in: main at ds6.c:43 -> run ds6.c:46
+    in: main at ds6.c:34 -> run ds6.c:46
 
   dereference at ds6.c:26
     locations possibly dereferenced: 
@@ -46,11 +61,9 @@ Warning: Possible data race: alloc.data:ds6.c:40 is protected by non-linear or c
       (*cur).lock:ds6.c:14
       (*new).lock:ds6.c:40
       non linear concrete new->lock:ds6.c:42
-    in: main at ds6.c:43 -> run ds6.c:45
+    in: main at ds6.c:34 -> run ds6.c:45
 
 alloc.next:ds6.c:40 is protected by:
-  global_lock:ds6.c:13
   concrete global_lock:ds6.c:38
+  global_lock:ds6.c:13
 *************************** DONE ***************************
-
-

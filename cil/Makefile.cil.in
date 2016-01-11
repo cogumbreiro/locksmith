@@ -76,19 +76,20 @@ CILLY_LIBRARY_MODULES = pretty inthash errormsg trace stats util clist \
 # maincil's argument checking and whatnot ...
 CILLY_MODULES = $(CILLY_LIBRARY_MODULES) \
                 lockdefs \
+                lset \
                 dotpretty bansheemlifc \
                 falsecfl mycfl \
-                lockprofile \
                 livevars \
                 uniqueness \
                 labelname labelflow controlflow \
+                lockprofile \
                 lockstate \
                 shared \
                 correlation \
                 semiunification \
                 locksettings \
-                locktype \
                 lockpick \
+                locktype \
                 locksmith \
                 maincil
 CILLY_CMODULES = bansheeifc

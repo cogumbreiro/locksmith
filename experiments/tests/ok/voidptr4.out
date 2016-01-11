@@ -1,20 +1,33 @@
-
-
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: &g:voidptr4.c:3
         alloc.v:voidptr4.c:46
 &g:voidptr4.c:3 is protected by:
-  l:voidptr4.c:4
   concrete l:voidptr4.c:48
+  l:voidptr4.c:4
 
 Warning: Possible data race: alloc.v:voidptr4.c:46 is not protected!
  references:
   dereference at voidptr4.c:41
     locations possibly dereferenced: 
+      (*void).v:voidptr4.c:49
       (*w).v:voidptr4.c:26
       (b).v:voidptr4.c:46
-      (*void).v:voidptr4.c:49
       alloc.v:voidptr4.c:46
     locks acquired at dereference: 
       <empty>
@@ -22,34 +35,32 @@ Warning: Possible data race: alloc.v:voidptr4.c:46 is not protected!
 
   dereference at voidptr4.c:32
     locations possibly dereferenced: 
+      (*void).v:voidptr4.c:49
       (*w).v:voidptr4.c:26
       (b).v:voidptr4.c:46
-      (*void).v:voidptr4.c:49
       alloc.v:voidptr4.c:46
     locks acquired at dereference: 
       <empty>
     in: FORK at voidptr4.c:50 -> dostuff2 voidptr4.c:50
 
-  dereference at voidptr4.c:41
-    locations possibly dereferenced: 
-      (*w).v:voidptr4.c:26
-      (b).v:voidptr4.c:46
-      (*void).v:voidptr4.c:49
-      alloc.v:voidptr4.c:46
-    locks acquired at dereference: 
-      <empty>
-    in: main at voidptr4.c:52 -> dostuff3 voidptr4.c:51
-
   dereference at voidptr4.c:32
     locations possibly dereferenced: 
+      (*void).v:voidptr4.c:49
       (*w).v:voidptr4.c:26
       (b).v:voidptr4.c:46
-      (*void).v:voidptr4.c:49
       alloc.v:voidptr4.c:46
     locks acquired at dereference: 
       <empty>
-    in: main at voidptr4.c:52 -> dostuff2 voidptr4.c:50
+    in: main at voidptr4.c:44 -> dostuff2 voidptr4.c:50
+
+  dereference at voidptr4.c:41
+    locations possibly dereferenced: 
+      (*void).v:voidptr4.c:49
+      (*w).v:voidptr4.c:26
+      (b).v:voidptr4.c:46
+      alloc.v:voidptr4.c:46
+    locks acquired at dereference: 
+      <empty>
+    in: main at voidptr4.c:44 -> dostuff3 voidptr4.c:51
 
 *************************** DONE ***************************
-
-

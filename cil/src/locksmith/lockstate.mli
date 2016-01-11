@@ -1,6 +1,6 @@
 (*
  *
- * Copyright (c) 2004-2006, 
+ * Copyright (c) 2004-2007, 
  *  Polyvios Pratikakis <polyvios@cs.umd.edu>
  *  Michael Hicks       <mwh@cs.umd.edu>
  *  Jeff Foster         <jfoster@cs.umd.edu>
@@ -34,17 +34,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *)
-type phi_kind =
-  | PhiVar
-  | PhiForked
-  | PhiPack of Controlflow.phi
-  | PhiNewlock of Labelflow.lock
-  | PhiAcquire of Labelflow.lock
-  | PhiRelease of Labelflow.lock
-  | PhiDelete of Labelflow.lock
-  | PhiSplitCall of Labelflow.lock_effect * Controlflow.phi * Cil.location
-  | PhiSplitReturn of Labelflow.lock_effect * Controlflow.phi
-
 type t = Labelflow.lockSet (** Labelflow.lockSet*)
 
 (*module LS : Controlflow.ForwardsAnalysis
@@ -52,8 +41,6 @@ type t = Labelflow.lockSet (** Labelflow.lockSet*)
 *)
 
 val get_split_state : Controlflow.phi -> t
-val set_phi_kind : Controlflow.phi -> phi_kind -> unit
-val get_phi_kind : Controlflow.phi -> phi_kind
 val print_graph : out_channel -> unit
 val get_state_before : Controlflow.phi -> t
 val solve : unit -> unit

@@ -1,5 +1,20 @@
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: &i:function-pointer4.c:12
 
 Warning: Possible data race: &i:function-pointer4.c:12 is not protected!
@@ -23,13 +38,13 @@ Warning: Possible data race: &i:function-pointer4.c:12 is not protected!
       &i:function-pointer4.c:12
     locks acquired at dereference: 
       <empty>
-    in: main at function-pointer4.c:22 -> thread function-pointer4.c:20 -> callfp function-pointer4.c:14 -> foo function-pointer4.c:14
+    in: main at function-pointer4.c:17 -> thread function-pointer4.c:20 -> callfp function-pointer4.c:14 -> foo function-pointer4.c:14
 
   dereference at function-pointer4.c:4
     locations possibly dereferenced: 
       &i:function-pointer4.c:12
     locks acquired at dereference: 
       <empty>
-    in: main at function-pointer4.c:22 -> thread function-pointer4.c:19 -> callfp function-pointer4.c:14 -> foo function-pointer4.c:14
+    in: main at function-pointer4.c:17 -> thread function-pointer4.c:19 -> callfp function-pointer4.c:14 -> foo function-pointer4.c:14
 
 *************************** DONE ***************************

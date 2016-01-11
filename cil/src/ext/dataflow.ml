@@ -1,9 +1,10 @@
 (*
  *
- * Copyright (c) 2004-2006, 
- *  Polyvios Pratikakis <polyvios@cs.umd.edu>
- *  Michael Hicks       <mwh@cs.umd.edu>
- *  Jeff Foster         <jfoster@cs.umd.edu>
+ * Copyright (c) 2004-2007, 
+ *  George C. Necula    <necula@cs.berkeley.edu>
+ *  Scott McPeak        <smcpeak@cs.berkeley.edu>
+ *  Wes Weimer          <weimer@cs.berkeley.edu>
+ *  (some changes for locksmith) Polyvios Pratikakis <polyvios@cs.umd.edu>
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without

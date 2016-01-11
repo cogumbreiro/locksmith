@@ -39,9 +39,9 @@
 #define PROC_LINE_LENGTH 4096
 
 /* Return the memory used by the current process, in bytes */
-unsigned long get_memusage(void)
+long get_memusage(void)
 {
-  unsigned long vmsize;
+  long vmsize;
   pid_t pid;
   char filename[64];
   char buf[PROC_LINE_LENGTH];
@@ -55,8 +55,10 @@ unsigned long get_memusage(void)
   stat_file = fopen(filename, "r");
   if (!stat_file)
     {
-      perror(filename);
-      exit(EXIT_FAILURE);
+      //POLYVIOS: we might not be running on linux.  mac has no /proc
+      //perror(filename);
+      //exit(EXIT_FAILURE);
+      return -1;
     }
 
   /* Read in /proc/<pid>/stat */

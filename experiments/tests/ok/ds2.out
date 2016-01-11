@@ -1,9 +1,22 @@
 ************************* STARTING *************************
 
+functions declared but not defined:
+  __builtin_expect
+  __builtin_fabs
+  __builtin_fabsl
+  __builtin_memset
+  __builtin_next_arg
+  __builtin_stdarg_start
+  __builtin_strcat
+  __builtin_strchr
+  __builtin_strncat
+  __builtin_strpbrk
+  __builtin_va_arg
+  __builtin_va_copy
+  __builtin_va_end
+  __builtin_varargs_start
 shared: alloc.data:ds2.c:11
 alloc.data:ds2.c:11 is protected by:
-  shared.lock:ds2.c:11
   concrete shared.lock:ds2.c:22
+  shared.lock:ds2.c:11
 *************************** DONE ***************************
-
-
