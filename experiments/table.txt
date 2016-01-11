@@ -1,0 +1,12 @@
+file               Warnings  Races(empty gb-set)   time(1) output
+-----------------------------------------------------------------------
+aget_comb.c           9        2            44.96user 0.17system 0:45.44elapsed
+knot_comb.c          27        8           128.88user 0.56system 2:09.57elapsed
+ctrace_comb.c         8        3           397.65user 0.73system 6:40.91elapsed
+freshclam_comb.c (core dump)
+
+Thu Feb 23 15:42:54 EST 2006
+aget_comb.c           9        2             3.23user 0.20system 0:03.44elapsed
+knot_comb.c          27        8            20.55user 0.56system 0:21.32elapsed
+ctrace_comb.c         8        3             2.97user 0.16system 0:03.14elapsed   
+freshclam_comb.c (core dump)

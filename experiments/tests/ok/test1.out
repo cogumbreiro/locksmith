@@ -1,0 +1,37 @@
+************************* STARTING *************************
+
+shared: &j:test1.c:4
+
+Warning: Possible data race: &j:test1.c:4 is not protected!
+ references:
+  dereference at test1.c:12
+    locations possibly dereferenced: 
+      &j:test1.c:4
+    locks acquired at dereference: 
+      concrete l::-1 -> dostuff test1.c:21
+    in: FORK at test1.c:21 -> dostuff test1.c:21
+
+  dereference at test1.c:12
+    locations possibly dereferenced: 
+      &j:test1.c:4
+    locks acquired at dereference: 
+      concrete l::-1 -> dostuff test1.c:20
+    in: FORK at test1.c:20 -> dostuff test1.c:20
+
+  dereference at test1.c:12
+    locations possibly dereferenced: 
+      &j:test1.c:4
+    locks acquired at dereference: 
+      concrete l::-1 -> dostuff test1.c:21
+    in: main at test1.c:22 -> dostuff test1.c:21
+
+  dereference at test1.c:12
+    locations possibly dereferenced: 
+      &j:test1.c:4
+    locks acquired at dereference: 
+      concrete l::-1 -> dostuff test1.c:20
+    in: main at test1.c:22 -> dostuff test1.c:20
+
+*************************** DONE ***************************
+
+

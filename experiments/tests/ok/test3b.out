@@ -1,0 +1,42 @@
+************************* STARTING *************************
+
+
+test3b.c:15: Warning: lock is conflated! (*l:test3b.c:4)
+
+test3b.c:15: Warning: assigning number to pointer
+
+test3b.c:24: Warning: subtyping incompatible types:
+int
+(void)
+functions declared but not defined:
+  printf
+shared: &i:test3b.c:28
+
+Warning: Possible data race: &i:test3b.c:28 is not protected!
+ references:
+  dereference at test3b.c:24
+    locations possibly dereferenced: 
+      &i:test3b.c:28
+      dostuff.a:test3b.c:31
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at test3b.c:31 -> dostuff test3b.c:31
+
+  dereference at test3b.c:32
+    locations possibly dereferenced: 
+      &i:test3b.c:28
+    locks acquired at dereference: 
+      <empty>
+    in: main at test3b.c:33
+
+  dereference at test3b.c:24
+    locations possibly dereferenced: 
+      &i:test3b.c:28
+      dostuff.a:test3b.c:31
+    locks acquired at dereference: 
+      <empty>
+    in: main at test3b.c:33 -> dostuff test3b.c:31
+
+*************************** DONE ***************************
+
+

@@ -1,0 +1,41 @@
+************************* STARTING *************************
+
+shared: &j:uniq1a.c:4
+        &k:uniq1a.c:10
+&j:uniq1a.c:4 is protected by:
+  l:uniq1a.c:5
+  concrete l:uniq1a.c:23
+
+Warning: Possible data race: &k:uniq1a.c:10 is not protected!
+ references:
+  dereference at uniq1a.c:17
+    locations possibly dereferenced: 
+      &k:uniq1a.c:10
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at uniq1a.c:26 -> dostuff uniq1a.c:26
+
+  dereference at uniq1a.c:17
+    locations possibly dereferenced: 
+      &k:uniq1a.c:10
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at uniq1a.c:25 -> dostuff uniq1a.c:25
+
+  dereference at uniq1a.c:17
+    locations possibly dereferenced: 
+      &k:uniq1a.c:10
+    locks acquired at dereference: 
+      <empty>
+    in: main at uniq1a.c:27 -> dostuff uniq1a.c:26
+
+  dereference at uniq1a.c:17
+    locations possibly dereferenced: 
+      &k:uniq1a.c:10
+    locks acquired at dereference: 
+      <empty>
+    in: main at uniq1a.c:27 -> dostuff uniq1a.c:25
+
+*************************** DONE ***************************
+
+

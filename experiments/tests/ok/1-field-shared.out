@@ -1,0 +1,42 @@
+
+************************* STARTING *************************
+
+shared: alloc.data:1-field-shared.c:15
+
+Warning: Possible data race: alloc.data:1-field-shared.c:15 is not protected!
+ references:
+  dereference at 1-field-shared.c:9
+    locations possibly dereferenced: 
+      (*p, *tmp, *f.p, *f.p).data:1-field-shared.c:15
+      alloc.data:1-field-shared.c:15
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at 1-field-shared.c:18 -> f 1-field-shared.c:18
+
+  dereference at 1-field-shared.c:9
+    locations possibly dereferenced: 
+      (*p, *tmp, *f.p, *f.p).data:1-field-shared.c:15
+      alloc.data:1-field-shared.c:15
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at 1-field-shared.c:17 -> f 1-field-shared.c:17
+
+  dereference at 1-field-shared.c:9
+    locations possibly dereferenced: 
+      (*p, *tmp, *f.p, *f.p).data:1-field-shared.c:15
+      alloc.data:1-field-shared.c:15
+    locks acquired at dereference: 
+      <empty>
+    in: main at 1-field-shared.c:19 -> f 1-field-shared.c:18
+
+  dereference at 1-field-shared.c:9
+    locations possibly dereferenced: 
+      (*p, *tmp, *f.p, *f.p).data:1-field-shared.c:15
+      alloc.data:1-field-shared.c:15
+    locks acquired at dereference: 
+      <empty>
+    in: main at 1-field-shared.c:19 -> f 1-field-shared.c:17
+
+*************************** DONE ***************************
+
+

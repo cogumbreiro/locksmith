@@ -1,0 +1,240 @@
+todo:
++ add switch to turn flow-sensitive "sharedness" on/off
++ turn the flow sensitivity of the "guarded-by" computation
+  (currently flow-sensitive, "per psi") on or off and measure running time
+  changes
++ re-run experiments for all optimizations on/off
++ update all running times in the paper
+++ regression testing & some way to automate it as output-syntax-sensitively
+   as possible
+   it keeps breaking every time I change the error-reporting format :-/
+   + write more small sanity tests
+   + write more small insanity tests and try to enumerate all cases
+     we don't handle
++ send a copy of the (updated with correct results) paper to Bill McCloskey
+
+ideas for locksmith:
++ report "flows-to" paths
+  + do so in a readable way
+    (?) fit every race error message in a page (25x80)
+    (?) copy CQual and use emacs
++ identify read/write locks?
+
+ideas for an AutoLocker clone:
++ identify only data-dependencies and deduce atomic regions from that.
++ think about "auto-locking" data structures
++ use read/write locks
+
+future work:
++ autolocker for java and futures
++ flow analysis & presenting the results (in eclipse?)
++ OO languages (java probably)
++ data flow analysis for languages with quantified types
+
+to read:
++ linear type systems (inferring linearity through flow-analysis?)
+  are there more flow-analyses that use linearity?
+  are there more applications using linear analyses?
+  what kind of analysis does the cyclone-auto-porting tool use to infer unique?
++ escape analysis
++ auto-parallelization
++ auto-synchronization
+
+generic todos:
++ reading group
++ start reading banshee engine
+
+
+Sat Jan 14 09:51:23 EST 2006 (during SPACE)
+ideas for locksmith:
++ reason about "separate compilation"
+  it might actually reduce the memory consumption
+  + think about a format of saving the graph "per function" or "per file"
+    (xml?) and an algorithm of getting rid of irrelevant nodes.
++ at some point we need to solve the array-precision problem....
+  (track integer flow?)
++ semaphores???
+
+read book: 7 habits of really effective people
+plan & write schedule & daily TODO
+
+thoughts on autolocker
++ finish the proof of optimality
++ try to add quantification/instantiation of labels to it see what happens.
++ if not, figure out what has to be done statically & what needs to be done
+  dynamically to avoid deadlock in datastructures.
+
+reading group:
++ scala 
+  oopsla 2005: scalable component abstractions
++ Xavier Leroy paper popl 2006: Formal Certification of a Compiler Back-end
++ Hybrid type checking
++ A Virtual class calculus
++ Harmless Advice
++ B.Pierce TYPES book vol 2. chapters 1 & 2
+
+Tue Jan 17 15:05:57 EST 2006
+problem with analysis:
+&local creates a concrete rho.  that flows to the effects of the function and
+is returned (problem starts).  so, it might be marked as shared (problem
+continues).  a fix can be the way we compute sharedness.
+fix: when flow-sensitive sharedness is off, shared things aren't in the
+intersection of the continuation effects with the forked effects.  instead,
+forked effects DO NOT flow to main thread effects, and we just intersect 
+the effects of EACH THREAD.  that is, the only effects we care about are
+the effect of main(), and the effect of the function forked.
+TODO: need to implement that, currently we're reusing the policy of
+flow-sensitive sharedness.
+
+
+existentials:
+
+I'll try to describe the problem as good as I can.  Hopefully this description
+will be refined over time to be clearer:
+
+Each abstract type in the flow-analysis system captures a context, and "inlines"
+that context (an instance of it actually) whenever the type is instantiated.
+So, \forall types (functions) inline the function body (using fresh variables)
+at every call site of the function.  This way we get context sensitive analysis.
+Similarly, with existentials, \exist types inline any constraints that come up
+from USING the package throughout the program, at the point where the package
+is created.
+The problem rises because existential types are first-class.  So, existential
+types might appear in a universal or existential type.  For example, suppose
+type \exists C_1.tau_1 is a part of the structure of type \exists C_2.\tau_2.
+What does it mean, then, for the context C_1 to be "passed" through some
+instantiation of the including type?  What if something "escapes" the context
+C_1?  What context will the escaping name have a meaning in?
+Is the escaping name defined in the context where C_1 is defined, or in C_2?
+Defined here means essentially "is reached with a matched path from other names
+in C_1 or C_2".
+Example:
+A label L (context C_0) is packed (as l_1) into an existential (enters C_1) at
+instantiation i.
+Then, C_1 enters C_2 at instantiation j.
+Now, l_1 escapes C_1 as l_2.
+Which context is l_2 in? is it matched-reachable from other stuff in C_0,
+or C_2?
+The correct answer should be C_2, obviously.
+However, this is slightly difficult to implement with parentheses...
+The main problem appears to happen when context C_1 enters context C_2 through
+j.
+The easy (and wrong) thing to do at that point, is have names in C_1 directly
+enter C_2 through j.  That's wrong, because now they can't escape C_1 before
+exitting C_2.  We need a configuration such that labels in C_1 entering C_2
+can escape C_1 first, and be in C_2.  Also, we need to be able to
+exit C_2 first and be in C_1!!!
+Now we're stuck, because we can only do that with intersecting CFLs, and we
+don't want to go there...
+We've tried some solutions to that problem, sacrificing some precision in
+each case:
+
+-Solution 1:
+When C_1 enters C_2, it's still C_1, and names CANNOT escape C_1.
+So, this way, we handle all the difficult cases:
+  1) exit C_1 first, then C_2; and
+  2) exit C_2 first, then C_1
+by forbidding them.
+This is somewhat restrictive, even in C programs I had to re-write some
+code in certain cases to make things not escape.
+
+-Solution 2:
+Everything that escapes C_1 is defined both in and out of C_2
+(C_2 selfloops on escape variables)
+The problem here is implementing it.  A zillion self-loops everywhere aren't
+fast.  Moreover, we would need C_2 selfloops for all possible contexts C_2
+that C_1 might enter.
+
+-Solution 3(?):
+I just thought of this one:
+How about having "context capabilities" on existentials?
+So, existential types won't be (\exists \alpha. \tau) any more.
+Instead, existential types will be annotated with a set of "context entering"
+and a set of "context exitting" capabilities:
+
+  \exists [in: i,j,k][out: m,n,o] \alpha . \tau
+
+Now, when entering a context we "consume" the entry capability, and when
+exitting a context we consume the "exit" capability:
+
+\inference{Inst-exist-exit}
+{
+  ...
+}
+{
+  (\exist [in][out] \alpha . \tau) 
+  \preceq_{+}^i
+  (\exist [in][out \union {i}] \beta . \tau') 
+}
+
+\inference{Inst-exist-enter}
+{
+  ...
+}
+{
+  (\exist [in \union {i}][out] \alpha . \tau) 
+  \preceq_{-}^i
+  (\exist [in][out] \beta . \tau') 
+}
+
+Now, whenever \alpha escapes at the unpack point, we have the set of
+contexts (C_2 in the example) that the existential has been passed through,
+and can add the selfloops needed:
+open selfloops for contexts in the "in" set, close-selfloops for contexts
+in the "out" set.
+
+So, everything that escapes C_1 will have the corresponding number of
+"correcting" selfloops to put it in the context where it would have been had
+it not been existentially quantified.
+
+Solution 2 (our current implementation) is the easiest to implement:
++ No great number of self-loops
++ No implication constraints necessary (some solvers have problems with these)
++ Easy to prove O(n^3)
+
+Fri Feb 10 15:44:14 EST 2006
+I've implemented these ways to specify atomic blocks:
+
+1. function attribute
+
+  __attribute__((atomic)) void f() { ... }
+
+  this means the whole function body is an atomic block.
+  we acquire the locks for anything shared in the function just after entering
+  it, and release them just before exitting it (I've assumed there's only one
+  return statement for now, and it's the last in the function body,
+  I'll fix that soon)
+
+2. labeled blocks:
+  
+  #pragma atomic("foo", "foo_l1", "foo_l2")
+
+  void foo() {
+    ...
+    foo_l1: {
+      // atomic block
+    }
+    ...
+    foo_l2: {
+      //another atomic block
+    }
+  }
+
+  This way, you can specify more fine-grain blocks.  The atomic() pragma takes 
+  the function name as first argument, and the label names within that 
+  function follow.  You can use any number of label names after the function 
+  name.
+
+  Locks for shared data are acquired just before entering the block and
+  released just after.  The current implementation for inserting locking
+  is still in a "proof-of-concept" stage, so it doesn't work with gotos
+  from and to the atomic block.  This (as with the function-exit case)
+  isn't hard to fix, I just haven't done it yet.
+
+other issues:
+__attribute__((atomic)) functions can't contain atomic blocks, nor #pragma
+atomic() labels can be nested, but the tool doesn't check that annotations are
+correct currently.  If you nest atomic blocks (by calling an atomic function
+from an atomic function for example,) the locks will be acquired twice,
+because each function body acquires all the locks it needs, even if they've
+been acquired by the caller.

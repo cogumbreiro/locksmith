@@ -1,0 +1,41 @@
+************************* STARTING *************************
+
+shared: alloc.data:ds4b.c:34
+
+Warning: Possible data race: alloc.data:ds4b.c:34 is not protected!
+ references:
+  dereference at ds4b.c:22
+    locations possibly dereferenced: 
+      (*cur).data:ds4b.c:13
+      alloc.data:ds4b.c:34
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at ds4b.c:40 -> run ds4b.c:40
+
+  dereference at ds4b.c:22
+    locations possibly dereferenced: 
+      (*cur).data:ds4b.c:13
+      alloc.data:ds4b.c:34
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at ds4b.c:39 -> run ds4b.c:39
+
+  dereference at ds4b.c:22
+    locations possibly dereferenced: 
+      (*cur).data:ds4b.c:13
+      alloc.data:ds4b.c:34
+    locks acquired at dereference: 
+      <empty>
+    in: main at ds4b.c:41 -> run ds4b.c:40
+
+  dereference at ds4b.c:22
+    locations possibly dereferenced: 
+      (*cur).data:ds4b.c:13
+      alloc.data:ds4b.c:34
+    locks acquired at dereference: 
+      <empty>
+    in: main at ds4b.c:41 -> run ds4b.c:39
+
+*************************** DONE ***************************
+
+

@@ -1,0 +1,81 @@
+************************* STARTING *************************
+
+shared: &j:uniq2.c:4
+        alloc:uniq2.c:13
+&j:uniq2.c:4 is protected by:
+  l:uniq2.c:5
+  concrete l:uniq2.c:25
+
+Warning: Possible data race: alloc:uniq2.c:13 is not protected!
+ references:
+  dereference at uniq2.c:17
+    locations possibly dereferenced: 
+      j:uniq2.c:4
+      k:uniq2.c:10
+      alloc:uniq2.c:13
+    locks acquired at dereference: 
+      l:uniq2.c:5
+      concrete l:uniq2.c:25
+    in: FORK at uniq2.c:28 -> dostuff uniq2.c:28
+
+  dereference at uniq2.c:19
+    locations possibly dereferenced: 
+      alloc:uniq2.c:13
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at uniq2.c:28 -> dostuff uniq2.c:28
+
+  dereference at uniq2.c:17
+    locations possibly dereferenced: 
+      j:uniq2.c:4
+      k:uniq2.c:10
+      alloc:uniq2.c:13
+    locks acquired at dereference: 
+      l:uniq2.c:5
+      concrete l:uniq2.c:25
+    in: FORK at uniq2.c:27 -> dostuff uniq2.c:27
+
+  dereference at uniq2.c:19
+    locations possibly dereferenced: 
+      alloc:uniq2.c:13
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at uniq2.c:27 -> dostuff uniq2.c:27
+
+  dereference at uniq2.c:17
+    locations possibly dereferenced: 
+      j:uniq2.c:4
+      k:uniq2.c:10
+      alloc:uniq2.c:13
+    locks acquired at dereference: 
+      l:uniq2.c:5
+      concrete l:uniq2.c:25
+    in: main at uniq2.c:29 -> dostuff uniq2.c:28
+
+  dereference at uniq2.c:17
+    locations possibly dereferenced: 
+      j:uniq2.c:4
+      k:uniq2.c:10
+      alloc:uniq2.c:13
+    locks acquired at dereference: 
+      l:uniq2.c:5
+      concrete l:uniq2.c:25
+    in: main at uniq2.c:29 -> dostuff uniq2.c:27
+
+  dereference at uniq2.c:19
+    locations possibly dereferenced: 
+      alloc:uniq2.c:13
+    locks acquired at dereference: 
+      <empty>
+    in: main at uniq2.c:29 -> dostuff uniq2.c:28
+
+  dereference at uniq2.c:19
+    locations possibly dereferenced: 
+      alloc:uniq2.c:13
+    locks acquired at dereference: 
+      <empty>
+    in: main at uniq2.c:29 -> dostuff uniq2.c:27
+
+*************************** DONE ***************************
+
+

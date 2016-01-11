@@ -1,0 +1,59 @@
+CHANGES TO THE DRIVER CODE
+--------------------------
+
+PARALLELISM
+
+There are two main sources of parallelism: system calls in "process context" in
+which multiple processes can perform the same actions on the device at the same
+time (e.g., two network ioctls or sends); or interrupt handlers, e.g., to 
+service a timeout or event (e.g., received packet).
+
+Thus, my fake main() could model both.  The interrupts should not start
+flying until we register the device driver with the system, I would think.
+
+SYNC
+
+Looks like we should be treating semaphores as locks in the kernel.
+In particular:
+
+init_MUTEX(&sem) initializes a mutex
+(also static versions)
+down(&sem) is like lock
+up(&sem) is like unlock
+down_interruptible(&sem) and down_trylock(&sem) are like trylock
+
+Q: Do these two functions have the same return value semantics as
+  the pthread version?
+
+There are also reader/writer versions (p. 113 LDD).
+
+Spin locks should only be used in an atomic context.  That is, the 
+code that is called while holding a lock should not block (it's OK
+to be preempted though).  Code that might block includes kmalloc,
+copy_to_user (due to paging), ... Thus in these cases the driver
+will use semaphores instead?
+
+TODO: test case for trylock. 
+
+
+NETWORK DRIVERS
+
+net/core/dev.c:
+
+Drivers should get register_netdevice(dev) to register their
+net_device structure with the kernel.  This routine acquires holding
+the lock which protects the list of net_device structures.  The
+routine register_netdev(dev) acquires this lock and then calls
+register_netdevice(dev).
+
+The rest of the routines in this file are other generic ways of
+calling the drivers.
+
+MODULES
+
+Turns out that we should not think about module loading as happening
+within a single thread.  Rather, it is happening concurrently, but
+nothing will happen until the driver has registered its input
+functions with the kernel. Thus we could model this by defining a stub
+for the kernel registration function that forks the activity thread.
+

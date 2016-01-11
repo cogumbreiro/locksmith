@@ -1,0 +1,2288 @@
+gcc -D_GNUCC -E -DCIL=1 aget_comb_lib.c -o /tmp/cil-78GzqvQC.i
+/fs/macdonald/mwh/src/locksmith/cil/obj/x86_LINUX/cilly.asm.exe --out /tmp/cil-FjMn1avR.cil.c --list-guardedby --list-shared /tmp/cil-78GzqvQC.i
+
+aget_comb_lib.c:1401: Error: cabs2cil: castTo struct __anonstruct___sigset_t_7  const   -> struct __anonstruct___sigset_t_7___0 
+
+error in doExp (Errormsg.Error)
+
+aget_comb_lib.c:1498: Error: cabs2cil: castTo struct __anonstruct___sigset_t_7___0  -> struct __anonstruct___sigset_t_7 
+
+error in doExp (Errormsg.Error)
+
+aget_comb_lib.c:1499: Error: cabs2cil: castTo struct __anonstruct___sigset_t_7  const   -> struct __anonstruct___sigset_t_7___0 
+
+error in doExp (Errormsg.Error)
+old type = TFun(TInt(int, ),
+                __s: TPtr(TNamed(FILE,
+                                 TComp(struct _IO_FILE,
+                                       _flags : TInt(int, ),
+                                       _IO_read_ptr : TPtr(TInt(char, ), ),
+                                       _IO_read_end : TPtr(TInt(char, ), ),
+                                       _IO_read_base : TPtr(TInt(char, ), ),
+                                       _IO_write_base : TPtr(TInt(char, ), ),
+                                       _IO_write_ptr : TPtr(TInt(char, ), ),
+                                       _IO_write_end : TPtr(TInt(char, ), ),
+                                       _IO_buf_base : TPtr(TInt(char, ), ),
+                                       _IO_buf_end : TPtr(TInt(char, ), ),
+                                       _IO_save_base : TPtr(TInt(char, ), ),
+                                       _IO_backup_base : TPtr(TInt(char, ), ),
+                                       _IO_save_end : TPtr(TInt(char, ), ),
+                                       _markers : TPtr(TComp(struct _IO_marker,
+                                                             _next : TPtr(TCompLoop(struct _IO_marker, _, ),
+                                                             ),
+                                                             _sbuf : TPtr(TCompLoop(struct _IO_FILE, _, ),
+                                                             ),
+                                                             _pos : TInt(int, ),
+                                                             , ), ),
+                                       _chain : TPtr(TCompLoop(struct _IO_FILE, _, ),
+                                       ), _fileno : TInt(int, ),
+                                       _flags2 : TInt(int, ),
+                                       _old_offset : TNamed(__off_t,
+                                                            TInt(long, ), ),
+                                       _cur_column : TInt(unsigned short, ),
+                                       _vtable_offset : TInt(signed char, ),
+                                       _shortbuf : TArray(TInt(char, ),
+                                                          Some(Const(Int64(1,int,None))),
+                                       ),
+                                       _lock : TPtr(TNamed(_IO_lock_t, TVoid(), ),
+                                       ),
+                                       _offset : TNamed(__off64_t,
+                                                        TNamed(__quad_t,
+                                                               TInt(long long, ),
+                                                        ), ),
+                                       __pad1 : TPtr(TVoid(), ),
+                                       __pad2 : TPtr(TVoid(), ),
+                                       _mode : TInt(int, ),
+                                       _unused2 : TArray(TInt(char, ),
+                                                         Some(CastE(TInt(int, ),
+                                                                    -(*(Const(Int64(15,unsigned int,None)),
+                                                                        sizeof(TInt(int,
+                                                                        ))),
+                                                                      *(Const(Int64(2,unsigned int,None)),
+                                                                        sizeof(TPtr(TVoid(),
+                                                                        )))))),
+                                       ), , ), ), ),
+                __format: TPtr(TInt(char,  const  ), ),
+                __arg: TNamed(__gnuc_va_list, TBuiltin_va_list(), ), )
+new type = TFun(TInt(int, ),
+                stream: TPtr(TNamed(FILE___0, TCompLoop(struct _IO_FILE, _, ), ),
+                ), fmt: TPtr(TInt(char,  const  ), ),
+                ap: TNamed(va_list___0, TBuiltin_va_list(), ), )
+
+aget_comb_lib.c:1513: Error: Declaration of vfprintf does not match previous declaration from aget_comb_lib.c:524 (different type constructors).
+error in collectFunction vfprintf: Errormsg.Error
+
+aget_comb_lib.c:1553: Error: cabs2cil: castTo struct __anonstruct___sigset_t_7___0  -> struct __anonstruct___sigset_t_7 
+
+error in doExp (Errormsg.Error)
+
+aget_comb_lib.c:1559: Error: cabs2cil: castTo struct __anonstruct___sigset_t_7___0  -> struct __anonstruct___sigset_t_7 
+
+error in doExp (Errormsg.Error)
+
+************************* STARTING *************************
+
+
+aget_comb_lib.c:896: Warning: subtyping incompatible types:
+int
+struct in_addr {
+  }
+
+aget_comb_lib.c:896: Warning: subtyping incompatible types:
+struct in_addr {
+  }
+int
+
+aget_comb_lib.c:1048: Warning: assigning number to pointer
+
+aget_comb_lib.c:1055: Warning: assigning number to pointer
+
+aget_comb_lib.c:1063: Warning: assigning number to pointer
+
+aget_comb_lib.c:1070: Warning: assigning number to pointer
+
+aget_comb_lib.c:1447: Warning: subtyping incompatible types:
+struct sockaddr {
+  }
+int
+
+aget_comb_lib.c:1492: Warning: assigning number to pointer
+functions declared but not defined:
+  vfprintf
+shared: .req#7555\naget_comb_lib.c:187
+        .soffset#7547\naget_comb_lib.c:346
+        .status#7540\naget_comb_lib.c:346
+        .offset#7539\naget_comb_lib.c:346
+        .soffset#7538\naget_comb_lib.c:451
+        .status#7531\naget_comb_lib.c:451
+        .offset#7530\naget_comb_lib.c:451
+        .req#7526\naget_comb_lib.c:1136
+        .offset#7508\naget_comb_lib.c:172
+        .status#7507\naget_comb_lib.c:172
+        .soffset#7498\naget_comb_lib.c:172
+        .soffset#7476\naget_comb_lib.c:187
+        .status#7467\naget_comb_lib.c:187
+        .offset#7466\naget_comb_lib.c:187
+        .req#7462\naget_comb_lib.c:172
+        .req#7433\naget_comb_lib.c:187
+        r#7192\naget_comb_lib.c:1534
+        r#7173\naget_comb_lib.c:1528
+        asm#7095\naget_comb_lib.c:1499
+        asm#7094\naget_comb_lib.c:1498
+        r#6970\naget_comb_lib.c:1469
+        r#6964\naget_comb_lib.c:1468
+        r#6889\naget_comb_lib.c:1447
+        .sa_family#6887\naget_comb_lib.c:1447
+        r#6850\naget_comb_lib.c:1435
+        r#6844\naget_comb_lib.c:1434
+        r#6831\naget_comb_lib.c:1430
+        r#6825\naget_comb_lib.c:1429
+        r#6699\naget_comb_lib.c:1393
+        r#6693\naget_comb_lib.c:1391
+        r#6642\naget_comb_lib.c:1378
+        .req#5943\naget_comb_lib.c:1136
+        .status#5720\naget_comb_lib.c:1015
+        .clength#5704\naget_comb_lib.c:1015
+        r#5682\naget_comb_lib.c:1112
+        r#5675\naget_comb_lib.c:1112
+        r#5651\naget_comb_lib.c:1107
+        r#5644\naget_comb_lib.c:1107
+        r#5640\naget_comb_lib.c:1106
+        .offset#5562\naget_comb_lib.c:1015
+        .soffset#5561\naget_comb_lib.c:1015
+        r#5400\naget_comb_lib.c:1065
+        r#5393\naget_comb_lib.c:1065
+        r#5337\naget_comb_lib.c:1058
+        r#5330\naget_comb_lib.c:1058
+        r#5318\naget_comb_lib.c:1015
+        alloc#5181\naget_comb_lib.c:1042
+        .foffset#5177\naget_comb_lib.c:1015
+        r#5168\naget_comb_lib.c:1039
+        r#5161\naget_comb_lib.c:1039
+        r#5160\naget_comb_lib.c:1039
+        r#5116\naget_comb_lib.c:1017
+        r#5098\naget_comb_lib.c:1011
+        r#5057\naget_comb_lib.c:1006
+        &bwritten#4776\naget_comb_lib.c:963
+        r#4044\naget_comb_lib.c:852
+        r#4036\naget_comb_lib.c:851
+        &prev#3702\naget_comb_lib.c:794
+        r#3695\naget_comb_lib.c:790
+        r#3688\naget_comb_lib.c:790
+        r#3563\naget_comb_lib.c:776
+        alloc#3552\naget_comb_lib.c:775
+        r#3532\naget_comb_lib.c:768
+        r#2484\naget_comb_lib.c:522
+        .offset#2203\naget_comb_lib.c:182
+        .req#1982\naget_comb_lib.c:174
+        .status#1828\naget_comb_lib.c:182
+        .soffset#1661\naget_comb_lib.c:182
+        r#1092\naget_comb_lib.c:294
+        r#1074\naget_comb_lib.c:289
+        alloc#396\naget_comb_lib.c:193
+        r#366\naget_comb_lib.c:180
+
+Error: Possible data race: .req#7555\naget_comb_lib.c:187 is not protected!
+ references:
+  guard@aget_comb_lib.c:218
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:218
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:224
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:224
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:457
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:457
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:459
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:459
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:463
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:463
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:468
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:468
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:472
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:472
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:513
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:513
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1001
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1001
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1143
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1143
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1145
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1145
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1148
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1148
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1184
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1184
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1186
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1186
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1189
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1189
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+Error: Possible data race: .soffset#7547\naget_comb_lib.c:346 is not protected!
+ references:
+  guard@aget_comb_lib.c:1095
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1097
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1099
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1101
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:391
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:480
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+Error: Possible data race: .status#7540\naget_comb_lib.c:346 is not protected!
+ references:
+  guard@aget_comb_lib.c:1121
+  rho: .status#7540\naget_comb_lib.c:346
+       .status#7531\naget_comb_lib.c:451
+       .status#7467\naget_comb_lib.c:187
+       .status#1828\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:414
+  rho: .status#7540\naget_comb_lib.c:346
+       .status#7531\naget_comb_lib.c:451
+       .status#7467\naget_comb_lib.c:187
+       .status#1828\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:498
+  rho: .status#7540\naget_comb_lib.c:346
+       .status#7531\naget_comb_lib.c:451
+       .status#7467\naget_comb_lib.c:187
+       .status#1828\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:990
+  rho: .status#7540\naget_comb_lib.c:346
+       .status#7531\naget_comb_lib.c:451
+       .status#7467\naget_comb_lib.c:187
+       .status#1828\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:990
+  rho: .status#7540\naget_comb_lib.c:346
+       .status#7531\naget_comb_lib.c:451
+       .status#7467\naget_comb_lib.c:187
+       .status#1828\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+Error: Possible data race: .offset#7539\naget_comb_lib.c:346 is not protected!
+ references:
+  guard@aget_comb_lib.c:1095
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1101
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1105
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1108
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1109
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1109
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1112
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1114
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1114
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1120
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:480
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+Error: Possible data race: .soffset#7538\naget_comb_lib.c:451 is not protected!
+ references:
+  guard@aget_comb_lib.c:1095
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1097
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1099
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1101
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:391
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:480
+  rho: .soffset#7547\naget_comb_lib.c:346
+       .soffset#7538\naget_comb_lib.c:451
+       .soffset#7476\naget_comb_lib.c:187
+       .soffset#1661\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+Error: Possible data race: .status#7531\naget_comb_lib.c:451 is not protected!
+ references:
+  guard@aget_comb_lib.c:1121
+  rho: .status#7540\naget_comb_lib.c:346
+       .status#7531\naget_comb_lib.c:451
+       .status#7467\naget_comb_lib.c:187
+       .status#1828\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:414
+  rho: .status#7540\naget_comb_lib.c:346
+       .status#7531\naget_comb_lib.c:451
+       .status#7467\naget_comb_lib.c:187
+       .status#1828\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:498
+  rho: .status#7540\naget_comb_lib.c:346
+       .status#7531\naget_comb_lib.c:451
+       .status#7467\naget_comb_lib.c:187
+       .status#1828\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:990
+  rho: .status#7540\naget_comb_lib.c:346
+       .status#7531\naget_comb_lib.c:451
+       .status#7467\naget_comb_lib.c:187
+       .status#1828\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:990
+  rho: .status#7540\naget_comb_lib.c:346
+       .status#7531\naget_comb_lib.c:451
+       .status#7467\naget_comb_lib.c:187
+       .status#1828\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+Error: Possible data race: .offset#7530\naget_comb_lib.c:451 is not protected!
+ references:
+  guard@aget_comb_lib.c:1095
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1101
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1105
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1108
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1109
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1109
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1112
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1114
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1114
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:1120
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 77aget_comb_lib.c:486 
+
+  guard@aget_comb_lib.c:480
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .offset#7539\naget_comb_lib.c:346
+       .offset#7530\naget_comb_lib.c:451
+       .offset#7466\naget_comb_lib.c:187
+       .offset#2203\naget_comb_lib.c:182
+  acq: 
+  through: 
+
+Error: Possible data race: .req#7526\naget_comb_lib.c:1136 is not protected!
+ references:
+  guard@aget_comb_lib.c:218
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:218
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:224
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:224
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:457
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:457
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:459
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:459
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:463
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:463
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:468
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:468
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:472
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:472
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:513
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:513
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1001
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1001
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1143
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1143
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1145
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1145
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1148
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1148
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1184
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1184
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1186
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1186
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1189
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1189
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+Error: Possible data race: alloc#5181\naget_comb_lib.c:1042 is not protected!
+ references:
+  guard@aget_comb_lib.c:1393
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       r#5594\naget_comb_lib.c:1099
+       r#5587\naget_comb_lib.c:1099
+       r#5580\naget_comb_lib.c:1097
+       r#5573\naget_comb_lib.c:1097
+       alloc#5181\naget_comb_lib.c:1042
+       r#5117\naget_comb_lib.c:1018
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 197aget_comb_lib.c:1097 
+
+  guard@aget_comb_lib.c:1393
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       r#5594\naget_comb_lib.c:1099
+       r#5587\naget_comb_lib.c:1099
+       alloc#5181\naget_comb_lib.c:1042
+       r#5117\naget_comb_lib.c:1018
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 198aget_comb_lib.c:1099 
+
+  guard@aget_comb_lib.c:1393
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5668\naget_comb_lib.c:1109
+       r#5661\naget_comb_lib.c:1109
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       alloc#5181\naget_comb_lib.c:1042
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 200aget_comb_lib.c:1109 
+
+  guard@aget_comb_lib.c:1393
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       alloc#5181\naget_comb_lib.c:1042
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 201aget_comb_lib.c:1112 
+
+  guard@aget_comb_lib.c:1393
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       r#5594\naget_comb_lib.c:1099
+       r#5587\naget_comb_lib.c:1099
+       r#5580\naget_comb_lib.c:1097
+       r#5573\naget_comb_lib.c:1097
+       alloc#5181\naget_comb_lib.c:1042
+       r#5117\naget_comb_lib.c:1018
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 197aget_comb_lib.c:1097 
+
+  guard@aget_comb_lib.c:1393
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       r#5594\naget_comb_lib.c:1099
+       r#5587\naget_comb_lib.c:1099
+       alloc#5181\naget_comb_lib.c:1042
+       r#5117\naget_comb_lib.c:1018
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 198aget_comb_lib.c:1099 
+
+  guard@aget_comb_lib.c:1393
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5668\naget_comb_lib.c:1109
+       r#5661\naget_comb_lib.c:1109
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       alloc#5181\naget_comb_lib.c:1042
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 200aget_comb_lib.c:1109 
+
+  guard@aget_comb_lib.c:1393
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       alloc#5181\naget_comb_lib.c:1042
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 201aget_comb_lib.c:1112 
+
+  guard@aget_comb_lib.c:1430
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       r#5400\naget_comb_lib.c:1065
+       r#5393\naget_comb_lib.c:1065
+       alloc#5181\naget_comb_lib.c:1042
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 190aget_comb_lib.c:1065 
+
+  guard@aget_comb_lib.c:1430
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       alloc#5181\naget_comb_lib.c:1042
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 199aget_comb_lib.c:1107 
+
+  guard@aget_comb_lib.c:1430
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       r#5400\naget_comb_lib.c:1065
+       r#5393\naget_comb_lib.c:1065
+       alloc#5181\naget_comb_lib.c:1042
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 190aget_comb_lib.c:1065 
+
+  guard@aget_comb_lib.c:1430
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       alloc#5181\naget_comb_lib.c:1042
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 199aget_comb_lib.c:1107 
+
+  guard@aget_comb_lib.c:1106
+  rho: r#5682\naget_comb_lib.c:1112
+       r#5675\naget_comb_lib.c:1112
+       r#5651\naget_comb_lib.c:1107
+       r#5644\naget_comb_lib.c:1107
+       r#5640\naget_comb_lib.c:1106
+       alloc#5181\naget_comb_lib.c:1042
+       r#5116\naget_comb_lib.c:1017
+  acq: 
+  through: 
+
+Error: Possible data race: &bwritten#4776\naget_comb_lib.c:963 is not protected!
+ references:
+  guard@aget_comb_lib.c:1001
+  rho: &bwritten#4776\naget_comb_lib.c:963
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1103
+  rho: &bwritten#4776\naget_comb_lib.c:963
+  acq: Cl#5103\naget_comb_lib.c:1013
+       l#5102\naget_comb_lib.c:1013
+       l#5100\naget_comb_lib.c:1013
+  through: 
+
+  guard@aget_comb_lib.c:1103
+  rho: &bwritten#4776\naget_comb_lib.c:963
+  acq: Cl#5103\naget_comb_lib.c:1013
+       l#5102\naget_comb_lib.c:1013
+       l#5100\naget_comb_lib.c:1013
+  through: 
+
+  guard@aget_comb_lib.c:1116
+  rho: &bwritten#4776\naget_comb_lib.c:963
+  acq: Cl#5103\naget_comb_lib.c:1013
+       l#5102\naget_comb_lib.c:1013
+       l#5100\naget_comb_lib.c:1013
+  through: 
+
+  guard@aget_comb_lib.c:1116
+  rho: &bwritten#4776\naget_comb_lib.c:963
+  acq: Cl#5103\naget_comb_lib.c:1013
+       l#5102\naget_comb_lib.c:1013
+       l#5100\naget_comb_lib.c:1013
+  through: 
+
+  guard@aget_comb_lib.c:1118
+  rho: &bwritten#4776\naget_comb_lib.c:963
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1163
+  rho: &bwritten#4776\naget_comb_lib.c:963
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1208
+  rho: &bwritten#4776\naget_comb_lib.c:963
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1210
+  rho: &bwritten#4776\naget_comb_lib.c:963
+  acq: 
+  through: 
+
+Error: Possible data race: &prev#3702\naget_comb_lib.c:794 is not protected!
+ references:
+  guard@aget_comb_lib.c:802
+  rho: &prev#3702\naget_comb_lib.c:794
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:818
+  rho: &prev#3702\naget_comb_lib.c:794
+  acq: 
+  through: 
+
+Error: Possible data race: alloc#3552\naget_comb_lib.c:775 is not protected!
+ references:
+  guard@aget_comb_lib.c:1469
+  rho: r#3695\naget_comb_lib.c:790
+       r#3688\naget_comb_lib.c:790
+       alloc#3552\naget_comb_lib.c:775
+       r#3532\naget_comb_lib.c:768
+  acq: 
+  through: 116aget_comb_lib.c:790 
+
+  guard@aget_comb_lib.c:1469
+  rho: r#3695\naget_comb_lib.c:790
+       r#3688\naget_comb_lib.c:790
+       alloc#3552\naget_comb_lib.c:775
+       r#3532\naget_comb_lib.c:768
+  acq: 
+  through: 116aget_comb_lib.c:790 
+
+  guard@aget_comb_lib.c:1530
+  rho: r#3695\naget_comb_lib.c:790
+       r#3688\naget_comb_lib.c:790
+       r#3563\naget_comb_lib.c:776
+       alloc#3552\naget_comb_lib.c:775
+       r#3532\naget_comb_lib.c:768
+  acq: 
+  through: 107aget_comb_lib.c:776 
+
+  guard@aget_comb_lib.c:1530
+  rho: r#3695\naget_comb_lib.c:790
+       r#3688\naget_comb_lib.c:790
+       r#3563\naget_comb_lib.c:776
+       alloc#3552\naget_comb_lib.c:775
+       r#3532\naget_comb_lib.c:768
+  acq: 
+  through: 107aget_comb_lib.c:776 
+
+Error: Possible data race: alloc#396\naget_comb_lib.c:193 is not protected!
+ references:
+  guard@aget_comb_lib.c:218
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:218
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:224
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:224
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:455
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:457
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:457
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:459
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:459
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:463
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:463
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:468
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:468
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:472
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:472
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:482
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:513
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:513
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1001
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1001
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1143
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1143
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1145
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1145
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1148
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1148
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1184
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1184
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1186
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1186
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1189
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+
+  guard@aget_comb_lib.c:1189
+  rho: .req#7555\naget_comb_lib.c:187
+       .req#7526\naget_comb_lib.c:1136
+       .req#7433\naget_comb_lib.c:187
+       .req#5943\naget_comb_lib.c:1136
+       .req#1982\naget_comb_lib.c:174
+       alloc#396\naget_comb_lib.c:193
+       r#366\naget_comb_lib.c:180
+  acq: 
+  through: 
+*************************** DONE ***************************
+
+LockSmith run for: 1.010000 seconds
+
+
+Error: Cabs2cil has some errors
+Fatal error: exception Errormsg.Error

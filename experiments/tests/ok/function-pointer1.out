@@ -1,0 +1,30 @@
+************************* STARTING *************************
+
+shared: &j:function-pointer1.c:4
+
+Warning: Possible data race: &j:function-pointer1.c:4 is not protected!
+ references:
+  dereference at function-pointer1.c:23
+    locations possibly dereferenced: 
+      &j:function-pointer1.c:4
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at function-pointer1.c:32 -> dostuff function-pointer1.c:32
+
+  dereference at function-pointer1.c:33
+    locations possibly dereferenced: 
+      &j:function-pointer1.c:4
+    locks acquired at dereference: 
+      <empty>
+    in: main at function-pointer1.c:34
+
+  dereference at function-pointer1.c:23
+    locations possibly dereferenced: 
+      &j:function-pointer1.c:4
+    locks acquired at dereference: 
+      <empty>
+    in: main at function-pointer1.c:34 -> dostuff function-pointer1.c:32
+
+*************************** DONE ***************************
+
+

@@ -1,0 +1,32 @@
+************************* STARTING *************************
+
+shared: &j:goto.c:4
+
+Warning: Possible data race: &j:goto.c:4 is not protected!
+ references:
+  dereference at goto.c:11
+    locations possibly dereferenced: 
+      &j:goto.c:4
+    locks acquired at dereference: 
+      l:goto.c:5
+      concrete l:goto.c:18
+    in: FORK at goto.c:20 -> dostuff goto.c:20
+
+  dereference at goto.c:33
+    locations possibly dereferenced: 
+      &j:goto.c:4
+    locks acquired at dereference: 
+      <empty>
+    in: main at goto.c:34
+
+  dereference at goto.c:11
+    locations possibly dereferenced: 
+      &j:goto.c:4
+    locks acquired at dereference: 
+      l:goto.c:5
+      concrete l:goto.c:18
+    in: main at goto.c:34 -> dostuff goto.c:20
+
+*************************** DONE ***************************
+
+

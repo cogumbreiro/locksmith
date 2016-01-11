@@ -1,0 +1,30 @@
+************************* STARTING *************************
+
+shared: &i:function-pointer2.c:14
+
+Warning: Possible data race: &i:function-pointer2.c:14 is not protected!
+ references:
+  dereference at function-pointer2.c:19
+    locations possibly dereferenced: 
+      &i:function-pointer2.c:14
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at function-pointer2.c:26 -> thread_main function-pointer2.c:26
+
+  dereference at function-pointer2.c:27
+    locations possibly dereferenced: 
+      &i:function-pointer2.c:14
+    locks acquired at dereference: 
+      <empty>
+    in: main at function-pointer2.c:28
+
+  dereference at function-pointer2.c:19
+    locations possibly dereferenced: 
+      &i:function-pointer2.c:14
+    locks acquired at dereference: 
+      <empty>
+    in: main at function-pointer2.c:28 -> thread_main function-pointer2.c:26
+
+*************************** DONE ***************************
+
+

@@ -1,0 +1,47 @@
+
+************************* STARTING *************************
+
+shared: alloc.numfiles:ds-gftp.c:35
+        alloc.cancel:ds-gftp.c:35
+        alloc.done:ds-gftp.c:35
+
+Warning: Possible data race: alloc.numfiles:ds-gftp.c:35 is not protected!
+ references:
+  dereference at ds-gftp.c:67
+    locations possibly dereferenced: 
+      (*tdata).numfiles:ds-gftp.c:96
+      (**gftp_tdata_new, **tdata).numfiles:ds-gftp.c:38
+      alloc.numfiles:ds-gftp.c:35
+    locks acquired at dereference: 
+      (**tdata, **tmp, *gftp_tdata_new.return, *doit1.tdata, *doit2.tdata).statmutex:ds-gftp.c:96
+      concrete tdata->statmutex::-1 -> gftp_tdata_new ds-gftp.c:96
+    in: FORK at ds-gftp.c:100 -> doit2 ds-gftp.c:100 -> update_file_status ds-gftp.c:86
+
+  dereference at ds-gftp.c:97
+    locations possibly dereferenced: 
+      (*tdata).numfiles:ds-gftp.c:96
+      (**gftp_tdata_new, **tdata).numfiles:ds-gftp.c:38
+      alloc.numfiles:ds-gftp.c:35
+    locks acquired at dereference: 
+      <empty>
+    in: main at ds-gftp.c:96
+
+  dereference at ds-gftp.c:67
+    locations possibly dereferenced: 
+      (*tdata).numfiles:ds-gftp.c:96
+      (**gftp_tdata_new, **tdata).numfiles:ds-gftp.c:38
+      alloc.numfiles:ds-gftp.c:35
+    locks acquired at dereference: 
+      (**tdata, **tmp, *gftp_tdata_new.return, *doit1.tdata, *doit2.tdata).statmutex:ds-gftp.c:96
+      concrete tdata->statmutex::-1 -> gftp_tdata_new ds-gftp.c:96
+    in: main at ds-gftp.c:96 -> doit2 ds-gftp.c:100 -> update_file_status ds-gftp.c:86
+
+alloc.cancel:ds-gftp.c:35 is protected by:
+  (**tdata, **tmp, *gftp_tdata_new.return, *doit1.tdata, *doit2.tdata).structmutex:ds-gftp.c:96
+  concrete tdata->structmutex::-1 -> gftp_tdata_new ds-gftp.c:96
+alloc.done:ds-gftp.c:35 is protected by:
+  (**tdata, **tmp, *gftp_tdata_new.return, *doit1.tdata, *doit2.tdata).structmutex:ds-gftp.c:96
+  concrete tdata->structmutex::-1 -> gftp_tdata_new ds-gftp.c:96
+*************************** DONE ***************************
+
+

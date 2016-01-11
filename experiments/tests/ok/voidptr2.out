@@ -1,0 +1,45 @@
+************************* STARTING *************************
+
+shared: &a:voidptr2.c:9
+
+Warning: Possible data race: &a:voidptr2.c:9 is not protected!
+ references:
+  dereference at voidptr2.c:5
+    locations possibly dereferenced: 
+      &a:voidptr2.c:9
+      dostuff.x:voidptr2.c:11
+      dostuff.x:voidptr2.c:12
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at voidptr2.c:12 -> dostuff voidptr2.c:12
+
+  dereference at voidptr2.c:5
+    locations possibly dereferenced: 
+      &a:voidptr2.c:9
+      dostuff.x:voidptr2.c:11
+      dostuff.x:voidptr2.c:12
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at voidptr2.c:11 -> dostuff voidptr2.c:11
+
+  dereference at voidptr2.c:5
+    locations possibly dereferenced: 
+      &a:voidptr2.c:9
+      dostuff.x:voidptr2.c:11
+      dostuff.x:voidptr2.c:12
+    locks acquired at dereference: 
+      <empty>
+    in: main at voidptr2.c:13 -> dostuff voidptr2.c:12
+
+  dereference at voidptr2.c:5
+    locations possibly dereferenced: 
+      &a:voidptr2.c:9
+      dostuff.x:voidptr2.c:11
+      dostuff.x:voidptr2.c:12
+    locks acquired at dereference: 
+      <empty>
+    in: main at voidptr2.c:13 -> dostuff voidptr2.c:11
+
+*************************** DONE ***************************
+
+

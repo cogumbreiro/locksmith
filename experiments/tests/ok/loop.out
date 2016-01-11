@@ -1,0 +1,42 @@
+************************* STARTING *************************
+
+shared: &j:loop.c:4
+
+Warning: Possible data race: &j:loop.c:4 is protected by non-linear or concrete lock(s):
+  l:loop.c:6
+  non linear concrete l:loop.c:20
+ references:
+  dereference at loop.c:10
+    locations possibly dereferenced: 
+      &j:loop.c:4
+    locks acquired at dereference: 
+      l:loop.c:6
+      non linear concrete l:loop.c:20
+    in: FORK at loop.c:23 -> dostuff loop.c:23
+
+  dereference at loop.c:10
+    locations possibly dereferenced: 
+      &j:loop.c:4
+    locks acquired at dereference: 
+      l:loop.c:6
+      non linear concrete l:loop.c:20
+    in: FORK at loop.c:22 -> dostuff loop.c:22
+
+  dereference at loop.c:10
+    locations possibly dereferenced: 
+      &j:loop.c:4
+    locks acquired at dereference: 
+      l:loop.c:6
+      non linear concrete l:loop.c:20
+    in: main at loop.c:20 -> dostuff loop.c:23
+
+  dereference at loop.c:10
+    locations possibly dereferenced: 
+      &j:loop.c:4
+    locks acquired at dereference: 
+      l:loop.c:6
+      non linear concrete l:loop.c:20
+    in: main at loop.c:20 -> dostuff loop.c:22
+
+*************************** DONE ***************************
+

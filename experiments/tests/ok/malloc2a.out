@@ -1,0 +1,42 @@
+************************* STARTING *************************
+
+shared: alloc:malloc2a.c:13
+
+Warning: Possible data race: alloc:malloc2a.c:13 is not protected!
+ references:
+  dereference at malloc2a.c:9
+    locations possibly dereferenced: 
+      i:malloc2a.c:13
+      tmp::-1
+      *a:malloc2a.c:14
+      *tmp___0::-1
+      alloc:malloc2a.c:13
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at malloc2a.c:16 -> dostuff malloc2a.c:16
+
+  dereference at malloc2a.c:17
+    locations possibly dereferenced: 
+      i:malloc2a.c:13
+      tmp::-1
+      *a:malloc2a.c:14
+      *tmp___0::-1
+      alloc:malloc2a.c:13
+    locks acquired at dereference: 
+      <empty>
+    in: main at malloc2a.c:18
+
+  dereference at malloc2a.c:9
+    locations possibly dereferenced: 
+      i:malloc2a.c:13
+      tmp::-1
+      *a:malloc2a.c:14
+      *tmp___0::-1
+      alloc:malloc2a.c:13
+    locks acquired at dereference: 
+      <empty>
+    in: main at malloc2a.c:18 -> dostuff malloc2a.c:16
+
+*************************** DONE ***************************
+
+

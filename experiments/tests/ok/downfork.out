@@ -1,0 +1,27 @@
+************************* STARTING *************************
+
+
+downfork.c:4: Warning: subtyping incompatible types:
+int
+(void)
+shared: &x:downfork.c:11
+
+Warning: Possible data race: &x:downfork.c:11 is not protected!
+ references:
+  dereference at downfork.c:13
+    locations possibly dereferenced: 
+      &x:downfork.c:11
+    locks acquired at dereference: 
+      <empty>
+    in: main at downfork.c:14
+
+  dereference at downfork.c:4
+    locations possibly dereferenced: 
+      &x:downfork.c:11
+      dofork.y:downfork.c:12
+    locks acquired at dereference: 
+      <empty>
+    in: main at downfork.c:14 -> dofork downfork.c:12 -> doit downfork.c:8
+
+*************************** DONE ***************************
+

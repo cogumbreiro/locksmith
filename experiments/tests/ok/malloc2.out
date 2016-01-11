@@ -1,0 +1,80 @@
+************************* STARTING *************************
+
+shared: alloc:malloc2.c:16
+        alloc:malloc2.c:17
+
+Warning: Possible data race: alloc:malloc2.c:16 is not protected!
+ references:
+  dereference at malloc2.c:9
+    locations possibly dereferenced: 
+      i:malloc2.c:16
+      tmp::-1
+      *a:malloc2.c:17
+      *tmp___0::-1
+      alloc:malloc2.c:16
+      *id.a:malloc2.c:20
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at malloc2.c:19 -> dostuff malloc2.c:19
+
+  dereference at malloc2.c:9
+    locations possibly dereferenced: 
+      i:malloc2.c:16
+      tmp::-1
+      *a:malloc2.c:17
+      *tmp___0::-1
+      alloc:malloc2.c:16
+      *id.a:malloc2.c:20
+    locks acquired at dereference: 
+      <empty>
+    in: main at malloc2.c:21 -> dostuff malloc2.c:19
+
+  dereference at malloc2.c:13
+    locations possibly dereferenced: 
+      i:malloc2.c:16
+      tmp::-1
+      *a:malloc2.c:17
+      *tmp___0::-1
+      alloc:malloc2.c:16
+      *id.a:malloc2.c:20
+    locks acquired at dereference: 
+      <empty>
+    in: main at malloc2.c:21 -> id malloc2.c:20
+
+
+Warning: Possible data race: alloc:malloc2.c:17 is not protected!
+ references:
+  dereference at malloc2.c:9
+    locations possibly dereferenced: 
+      a:malloc2.c:17
+      tmp___0::-1
+      alloc:malloc2.c:17
+      dostuff.a:malloc2.c:19
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at malloc2.c:19 -> dostuff malloc2.c:19
+
+  dereference at malloc2.c:9
+    locations possibly dereferenced: 
+      a:malloc2.c:17
+      tmp___0::-1
+      alloc:malloc2.c:17
+      dostuff.a:malloc2.c:19
+    locks acquired at dereference: 
+      <empty>
+    in: main at malloc2.c:21 -> dostuff malloc2.c:19
+
+  dereference at malloc2.c:13
+    locations possibly dereferenced: 
+      a:malloc2.c:17
+      tmp___0::-1
+      alloc:malloc2.c:17
+      dostuff.a:malloc2.c:19
+      id.a:malloc2.c:20
+    locks acquired at dereference: 
+      <empty>
+    in: main at malloc2.c:21 -> id malloc2.c:20
+
+*************************** DONE ***************************
+
+

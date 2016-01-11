@@ -1,0 +1,9 @@
+************************* STARTING *************************
+
+shared: alloc.bar:recursive1.c:10
+alloc.bar:recursive1.c:10 is protected by:
+  l:recursive1.c:17
+  concrete l:recursive1.c:32
+*************************** DONE ***************************
+
+

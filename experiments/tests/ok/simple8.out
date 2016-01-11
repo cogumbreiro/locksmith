@@ -1,0 +1,42 @@
+
+************************* STARTING *************************
+
+shared: &foo:simple8.c:10
+
+Warning: Possible data race: &foo:simple8.c:10 is not protected!
+ references:
+  dereference at simple8.c:7
+    locations possibly dereferenced: 
+      &foo:simple8.c:10
+      f.j:simple8.c:13
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at simple8.c:13 -> f simple8.c:13
+
+  dereference at simple8.c:7
+    locations possibly dereferenced: 
+      &foo:simple8.c:10
+      f.j:simple8.c:12
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at simple8.c:12 -> f simple8.c:12
+
+  dereference at simple8.c:7
+    locations possibly dereferenced: 
+      &foo:simple8.c:10
+      f.j:simple8.c:13
+    locks acquired at dereference: 
+      <empty>
+    in: main at simple8.c:14 -> f simple8.c:13
+
+  dereference at simple8.c:7
+    locations possibly dereferenced: 
+      &foo:simple8.c:10
+      f.j:simple8.c:12
+    locks acquired at dereference: 
+      <empty>
+    in: main at simple8.c:14 -> f simple8.c:12
+
+*************************** DONE ***************************
+
+

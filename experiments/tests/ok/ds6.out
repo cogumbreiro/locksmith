@@ -1,0 +1,56 @@
+************************* STARTING *************************
+
+shared: alloc.data:ds6.c:40
+        alloc.next:ds6.c:40
+
+Warning: Possible data race: alloc.data:ds6.c:40 is protected by non-linear or concrete lock(s):
+  (*cur).lock:ds6.c:14
+  (*new).lock:ds6.c:40
+  non linear concrete new->lock:ds6.c:42
+ references:
+  dereference at ds6.c:26
+    locations possibly dereferenced: 
+      (*cur).data:ds6.c:14
+      alloc.data:ds6.c:40
+    locks acquired at dereference: 
+      (*cur).lock:ds6.c:14
+      (*new).lock:ds6.c:40
+      non linear concrete new->lock:ds6.c:42
+    in: FORK at ds6.c:46 -> run ds6.c:46
+
+  dereference at ds6.c:26
+    locations possibly dereferenced: 
+      (*cur).data:ds6.c:14
+      alloc.data:ds6.c:40
+    locks acquired at dereference: 
+      (*cur).lock:ds6.c:14
+      (*new).lock:ds6.c:40
+      non linear concrete new->lock:ds6.c:42
+    in: FORK at ds6.c:45 -> run ds6.c:45
+
+  dereference at ds6.c:26
+    locations possibly dereferenced: 
+      (*cur).data:ds6.c:14
+      alloc.data:ds6.c:40
+    locks acquired at dereference: 
+      (*cur).lock:ds6.c:14
+      (*new).lock:ds6.c:40
+      non linear concrete new->lock:ds6.c:42
+    in: main at ds6.c:43 -> run ds6.c:46
+
+  dereference at ds6.c:26
+    locations possibly dereferenced: 
+      (*cur).data:ds6.c:14
+      alloc.data:ds6.c:40
+    locks acquired at dereference: 
+      (*cur).lock:ds6.c:14
+      (*new).lock:ds6.c:40
+      non linear concrete new->lock:ds6.c:42
+    in: main at ds6.c:43 -> run ds6.c:45
+
+alloc.next:ds6.c:40 is protected by:
+  global_lock:ds6.c:13
+  concrete global_lock:ds6.c:38
+*************************** DONE ***************************
+
+

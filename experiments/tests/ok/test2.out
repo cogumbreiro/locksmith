@@ -1,0 +1,72 @@
+************************* STARTING *************************
+
+
+test2.c:15: Warning: lock is conflated! (*l:test2.c:4)
+
+test2.c:15: Warning: assigning number to pointer
+
+test2.c:32: Warning: subtyping incompatible types:
+int
+(void)
+functions declared but not defined:
+  printf
+shared: &i:test2.c:36
+
+Warning: Possible data race: &i:test2.c:36 is not protected!
+ references:
+  dereference at test2.c:32
+    locations possibly dereferenced: 
+      &i:test2.c:36
+      dostuff.a:test2.c:40
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at test2.c:40 -> dostuff test2.c:40
+
+  dereference at test2.c:32
+    locations possibly dereferenced: 
+      &i:test2.c:36
+      dostuff.a:test2.c:39
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at test2.c:39 -> dostuff test2.c:39
+
+  dereference at test2.c:41
+    locations possibly dereferenced: 
+      &i:test2.c:36
+    locks acquired at dereference: 
+      <empty>
+    in: main at test2.c:45
+
+  dereference at test2.c:42
+    locations possibly dereferenced: 
+      &i:test2.c:36
+    locks acquired at dereference: 
+      <empty>
+    in: main at test2.c:45
+
+  dereference at test2.c:44
+    locations possibly dereferenced: 
+      &i:test2.c:36
+    locks acquired at dereference: 
+      <empty>
+    in: main at test2.c:45
+
+  dereference at test2.c:32
+    locations possibly dereferenced: 
+      &i:test2.c:36
+      dostuff.a:test2.c:40
+    locks acquired at dereference: 
+      <empty>
+    in: main at test2.c:45 -> dostuff test2.c:40
+
+  dereference at test2.c:32
+    locations possibly dereferenced: 
+      &i:test2.c:36
+      dostuff.a:test2.c:39
+    locks acquired at dereference: 
+      <empty>
+    in: main at test2.c:45 -> dostuff test2.c:39
+
+*************************** DONE ***************************
+
+

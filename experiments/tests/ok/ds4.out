@@ -1,0 +1,9 @@
+************************* STARTING *************************
+
+shared: alloc.data:ds4.c:30
+alloc.data:ds4.c:30 is protected by:
+  global_lock:ds4.c:11
+  concrete global_lock:ds4.c:34
+*************************** DONE ***************************
+
+

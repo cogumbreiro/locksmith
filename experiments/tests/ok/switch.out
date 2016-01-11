@@ -1,0 +1,32 @@
+************************* STARTING *************************
+
+shared: &j:switch.c:4
+
+Warning: Possible data race: &j:switch.c:4 is not protected!
+ references:
+  dereference at switch.c:11
+    locations possibly dereferenced: 
+      &j:switch.c:4
+    locks acquired at dereference: 
+      l:switch.c:5
+      concrete l:switch.c:18
+    in: FORK at switch.c:20 -> dostuff switch.c:20
+
+  dereference at switch.c:29
+    locations possibly dereferenced: 
+      &j:switch.c:4
+    locks acquired at dereference: 
+      <empty>
+    in: main at switch.c:29
+
+  dereference at switch.c:11
+    locations possibly dereferenced: 
+      &j:switch.c:4
+    locks acquired at dereference: 
+      l:switch.c:5
+      concrete l:switch.c:18
+    in: main at switch.c:29 -> dostuff switch.c:20
+
+*************************** DONE ***************************
+
+

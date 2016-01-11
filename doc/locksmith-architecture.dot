@@ -1,0 +1,98 @@
+digraph A {
+node [fontname="Helvetica",fontsize=12];
+rankdir=LR;
+  "C" [shape=plaintext];
+  "CIL" [shape=box];
+  "AST" [shape=plaintext];
+
+  "Typing" [shape=box];
+  "shared effects" [shape=plaintext];
+  "rho and l labelflow constraints" [shape=plaintext];
+  "dereferences (correlations)" [shape=plaintext]
+  "control flow constraints (phi graph)" [shape=plaintext];
+  "semiunification constraints" [shape=plaintext];
+  { rank=same; 
+  "rho and l labelflow constraints"
+  "dereferences (correlations)"
+  "control flow constraints (phi graph)"
+  "semiunification constraints"
+  }
+
+  "Shared Analysis" [shape=box];
+  "shared rhos" [shape=plaintext];
+
+  "Semiunification" [shape=box];
+  "new L labels" [shape=plaintext];
+  "escapes() checks" [shape=plaintext];
+
+  "Lock State" [shape=box];
+  "locks acquired per phi" [shape=plaintext];
+  
+  "Correlation" [shape=box];
+  "correlations" [shape=plaintext];
+
+  "Check escapes()" [shape=box];
+  "mark non-linear locks" [shape=plaintext];
+
+  "Race Detection" [shape=box];
+
+  "C" -> "CIL";
+  "CIL" -> "AST" [style=dotted];
+
+  "AST" -> "Typing" [color=red];
+
+  "Typing" -> {
+    "shared effects"
+    "rho and l labelflow constraints"
+    "dereferences (correlations)"
+    "control flow constraints (phi graph)"
+    "semiunification constraints"
+  } [style=dotted];
+
+  { "shared effects"
+    "rho and l labelflow constraints"
+  } -> "Shared Analysis" [color=red];
+
+  "Shared Analysis" -> "shared rhos" [style=dotted];
+
+  "semiunification constraints" -> "Semiunification" [color=red];
+
+  "Semiunification" -> {
+    "new L labels"
+    "escapes() checks"
+  } [style=dotted];
+
+  {
+    "control flow constraints (phi graph)"
+    "rho and l labelflow constraints"
+    "new L labels"
+  } -> "Lock State" [color=red];
+
+  "Lock State" -> {
+    "locks acquired per phi"
+  
+  } [style=dotted];
+
+  {
+    "locks acquired per phi"
+    "rho and l labelflow constraints"
+    "dereferences (correlations)"
+    "shared rhos"
+  } -> "Correlation" [color=red];
+
+  "Correlation" -> "correlations" [style=dotted];
+
+  {
+    "escapes() checks"
+    "correlations"
+  } -> "Check escapes()" [color=red];
+  
+  "Check escapes()" -> "mark non-linear locks" [style=dotted];
+
+  {
+    "mark non-linear locks"
+    "correlations"
+  } -> "Race Detection" [color=red];
+
+  
+}

@@ -1,0 +1,1129 @@
+%!PS-Adobe-2.0
+%%Creator: dot version 1.12 (Wed Sep  8 21:07:21 UTC 2004)
+%%For: (polyvios) Polyvios Pratikakis,,,,
+%%Title: A
+%%Pages: (atend)
+%%BoundingBox: 35 35 1929 323
+%%EndComments
+save
+%%BeginProlog
+/DotDict 200 dict def
+DotDict begin
+
+/setupLatin1 {
+mark
+/EncodingVector 256 array def
+ EncodingVector 0
+
+ISOLatin1Encoding 0 255 getinterval putinterval
+
+EncodingVector
+  dup 306 /AE
+  dup 301 /Aacute
+  dup 302 /Acircumflex
+  dup 304 /Adieresis
+  dup 300 /Agrave
+  dup 305 /Aring
+  dup 303 /Atilde
+  dup 307 /Ccedilla
+  dup 311 /Eacute
+  dup 312 /Ecircumflex
+  dup 313 /Edieresis
+  dup 310 /Egrave
+  dup 315 /Iacute
+  dup 316 /Icircumflex
+  dup 317 /Idieresis
+  dup 314 /Igrave
+  dup 334 /Udieresis
+  dup 335 /Yacute
+  dup 376 /thorn
+  dup 337 /germandbls
+  dup 341 /aacute
+  dup 342 /acircumflex
+  dup 344 /adieresis
+  dup 346 /ae
+  dup 340 /agrave
+  dup 345 /aring
+  dup 347 /ccedilla
+  dup 351 /eacute
+  dup 352 /ecircumflex
+  dup 353 /edieresis
+  dup 350 /egrave
+  dup 355 /iacute
+  dup 356 /icircumflex
+  dup 357 /idieresis
+  dup 354 /igrave
+  dup 360 /dcroat
+  dup 361 /ntilde
+  dup 363 /oacute
+  dup 364 /ocircumflex
+  dup 366 /odieresis
+  dup 362 /ograve
+  dup 365 /otilde
+  dup 370 /oslash
+  dup 372 /uacute
+  dup 373 /ucircumflex
+  dup 374 /udieresis
+  dup 371 /ugrave
+  dup 375 /yacute
+  dup 377 /ydieresis  
+
+% Set up ISO Latin 1 character encoding
+/starnetISO {
+        dup dup findfont dup length dict begin
+        { 1 index /FID ne { def }{ pop pop } ifelse
+        } forall
+        /Encoding EncodingVector def
+        currentdict end definefont
+} def
+/Times-Roman starnetISO def
+/Times-Italic starnetISO def
+/Times-Bold starnetISO def
+/Times-BoldItalic starnetISO def
+/Helvetica starnetISO def
+/Helvetica-Oblique starnetISO def
+/Helvetica-Bold starnetISO def
+/Helvetica-BoldOblique starnetISO def
+/Courier starnetISO def
+/Courier-Oblique starnetISO def
+/Courier-Bold starnetISO def
+/Courier-BoldOblique starnetISO def
+cleartomark
+} bind def
+
+%%BeginResource: procset
+/coord-font-family /Times-Roman def
+/default-font-family /Times-Roman def
+/coordfont coord-font-family findfont 8 scalefont def
+
+/InvScaleFactor 1.0 def
+/set_scale {
+	dup 1 exch div /InvScaleFactor exch def
+	dup scale
+} bind def
+
+% styles
+/solid { [] 0 setdash } bind def
+/dashed { [9 InvScaleFactor mul dup ] 0 setdash } bind def
+/dotted { [1 InvScaleFactor mul 6 InvScaleFactor mul] 0 setdash } bind def
+/invis {/fill {newpath} def /stroke {newpath} def /show {pop newpath} def} bind def
+/bold { 2 setlinewidth } bind def
+/filled { } bind def
+/unfilled { } bind def
+/rounded { } bind def
+/diagonals { } bind def
+
+% hooks for setting color 
+/nodecolor { sethsbcolor } bind def
+/edgecolor { sethsbcolor } bind def
+/graphcolor { sethsbcolor } bind def
+/nopcolor {pop pop pop} bind def
+
+/beginpage {	% i j npages
+	/npages exch def
+	/j exch def
+	/i exch def
+	/str 10 string def
+	npages 1 gt {
+		gsave
+			coordfont setfont
+			0 0 moveto
+			(\() show i str cvs show (,) show j str cvs show (\)) show
+		grestore
+	} if
+} bind def
+
+/set_font {
+	findfont exch
+	scalefont setfont
+} def
+
+% draw aligned label in bounding box aligned to current point
+/alignedtext {			% width adj text
+	/text exch def
+	/adj exch def
+	/width exch def
+	gsave
+		width 0 gt {
+			text stringwidth pop adj mul 0 rmoveto
+		} if
+		[] 0 setdash
+		text show
+	grestore
+} def
+
+/boxprim {				% xcorner ycorner xsize ysize
+		4 2 roll
+		moveto
+		2 copy
+		exch 0 rlineto
+		0 exch rlineto
+		pop neg 0 rlineto
+		closepath
+} bind def
+
+/ellipse_path {
+	/ry exch def
+	/rx exch def
+	/y exch def
+	/x exch def
+	matrix currentmatrix
+	newpath
+	x y translate
+	rx ry scale
+	0 0 1 0 360 arc
+	setmatrix
+} bind def
+
+/endpage { showpage } bind def
+/showpage { } def
+
+/layercolorseq
+	[	% layer color sequence - darkest to lightest
+		[0 0 0]
+		[.2 .8 .8]
+		[.4 .8 .8]
+		[.6 .8 .8]
+		[.8 .8 .8]
+	]
+def
+
+/layerlen layercolorseq length def
+
+/setlayer {/maxlayer exch def /curlayer exch def
+	layercolorseq curlayer 1 sub layerlen mod get
+	aload pop sethsbcolor
+	/nodecolor {nopcolor} def
+	/edgecolor {nopcolor} def
+	/graphcolor {nopcolor} def
+} bind def
+
+/onlayer { curlayer ne {invis} if } def
+
+/onlayers {
+	/myupper exch def
+	/mylower exch def
+	curlayer mylower lt
+	curlayer myupper gt
+	or
+	{invis} if
+} def
+
+/curlayer 0 def
+
+%%EndResource
+%%EndProlog
+%%BeginSetup
+14 default-font-family set_font
+1 setmiterlimit
+% /arrowlength 10 def
+% /arrowwidth 5 def
+
+% make sure pdfmark is harmless for PS-interpreters other than Distiller
+/pdfmark where {pop} {userdict /pdfmark /cleartomark load put} ifelse
+% make '<<' and '>>' safe on PS Level 1 devices
+/languagelevel where {pop languagelevel}{1} ifelse
+2 lt {
+    userdict (<<) cvn ([) cvn load put
+    userdict (>>) cvn ([) cvn load put
+} if
+
+%%EndSetup
+%%Page: 1 1
+%%PageBoundingBox: 36 36 1929 323
+%%PageOrientation: Portrait
+gsave
+35 35 1894 288 boxprim clip newpath
+36 36 translate
+0 0 1 beginpage
+0 0 translate 0 rotate
+0.000 0.000 0.000 graphcolor
+12.00 /Helvetica set_font
+
+%	C
+gsave 10 dict begin
+gsave 10 dict begin
+35 146 moveto 9 -0.5 (C) alignedtext
+end grestore
+end grestore
+
+%	CIL
+gsave 10 dict begin
+newpath 152 168 moveto
+98 168 lineto
+98 132 lineto
+152 132 lineto
+closepath
+stroke
+gsave 10 dict begin
+125 146 moveto 23 -0.5 (CIL) alignedtext
+end grestore
+end grestore
+
+%	C -> CIL
+newpath 62 150 moveto
+70 150 79 150 88 150 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 88 154 moveto
+98 150 lineto
+88 147 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 88 154 moveto
+98 150 lineto
+88 147 lineto
+closepath
+stroke
+end grestore
+
+%	AST
+gsave 10 dict begin
+gsave 10 dict begin
+215 146 moveto 27 -0.5 (AST) alignedtext
+end grestore
+end grestore
+
+%	CIL -> AST
+gsave 10 dict begin
+dotted
+newpath 152 150 moveto
+160 150 169 150 178 150 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 178 154 moveto
+188 150 lineto
+178 147 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 178 154 moveto
+188 150 lineto
+178 147 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	Typing
+gsave 10 dict begin
+newpath 337 168 moveto
+279 168 lineto
+279 132 lineto
+337 132 lineto
+closepath
+stroke
+gsave 10 dict begin
+308 146 moveto 43 -0.5 (Typing) alignedtext
+end grestore
+end grestore
+
+%	AST -> Typing
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 242 150 moveto
+250 150 259 150 268 150 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 268 154 moveto
+278 150 lineto
+268 147 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 268 154 moveto
+278 150 lineto
+268 147 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	shared effects
+gsave 10 dict begin
+gsave 10 dict begin
+487 22 moveto 82 -0.5 (shared effects) alignedtext
+end grestore
+end grestore
+
+%	Typing -> shared effects
+gsave 10 dict begin
+dotted
+newpath 318 132 moveto
+329 113 349 82 374 64 curveto
+390 53 410 45 428 39 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 429 42 moveto
+438 36 lineto
+427 36 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 429 42 moveto
+438 36 lineto
+427 36 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	rho and l labelflow constraints
+gsave 10 dict begin
+gsave 10 dict begin
+487 87 moveto 180 -0.5 (rho and l labelflow constraints) alignedtext
+end grestore
+end grestore
+
+%	Typing -> rho and l labelflow constraints
+gsave 10 dict begin
+dotted
+newpath 338 137 moveto
+349 132 362 127 374 123 curveto
+385 119 396 115 407 112 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 408 115 moveto
+417 109 lineto
+406 109 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 408 115 moveto
+417 109 lineto
+406 109 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	dereferences (correlations)
+gsave 10 dict begin
+gsave 10 dict begin
+487 264 moveto 154 -0.5 (dereferences \(correlations\)) alignedtext
+end grestore
+end grestore
+
+%	Typing -> dereferences (correlations)
+gsave 10 dict begin
+dotted
+newpath 317 168 moveto
+328 188 348 220 374 238 curveto
+380 242 386 245 392 248 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 391 252 moveto
+402 252 lineto
+394 245 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 391 252 moveto
+402 252 lineto
+394 245 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	control flow constraints (phi graph)
+gsave 10 dict begin
+gsave 10 dict begin
+487 207 moveto 210 -0.5 (control flow constraints \(phi graph\)) alignedtext
+end grestore
+end grestore
+
+%	Typing -> control flow constraints (phi graph)
+gsave 10 dict begin
+dotted
+newpath 338 163 moveto
+349 167 362 173 374 177 curveto
+387 182 401 186 414 190 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 413 193 moveto
+424 193 lineto
+415 187 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 413 193 moveto
+424 193 lineto
+415 187 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	semiunification constraints
+gsave 10 dict begin
+gsave 10 dict begin
+487 146 moveto 158 -0.5 (semiunification constraints) alignedtext
+end grestore
+end grestore
+
+%	Typing -> semiunification constraints
+gsave 10 dict begin
+dotted
+newpath 338 150 moveto
+352 150 371 150 390 150 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 390 154 moveto
+400 150 lineto
+390 147 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 390 154 moveto
+400 150 lineto
+390 147 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	Shared Analysis
+gsave 10 dict begin
+newpath 747 36 moveto
+637 36 lineto
+637 0 lineto
+747 0 lineto
+closepath
+stroke
+gsave 10 dict begin
+692 14 moveto 95 -0.5 (Shared Analysis) alignedtext
+end grestore
+end grestore
+
+%	shared effects -> Shared Analysis
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 536 24 moveto
+563 23 597 22 626 21 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 626 24 moveto
+636 20 lineto
+626 18 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 626 24 moveto
+636 20 lineto
+626 18 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	rho and l labelflow constraints -> Shared Analysis
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 541 73 moveto
+560 67 581 60 600 53 curveto
+612 49 625 44 638 40 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 639 43 moveto
+647 36 lineto
+636 37 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 639 43 moveto
+647 36 lineto
+636 37 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	Lock State
+gsave 10 dict begin
+newpath 993 162 moveto
+915 162 lineto
+915 126 lineto
+993 126 lineto
+closepath
+stroke
+gsave 10 dict begin
+954 140 moveto 62 -0.5 (Lock State) alignedtext
+end grestore
+end grestore
+
+%	rho and l labelflow constraints -> Lock State
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 585 93 moveto
+664 95 778 103 876 121 curveto
+886 122 896 125 905 127 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 904 130 moveto
+915 130 lineto
+906 124 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 904 130 moveto
+915 130 lineto
+906 124 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	Correlation
+gsave 10 dict begin
+newpath 1296 158 moveto
+1214 158 lineto
+1214 122 lineto
+1296 122 lineto
+closepath
+stroke
+gsave 10 dict begin
+1255 136 moveto 66 -0.5 (Correlation) alignedtext
+end grestore
+end grestore
+
+%	rho and l labelflow constraints -> Correlation
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 585 79 moveto
+654 72 748 64 830 64 curveto
+830 64 830 64 954 64 curveto
+1044 64 1146 96 1205 119 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 1203 122 moveto
+1214 123 lineto
+1206 116 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 1203 122 moveto
+1214 123 lineto
+1206 116 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	dereferences (correlations) -> Correlation
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 572 269 moveto
+642 269 742 270 830 270 curveto
+830 270 830 270 954 270 curveto
+1056 270 1090 271 1178 221 curveto
+1202 207 1223 185 1237 166 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 1240 168 moveto
+1243 158 lineto
+1234 164 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 1240 168 moveto
+1243 158 lineto
+1234 164 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	control flow constraints (phi graph) -> Lock State
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 600 209 moveto
+679 205 785 197 876 175 curveto
+886 173 896 169 906 166 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 907 169 moveto
+915 162 lineto
+904 163 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 907 169 moveto
+915 162 lineto
+904 163 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	Semiunification
+gsave 10 dict begin
+newpath 746 168 moveto
+638 168 lineto
+638 132 lineto
+746 132 lineto
+closepath
+stroke
+gsave 10 dict begin
+692 146 moveto 93 -0.5 (Semiunification) alignedtext
+end grestore
+end grestore
+
+%	semiunification constraints -> Semiunification
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 574 150 moveto
+592 150 610 150 627 150 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 627 154 moveto
+637 150 lineto
+627 147 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 627 154 moveto
+637 150 lineto
+627 147 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	shared rhos
+gsave 10 dict begin
+gsave 10 dict begin
+954 14 moveto 67 -0.5 (shared rhos) alignedtext
+end grestore
+end grestore
+
+%	Shared Analysis -> shared rhos
+gsave 10 dict begin
+dotted
+newpath 748 18 moveto
+793 18 858 18 902 18 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 902 22 moveto
+912 18 lineto
+902 15 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 902 22 moveto
+912 18 lineto
+902 15 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	shared rhos -> Correlation
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 996 16 moveto
+1043 15 1121 19 1178 50 curveto
+1205 65 1227 93 1240 113 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 1237 115 moveto
+1245 122 lineto
+1243 112 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 1237 115 moveto
+1245 122 lineto
+1243 112 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	new L labels
+gsave 10 dict begin
+gsave 10 dict begin
+830 144 moveto 75 -0.5 (new L labels) alignedtext
+end grestore
+end grestore
+
+%	Semiunification -> new L labels
+gsave 10 dict begin
+dotted
+newpath 747 149 moveto
+756 149 765 149 774 149 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 774 153 moveto
+784 149 lineto
+774 146 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 774 153 moveto
+784 149 lineto
+774 146 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	escapes() checks
+gsave 10 dict begin
+gsave 10 dict begin
+1105 190 moveto 94 -0.5 (escapes\(\) checks) alignedtext
+end grestore
+end grestore
+
+%	Semiunification -> escapes() checks
+gsave 10 dict begin
+dotted
+newpath 747 167 moveto
+759 170 772 173 784 175 curveto
+872 189 975 194 1040 194 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 1040 198 moveto
+1050 194 lineto
+1040 191 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 1040 198 moveto
+1050 194 lineto
+1040 191 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	new L labels -> Lock State
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 876 147 moveto
+886 146 895 146 905 146 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 905 149 moveto
+915 145 lineto
+905 143 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 905 149 moveto
+915 145 lineto
+905 143 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	Check escapes()
+gsave 10 dict begin
+newpath 1560 206 moveto
+1452 206 lineto
+1452 170 lineto
+1560 170 lineto
+closepath
+stroke
+gsave 10 dict begin
+1506 184 moveto 92 -0.5 (Check escapes\(\)) alignedtext
+end grestore
+end grestore
+
+%	escapes() checks -> Check escapes()
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 1160 193 moveto
+1234 192 1363 190 1442 189 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 1442 193 moveto
+1452 189 lineto
+1442 186 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 1442 193 moveto
+1452 189 lineto
+1442 186 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	locks acquired per phi
+gsave 10 dict begin
+gsave 10 dict begin
+1105 136 moveto 130 -0.5 (locks acquired per phi) alignedtext
+end grestore
+end grestore
+
+%	Lock State -> locks acquired per phi
+gsave 10 dict begin
+dotted
+newpath 993 143 moveto
+1002 143 1012 142 1022 142 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 1022 146 moveto
+1032 142 lineto
+1022 139 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 1022 146 moveto
+1032 142 lineto
+1022 139 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	locks acquired per phi -> Correlation
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 1178 140 moveto
+1186 140 1195 140 1204 140 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 1204 144 moveto
+1214 140 lineto
+1204 137 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 1204 144 moveto
+1214 140 lineto
+1204 137 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	correlations
+gsave 10 dict begin
+gsave 10 dict begin
+1374 138 moveto 67 -0.5 (correlations) alignedtext
+end grestore
+end grestore
+
+%	Correlation -> correlations
+gsave 10 dict begin
+dotted
+newpath 1296 141 moveto
+1304 141 1313 141 1322 141 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 1322 145 moveto
+1332 141 lineto
+1322 138 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 1322 145 moveto
+1332 141 lineto
+1322 138 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	correlations -> Check escapes()
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 1416 157 moveto
+1425 160 1435 164 1444 167 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 1443 170 moveto
+1454 170 lineto
+1445 164 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 1443 170 moveto
+1454 170 lineto
+1445 164 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	Race Detection
+gsave 10 dict begin
+newpath 1883 183 moveto
+1779 183 lineto
+1779 147 lineto
+1883 147 lineto
+closepath
+stroke
+gsave 10 dict begin
+1831 161 moveto 89 -0.5 (Race Detection) alignedtext
+end grestore
+end grestore
+
+%	correlations -> Race Detection
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 1416 144 moveto
+1497 148 1674 157 1768 162 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 1768 166 moveto
+1778 162 lineto
+1768 159 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 1768 166 moveto
+1778 162 lineto
+1768 159 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	mark non-linear locks
+gsave 10 dict begin
+gsave 10 dict begin
+1669 184 moveto 130 -0.5 (mark non-linear locks) alignedtext
+end grestore
+end grestore
+
+%	Check escapes() -> mark non-linear locks
+gsave 10 dict begin
+dotted
+newpath 1560 188 moveto
+1569 188 1577 188 1586 188 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 0.000 0.000 edgecolor
+newpath 1586 192 moveto
+1596 188 lineto
+1586 185 lineto
+closepath
+fill
+0.000 0.000 0.000 edgecolor
+newpath 1586 192 moveto
+1596 188 lineto
+1586 185 lineto
+closepath
+stroke
+end grestore
+end grestore
+
+%	mark non-linear locks -> Race Detection
+gsave 10 dict begin
+0.000 1.000 1.000 edgecolor
+newpath 1742 178 moveto
+1751 177 1760 175 1768 174 curveto
+stroke
+gsave 10 dict begin
+solid
+1 setlinewidth
+0.000 1.000 1.000 edgecolor
+newpath 1769 177 moveto
+1778 172 lineto
+1768 171 lineto
+closepath
+fill
+0.000 1.000 1.000 edgecolor
+newpath 1769 177 moveto
+1778 172 lineto
+1768 171 lineto
+closepath
+stroke
+end grestore
+end grestore
+endpage
+showpage
+grestore
+%%PageTrailer
+%%EndPage: 1
+%%Trailer
+%%Pages: 1
+end
+restore
+%%EOF

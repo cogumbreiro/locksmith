@@ -1,0 +1,62 @@
+************************* STARTING *************************
+
+shared: alloc.data:ds2b.c:11
+
+Warning: Possible data race: alloc.data:ds2b.c:11 is not protected!
+ references:
+  dereference at ds2b.c:15
+    locations possibly dereferenced: 
+      shared.data:ds2b.c:11
+      alloc.data:ds2b.c:11
+    locks acquired at dereference: 
+      shared.lock:ds2b.c:11
+      concrete shared.lock:ds2b.c:22
+    in: FORK at ds2b.c:25 -> run ds2b.c:25
+
+  dereference at ds2b.c:15
+    locations possibly dereferenced: 
+      shared.data:ds2b.c:11
+      alloc.data:ds2b.c:11
+    locks acquired at dereference: 
+      shared.lock:ds2b.c:11
+      concrete shared.lock:ds2b.c:22
+    in: FORK at ds2b.c:23 -> run ds2b.c:23
+
+  dereference at ds2b.c:24
+    locations possibly dereferenced: 
+      shared.data:ds2b.c:11
+      alloc.data:ds2b.c:11
+    locks acquired at dereference: 
+      <empty>
+    in: main at ds2b.c:27
+
+  dereference at ds2b.c:15
+    locations possibly dereferenced: 
+      shared.data:ds2b.c:11
+      alloc.data:ds2b.c:11
+    locks acquired at dereference: 
+      shared.lock:ds2b.c:11
+      concrete shared.lock:ds2b.c:22
+    in: main at ds2b.c:27 -> run ds2b.c:26
+
+  dereference at ds2b.c:15
+    locations possibly dereferenced: 
+      shared.data:ds2b.c:11
+      alloc.data:ds2b.c:11
+    locks acquired at dereference: 
+      shared.lock:ds2b.c:11
+      concrete shared.lock:ds2b.c:22
+    in: main at ds2b.c:27 -> run ds2b.c:25
+
+  dereference at ds2b.c:15
+    locations possibly dereferenced: 
+      shared.data:ds2b.c:11
+      alloc.data:ds2b.c:11
+    locks acquired at dereference: 
+      shared.lock:ds2b.c:11
+      concrete shared.lock:ds2b.c:22
+    in: main at ds2b.c:27 -> run ds2b.c:23
+
+*************************** DONE ***************************
+
+

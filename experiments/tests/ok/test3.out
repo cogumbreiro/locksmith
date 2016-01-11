@@ -1,0 +1,61 @@
+************************* STARTING *************************
+
+
+test3.c:23: Warning: subtyping incompatible types:
+int
+(void)
+functions declared but not defined:
+  printf
+shared: &i:test3.c:28
+
+Warning: Possible data race: &i:test3.c:28 is not protected!
+ references:
+  dereference at test3.c:23
+    locations possibly dereferenced: 
+      &i:test3.c:28
+      dostuff.a:test3.c:32
+    locks acquired at dereference: 
+      concrete *l::-1 -> dostuff test3.c:32 -> f test3.c:25
+    in: FORK at test3.c:32 -> dostuff test3.c:32
+
+  dereference at test3.c:23
+    locations possibly dereferenced: 
+      &i:test3.c:28
+      dostuff.a:test3.c:31
+    locks acquired at dereference: 
+      concrete *l::-1 -> dostuff test3.c:31 -> f test3.c:25
+    in: FORK at test3.c:31 -> dostuff test3.c:31
+
+  dereference at test3.c:33
+    locations possibly dereferenced: 
+      &i:test3.c:28
+    locks acquired at dereference: 
+      <empty>
+    in: main at test3.c:34
+
+  dereference at test3.c:34
+    locations possibly dereferenced: 
+      &i:test3.c:28
+    locks acquired at dereference: 
+      <empty>
+    in: main at test3.c:34
+
+  dereference at test3.c:23
+    locations possibly dereferenced: 
+      &i:test3.c:28
+      dostuff.a:test3.c:32
+    locks acquired at dereference: 
+      concrete *l::-1 -> dostuff test3.c:32 -> f test3.c:25
+    in: main at test3.c:34 -> dostuff test3.c:32
+
+  dereference at test3.c:23
+    locations possibly dereferenced: 
+      &i:test3.c:28
+      dostuff.a:test3.c:31
+    locks acquired at dereference: 
+      concrete *l::-1 -> dostuff test3.c:31 -> f test3.c:25
+    in: main at test3.c:34 -> dostuff test3.c:31
+
+*************************** DONE ***************************
+
+

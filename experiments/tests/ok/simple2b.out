@@ -1,0 +1,42 @@
+
+************************* STARTING *************************
+
+shared: &shared:simple2b.c:13
+        &non_protected:simple2b.c:14
+&shared:simple2b.c:13 is protected by:
+  lock:simple2b.c:3
+  concrete lock:simple2b.c:8
+
+Warning: Possible data race: &non_protected:simple2b.c:14 is not protected!
+ references:
+  dereference at simple2b.c:16
+    locations possibly dereferenced: 
+      &non_protected:simple2b.c:14
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at simple2b.c:10 -> run simple2b.c:10
+
+  dereference at simple2b.c:16
+    locations possibly dereferenced: 
+      &non_protected:simple2b.c:14
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at simple2b.c:9 -> run simple2b.c:9
+
+  dereference at simple2b.c:16
+    locations possibly dereferenced: 
+      &non_protected:simple2b.c:14
+    locks acquired at dereference: 
+      <empty>
+    in: main at simple2b.c:11 -> run simple2b.c:10
+
+  dereference at simple2b.c:16
+    locations possibly dereferenced: 
+      &non_protected:simple2b.c:14
+    locks acquired at dereference: 
+      <empty>
+    in: main at simple2b.c:11 -> run simple2b.c:9
+
+*************************** DONE ***************************
+
+

@@ -1,0 +1,15 @@
+************************* STARTING *************************
+
+
+nonlex.c:25: Warning: assigning number to pointer
+shared: &j:nonlex.c:6
+        &k:nonlex.c:7
+&j:nonlex.c:6 is protected by:
+  l:nonlex.c:5
+  concrete l:nonlex.c:24
+&k:nonlex.c:7 is protected by:
+  l:nonlex.c:5
+  concrete l:nonlex.c:24
+*************************** DONE ***************************
+
+

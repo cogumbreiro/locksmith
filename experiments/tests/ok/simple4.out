@@ -1,0 +1,36 @@
+
+************************* STARTING *************************
+
+shared: &shared:simple4.c:6
+        &non_protected:simple4.c:7
+&shared:simple4.c:6 is protected by:
+  lock:simple4.c:5
+  concrete lock:simple4.c:19
+  concrete lock::-1 -> doit simple4.c:26
+
+Warning: Possible data race: &non_protected:simple4.c:7 is not protected!
+ references:
+  dereference at simple4.c:13
+    locations possibly dereferenced: 
+      &non_protected:simple4.c:7
+    locks acquired at dereference: 
+      <empty>
+    in: main at simple4.c:27 -> doit simple4.c:26 -> run simple4.c:20
+
+  dereference at simple4.c:13
+    locations possibly dereferenced: 
+      &non_protected:simple4.c:7
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at simple4.c:21 -> run simple4.c:21
+
+  dereference at simple4.c:13
+    locations possibly dereferenced: 
+      &non_protected:simple4.c:7
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at simple4.c:20 -> run simple4.c:20
+
+*************************** DONE ***************************
+
+

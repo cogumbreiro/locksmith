@@ -1,0 +1,71 @@
+************************* STARTING *************************
+
+
+uniq4.c:17: Warning: assigning number to pointer
+shared: &j:uniq4.c:5
+
+Warning: Possible data race: &j:uniq4.c:5 is not protected!
+ references:
+  dereference at uniq4.c:15
+    locations possibly dereferenced: 
+      &j:uniq4.c:5
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at uniq4.c:27 -> dostuff uniq4.c:27
+
+  dereference at uniq4.c:17
+    locations possibly dereferenced: 
+      &j:uniq4.c:5
+    locks acquired at dereference: 
+      l:uniq4.c:6
+      concrete l:uniq4.c:24
+    in: FORK at uniq4.c:27 -> dostuff uniq4.c:27
+
+  dereference at uniq4.c:15
+    locations possibly dereferenced: 
+      &j:uniq4.c:5
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at uniq4.c:26 -> dostuff uniq4.c:26
+
+  dereference at uniq4.c:17
+    locations possibly dereferenced: 
+      &j:uniq4.c:5
+    locks acquired at dereference: 
+      l:uniq4.c:6
+      concrete l:uniq4.c:24
+    in: FORK at uniq4.c:26 -> dostuff uniq4.c:26
+
+  dereference at uniq4.c:15
+    locations possibly dereferenced: 
+      &j:uniq4.c:5
+    locks acquired at dereference: 
+      <empty>
+    in: main at uniq4.c:28 -> dostuff uniq4.c:27
+
+  dereference at uniq4.c:15
+    locations possibly dereferenced: 
+      &j:uniq4.c:5
+    locks acquired at dereference: 
+      <empty>
+    in: main at uniq4.c:28 -> dostuff uniq4.c:26
+
+  dereference at uniq4.c:17
+    locations possibly dereferenced: 
+      &j:uniq4.c:5
+    locks acquired at dereference: 
+      l:uniq4.c:6
+      concrete l:uniq4.c:24
+    in: main at uniq4.c:28 -> dostuff uniq4.c:27
+
+  dereference at uniq4.c:17
+    locations possibly dereferenced: 
+      &j:uniq4.c:5
+    locks acquired at dereference: 
+      l:uniq4.c:6
+      concrete l:uniq4.c:24
+    in: main at uniq4.c:28 -> dostuff uniq4.c:26
+
+*************************** DONE ***************************
+
+

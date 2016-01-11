@@ -1,0 +1,42 @@
+************************* STARTING *************************
+
+
+forkloop2.c:6: Warning: subtyping incompatible types:
+int
+(void)
+shared: alloc:forkloop2.c:12
+
+Warning: Possible data race: alloc:forkloop2.c:12 is not protected!
+ references:
+  dereference at forkloop2.c:6
+    locations possibly dereferenced: 
+      mem:forkloop2.c:12
+      tmp::-1
+      alloc:forkloop2.c:12
+      dostuff.a:forkloop2.c:14
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at forkloop2.c:14 -> dostuff forkloop2.c:14
+
+  dereference at forkloop2.c:13
+    locations possibly dereferenced: 
+      mem:forkloop2.c:12
+      tmp::-1
+      alloc:forkloop2.c:12
+    locks acquired at dereference: 
+      <empty>
+    in: main at forkloop2.c:14
+
+  dereference at forkloop2.c:6
+    locations possibly dereferenced: 
+      mem:forkloop2.c:12
+      tmp::-1
+      alloc:forkloop2.c:12
+      dostuff.a:forkloop2.c:14
+    locks acquired at dereference: 
+      <empty>
+    in: main at forkloop2.c:14 -> dostuff forkloop2.c:14
+
+*************************** DONE ***************************
+
+

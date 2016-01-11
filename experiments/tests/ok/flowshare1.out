@@ -1,0 +1,13 @@
+************************* STARTING *************************
+
+shared: &g:flowshare1.c:4
+        &i:flowshare1.c:16
+&g:flowshare1.c:4 is protected by:
+  l:flowshare1.c:5
+  concrete l:flowshare1.c:30
+&i:flowshare1.c:16 is protected by:
+  l:flowshare1.c:5
+  concrete l:flowshare1.c:30
+*************************** DONE ***************************
+
+

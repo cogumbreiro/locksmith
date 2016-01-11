@@ -1,0 +1,55 @@
+
+
+************************* STARTING *************************
+
+shared: &g:voidptr4.c:3
+        alloc.v:voidptr4.c:46
+&g:voidptr4.c:3 is protected by:
+  l:voidptr4.c:4
+  concrete l:voidptr4.c:48
+
+Warning: Possible data race: alloc.v:voidptr4.c:46 is not protected!
+ references:
+  dereference at voidptr4.c:41
+    locations possibly dereferenced: 
+      (*w).v:voidptr4.c:26
+      (b).v:voidptr4.c:46
+      (*void).v:voidptr4.c:49
+      alloc.v:voidptr4.c:46
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at voidptr4.c:51 -> dostuff3 voidptr4.c:51
+
+  dereference at voidptr4.c:32
+    locations possibly dereferenced: 
+      (*w).v:voidptr4.c:26
+      (b).v:voidptr4.c:46
+      (*void).v:voidptr4.c:49
+      alloc.v:voidptr4.c:46
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at voidptr4.c:50 -> dostuff2 voidptr4.c:50
+
+  dereference at voidptr4.c:41
+    locations possibly dereferenced: 
+      (*w).v:voidptr4.c:26
+      (b).v:voidptr4.c:46
+      (*void).v:voidptr4.c:49
+      alloc.v:voidptr4.c:46
+    locks acquired at dereference: 
+      <empty>
+    in: main at voidptr4.c:52 -> dostuff3 voidptr4.c:51
+
+  dereference at voidptr4.c:32
+    locations possibly dereferenced: 
+      (*w).v:voidptr4.c:26
+      (b).v:voidptr4.c:46
+      (*void).v:voidptr4.c:49
+      alloc.v:voidptr4.c:46
+    locks acquired at dereference: 
+      <empty>
+    in: main at voidptr4.c:52 -> dostuff2 voidptr4.c:50
+
+*************************** DONE ***************************
+
+

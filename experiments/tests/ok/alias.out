@@ -1,0 +1,45 @@
+************************* STARTING *************************
+
+shared: &m:alias.c:5
+
+Warning: Possible data race: &m:alias.c:5 is not protected!
+ references:
+  dereference at alias.c:16
+    locations possibly dereferenced: 
+      &m:alias.c:5
+      aa->arg1:alias.c:24
+      dostuff.a:alias.c:25
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at alias.c:28 -> dostuff2 alias.c:28
+
+  dereference at alias.c:10
+    locations possibly dereferenced: 
+      &m:alias.c:5
+      aa->arg1:alias.c:24
+      dostuff.a:alias.c:25
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at alias.c:27 -> dostuff alias.c:25
+
+  dereference at alias.c:10
+    locations possibly dereferenced: 
+      &m:alias.c:5
+      aa->arg1:alias.c:24
+      dostuff.a:alias.c:25
+    locks acquired at dereference: 
+      <empty>
+    in: main at alias.c:29 -> dostuff alias.c:25
+
+  dereference at alias.c:16
+    locations possibly dereferenced: 
+      &m:alias.c:5
+      aa->arg1:alias.c:24
+      dostuff.a:alias.c:25
+    locks acquired at dereference: 
+      <empty>
+    in: main at alias.c:29 -> dostuff2 alias.c:28
+
+*************************** DONE ***************************
+
+

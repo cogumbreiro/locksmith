@@ -1,0 +1,47 @@
+************************* STARTING *************************
+
+
+test4.c:15: Warning: lock is conflated! (*l:test4.c:4)
+
+test4.c:15: Warning: assigning number to pointer
+functions declared but not defined:
+  printf
+shared: &i:test4.c:24
+
+Warning: Possible data race: &i:test4.c:24 is not protected!
+ references:
+  dereference at test4.c:38
+    locations possibly dereferenced: 
+      &i:test4.c:24
+      dostuff.a:test4.c:28
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at test4.c:28 -> dostuff test4.c:28
+
+  dereference at test4.c:27
+    locations possibly dereferenced: 
+      &i:test4.c:24
+      dostuff.a:test4.c:28
+    locks acquired at dereference: 
+      <empty>
+    in: main at test4.c:27
+
+  dereference at test4.c:27
+    locations possibly dereferenced: 
+      &i:test4.c:24
+      dostuff.a:test4.c:28
+    locks acquired at dereference: 
+      <empty>
+    in: main at test4.c:27
+
+  dereference at test4.c:38
+    locations possibly dereferenced: 
+      &i:test4.c:24
+      dostuff.a:test4.c:28
+    locks acquired at dereference: 
+      <empty>
+    in: main at test4.c:27 -> dostuff test4.c:28
+
+*************************** DONE ***************************
+
+

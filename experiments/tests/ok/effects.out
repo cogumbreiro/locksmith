@@ -1,0 +1,36 @@
+************************* STARTING *************************
+
+
+effects.c:15: Warning: subtyping incompatible types:
+int
+(void)
+shared: &i:effects.c:21
+
+Warning: Possible data race: &i:effects.c:21 is not protected!
+ references:
+  dereference at effects.c:15
+    locations possibly dereferenced: 
+      &i:effects.c:21
+      dostuff.a:effects.c:23
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at effects.c:23 -> dostuff effects.c:23
+
+  dereference at effects.c:24
+    locations possibly dereferenced: 
+      &i:effects.c:21
+    locks acquired at dereference: 
+      <empty>
+    in: main at effects.c:25
+
+  dereference at effects.c:15
+    locations possibly dereferenced: 
+      &i:effects.c:21
+      dostuff.a:effects.c:23
+    locks acquired at dereference: 
+      <empty>
+    in: main at effects.c:25 -> dostuff effects.c:23
+
+*************************** DONE ***************************
+
+

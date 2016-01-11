@@ -1,0 +1,30 @@
+************************* STARTING *************************
+
+shared: &shared:test6.c:3
+
+Warning: Possible data race: &shared:test6.c:3 is not protected!
+ references:
+  dereference at test6.c:9
+    locations possibly dereferenced: 
+      &shared:test6.c:3
+    locks acquired at dereference: 
+      <empty>
+    in: main at test6.c:21 -> f test6.c:20 -> dostuff test6.c:13
+
+  dereference at test6.c:9
+    locations possibly dereferenced: 
+      &shared:test6.c:3
+    locks acquired at dereference: 
+      <empty>
+    in: main at test6.c:21 -> f test6.c:19 -> dostuff test6.c:13
+
+  dereference at test6.c:9
+    locations possibly dereferenced: 
+      &shared:test6.c:3
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at test6.c:13 -> dostuff test6.c:13
+
+*************************** DONE ***************************
+
+

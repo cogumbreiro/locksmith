@@ -1,0 +1,47 @@
+-*- outline -*-	
+
+New Banshee Manual
+
+* Introduction
+
+* Installation
+
+* Mixed Constraints
+
+** Sets
+
+*** expressions
+
+** Terms
+
+*** expressions
+
+** Flowrows
+
+*** expressions
+
+* Using Banshee
+
+* iBanshee
+
+** Syntax
+** Inspecting solutions
+
+* Using the nonspecialized engine (libnsengine.a)
+ 
+** API (nonspec.h)
+** Linking
+**  Handling errors
+
+* Using specialized engines (libengine.a)
+
+** Memory management
+** Data structures
+
+* CFL Reachability with Banshee
+
+* Adding New Sorts to Banshee
+    
+* Appendices
+** Copyright
+** Bugs

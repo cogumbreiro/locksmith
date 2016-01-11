@@ -1,0 +1,79 @@
+************************* STARTING *************************
+
+shared: &c:voidptr3.c:41
+        alloc.v:voidptr3.c:40
+
+Warning: Possible data race: &c:voidptr3.c:41 is not protected!
+ references:
+  dereference at voidptr3.c:35
+    locations possibly dereferenced: 
+      &c:voidptr3.c:41
+      dostuff4.s:voidptr3.c:46
+      dostuff5.q:voidptr3.c:47
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at voidptr3.c:47 -> dostuff5 voidptr3.c:47
+
+  dereference at voidptr3.c:30
+    locations possibly dereferenced: 
+      &c:voidptr3.c:41
+      dostuff4.s:voidptr3.c:46
+      dostuff5.q:voidptr3.c:47
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at voidptr3.c:46 -> dostuff4 voidptr3.c:46
+
+  dereference at voidptr3.c:35
+    locations possibly dereferenced: 
+      &c:voidptr3.c:41
+      dostuff4.s:voidptr3.c:46
+      dostuff5.q:voidptr3.c:47
+    locks acquired at dereference: 
+      <empty>
+    in: main at voidptr3.c:48 -> dostuff5 voidptr3.c:47
+
+  dereference at voidptr3.c:30
+    locations possibly dereferenced: 
+      &c:voidptr3.c:41
+      dostuff4.s:voidptr3.c:46
+      dostuff5.q:voidptr3.c:47
+    locks acquired at dereference: 
+      <empty>
+    in: main at voidptr3.c:48 -> dostuff4 voidptr3.c:46
+
+
+Warning: Possible data race: alloc.v:voidptr3.c:40 is not protected!
+ references:
+  dereference at voidptr3.c:25
+    locations possibly dereferenced: 
+      (b).v:voidptr3.c:40
+      alloc.v:voidptr3.c:40
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at voidptr3.c:45 -> dostuff3 voidptr3.c:45
+
+  dereference at voidptr3.c:19
+    locations possibly dereferenced: 
+      (b).v:voidptr3.c:40
+      alloc.v:voidptr3.c:40
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at voidptr3.c:44 -> dostuff2 voidptr3.c:44
+
+  dereference at voidptr3.c:19
+    locations possibly dereferenced: 
+      (b).v:voidptr3.c:40
+      alloc.v:voidptr3.c:40
+    locks acquired at dereference: 
+      <empty>
+    in: main at voidptr3.c:48 -> dostuff2 voidptr3.c:44
+
+  dereference at voidptr3.c:25
+    locations possibly dereferenced: 
+      (b).v:voidptr3.c:40
+      alloc.v:voidptr3.c:40
+    locks acquired at dereference: 
+      <empty>
+    in: main at voidptr3.c:48 -> dostuff3 voidptr3.c:45
+
+*************************** DONE ***************************

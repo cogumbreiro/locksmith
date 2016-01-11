@@ -1,0 +1,10 @@
+
+************************* STARTING *************************
+
+shared: &x:split-fp.c:3
+&x:split-fp.c:3 is protected by:
+  l:split-fp.c:4
+  concrete l:split-fp.c:20
+*************************** DONE ***************************
+
+

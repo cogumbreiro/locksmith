@@ -1,0 +1,577 @@
+../cil/bin/cilly  engine_lib.c > out/engine_lib.out 2>&1
+gcc -D_GNUCC -E -DCIL=1 engine_lib.c -o /tmp/cil-jRHRwGp4.i
+/export/home/mwh/src/tmp/locksmith/cil/obj/x86_LINUX/cilly.asm.exe --out /tmp/cil-gioCs2eV.cil.c --list-guardedby --list-shared --locksmith-version /tmp/cil-jRHRwGp4.i
+
+engine.c:840: Warning: Return statement without a value in function returning void *
+
+
+engine.c:928: Warning: Return statement without a value in function returning void *
+
+
+************************* STARTING *************************
+
+
+engine.c:164: Warning: subtyping incompatible types:
+int
+void
+
+engine.c:840: Warning: assigning pointer to non-pointer: void
+ ->
+ (void)*^{search:engine.c:911}
+
+engine.c:842: Warning: subtyping incompatible types:
+int
+struct in_addr {}
+
+engine.c:1044: Warning: assigning number to pointer
+
+lib.c:143: Warning: subtyping incompatible types:
+int
+(void)
+
+lib.c:173: Warning: subtyping incompatible types:
+int
+(void)
+
+lib.c:211: Warning: subtyping incompatible types:
+int
+(void)
+
+lib.c:217: Warning: subtyping incompatible types:
+(void)
+int
+
+lib.c:254: Warning: subtyping incompatible types:
+int
+(void)
+
+lib.c:259: Warning: subtyping incompatible types:
+(void)
+int
+
+lib.c:282: Warning: subtyping incompatible types:
+int
+(void)
+
+lib.c:299: Warning: subtyping incompatible types:
+int
+(void)
+
+lib.c:306: Warning: subtyping incompatible types:
+int
+(void)
+functions declared but not defined:
+  isspace
+  alphasort
+  scandir
+  regfree
+  regexec
+  regcomp
+  index
+  strchr
+  strcat
+  getenv
+  strtol
+  fgets
+  setvbuf
+  fdopen
+shared: &totalcount:engine.c:109
+        &duplicount:engine.c:110
+        &resltcount:engine.c:111
+        alloc.lnkcount:engine.c:968
+        alloc.dupcount:engine.c:968
+        alloc.lnkcount:engine.c:257
+        alloc.dupcount:engine.c:257
+
+Warning: Possible data race: &totalcount:engine.c:109 is not protected!
+ references:
+  dereference at engine.c:531
+    locations possibly dereferenced: 
+      &totalcount:engine.c:109
+    locks acquired at dereference: 
+      counter_mutex:engine.c:107
+      counter_mutex:engine.c:107
+      concrete counter_mutex:engine.c:107
+    in: FORK at engine.c:1044 -> search engine.c:1044 -> spout engine.c:908
+
+  dereference at engine.c:943
+    locations possibly dereferenced: 
+      &totalcount:engine.c:109
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1066
+    locations possibly dereferenced: 
+      &totalcount:engine.c:109
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1067
+    locations possibly dereferenced: 
+      &totalcount:engine.c:109
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1069
+    locations possibly dereferenced: 
+      &totalcount:engine.c:109
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1070
+    locations possibly dereferenced: 
+      &totalcount:engine.c:109
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1071
+    locations possibly dereferenced: 
+      &totalcount:engine.c:109
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1072
+    locations possibly dereferenced: 
+      &totalcount:engine.c:109
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:531
+    locations possibly dereferenced: 
+      &totalcount:engine.c:109
+    locks acquired at dereference: 
+      counter_mutex:engine.c:107
+      counter_mutex:engine.c:107
+      concrete counter_mutex:engine.c:107
+    in: main at engine.c:1096 -> search engine.c:1044 -> spout engine.c:908
+
+
+Warning: Possible data race: &duplicount:engine.c:110 is not protected!
+ references:
+  dereference at engine.c:705
+    locations possibly dereferenced: 
+      &duplicount:engine.c:110
+    locks acquired at dereference: 
+      counter_mutex:engine.c:107
+      counter_mutex:engine.c:107
+      concrete counter_mutex:engine.c:107
+    in: FORK at engine.c:1044 -> search engine.c:1044 -> spout engine.c:908
+
+  dereference at engine.c:944
+    locations possibly dereferenced: 
+      &duplicount:engine.c:110
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1074
+    locations possibly dereferenced: 
+      &duplicount:engine.c:110
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1076
+    locations possibly dereferenced: 
+      &duplicount:engine.c:110
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1077
+    locations possibly dereferenced: 
+      &duplicount:engine.c:110
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1078
+    locations possibly dereferenced: 
+      &duplicount:engine.c:110
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1079
+    locations possibly dereferenced: 
+      &duplicount:engine.c:110
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:705
+    locations possibly dereferenced: 
+      &duplicount:engine.c:110
+    locks acquired at dereference: 
+      counter_mutex:engine.c:107
+      counter_mutex:engine.c:107
+      concrete counter_mutex:engine.c:107
+    in: main at engine.c:1096 -> search engine.c:1044 -> spout engine.c:908
+
+
+Warning: Possible data race: &resltcount:engine.c:111 is not protected!
+ references:
+  dereference at engine.c:532
+    locations possibly dereferenced: 
+      &resltcount:engine.c:111
+    locks acquired at dereference: 
+      counter_mutex:engine.c:107
+      counter_mutex:engine.c:107
+      concrete counter_mutex:engine.c:107
+    in: FORK at engine.c:1044 -> search engine.c:1044 -> spout engine.c:908
+
+  dereference at engine.c:945
+    locations possibly dereferenced: 
+      &resltcount:engine.c:111
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1081
+    locations possibly dereferenced: 
+      &resltcount:engine.c:111
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1083
+    locations possibly dereferenced: 
+      &resltcount:engine.c:111
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1084
+    locations possibly dereferenced: 
+      &resltcount:engine.c:111
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1085
+    locations possibly dereferenced: 
+      &resltcount:engine.c:111
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1086
+    locations possibly dereferenced: 
+      &resltcount:engine.c:111
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:532
+    locations possibly dereferenced: 
+      &resltcount:engine.c:111
+    locks acquired at dereference: 
+      counter_mutex:engine.c:107
+      counter_mutex:engine.c:107
+      concrete counter_mutex:engine.c:107
+    in: main at engine.c:1096 -> search engine.c:1044 -> spout engine.c:908
+
+
+Warning: Possible data race: alloc.lnkcount:engine.c:968 is not protected!
+ references:
+  dereference at engine.c:911
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at engine.c:1044 -> search engine.c:1044
+
+  dereference at engine.c:1101
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1108
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1110
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1111
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1112
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1113
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:911
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096 -> search engine.c:1044
+
+
+Warning: Possible data race: alloc.dupcount:engine.c:968 is not protected!
+ references:
+  dereference at engine.c:706
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      counter_mutex:engine.c:107
+      counter_mutex:engine.c:107
+      concrete counter_mutex:engine.c:107
+    in: FORK at engine.c:1044 -> search engine.c:1044 -> spout engine.c:908
+
+  dereference at engine.c:1101
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1103
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1104
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1105
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1106
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:706
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      counter_mutex:engine.c:107
+      counter_mutex:engine.c:107
+      concrete counter_mutex:engine.c:107
+    in: main at engine.c:1096 -> search engine.c:1044 -> spout engine.c:908
+
+
+Warning: Possible data race: alloc.lnkcount:engine.c:257 is not protected!
+ references:
+  dereference at engine.c:911
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at engine.c:1044 -> search engine.c:1044
+
+  dereference at engine.c:1101
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1108
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1110
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1111
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1112
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1113
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:911
+    locations possibly dereferenced: 
+      (*Engine).lnkcount:engine.c:96
+      alloc.lnkcount:engine.c:968
+      alloc.lnkcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096 -> search engine.c:1044
+
+
+Warning: Possible data race: alloc.dupcount:engine.c:257 is not protected!
+ references:
+  dereference at engine.c:706
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      counter_mutex:engine.c:107
+      counter_mutex:engine.c:107
+      concrete counter_mutex:engine.c:107
+    in: FORK at engine.c:1044 -> search engine.c:1044 -> spout engine.c:908
+
+  dereference at engine.c:1101
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1103
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1104
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1105
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:1106
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      <empty>
+    in: main at engine.c:1096
+
+  dereference at engine.c:706
+    locations possibly dereferenced: 
+      (*Engine).dupcount:engine.c:96
+      alloc.dupcount:engine.c:968
+      alloc.dupcount:engine.c:257
+    locks acquired at dereference: 
+      counter_mutex:engine.c:107
+      counter_mutex:engine.c:107
+      concrete counter_mutex:engine.c:107
+    in: main at engine.c:1096 -> search engine.c:1044 -> spout engine.c:908
+
+*************************** DONE ***************************
+
+LockSmith run for: 0.870000 seconds
+
+LockSmith build #$Rev: 1737 $gcc -D_GNUCC -E /tmp/cil-gioCs2eV.cil.c -o /tmp/cil-9hoBkO8O.cil.i
+gcc -D_GNUCC -c -o ./engine_lib.o /tmp/cil-9hoBkO8O.cil.i
+/usr/include/stdlib.h:556: warning: `__unique__' attribute directive ignored

@@ -1,0 +1,10 @@
+
+************************* STARTING *************************
+
+functions declared but not defined:
+  printf
+shared: &shared:simple1.c:4
+&shared:simple1.c:4 is protected by:
+  lock:simple1.c:3
+  concrete lock:simple1.c:17
+*************************** DONE ***************************

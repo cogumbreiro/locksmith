@@ -1,0 +1,40 @@
+************************* STARTING *************************
+
+shared: allocuniq6.c:8
+        &guniq6.c:4
+&guniq6.c:4 is protected by:
+  Cluniq6.c:22
+  luniq6.c:5
+
+Warning: Possible data race: allocuniq6.c:8 is not protected!
+ references:
+  guard@uniq6.c:15
+  rho: allocuniq6.c:8
+       r:-1
+       runiq6.c:8
+       runiq6.c:4
+  acq: Cluniq6.c:22
+       luniq6.c:5
+  through: 1uniq6.c:23 
+
+  guard@uniq6.c:15
+  rho: allocuniq6.c:8
+       r:-1
+       runiq6.c:8
+       runiq6.c:4
+  acq: Cluniq6.c:22
+       luniq6.c:5
+  through: 2uniq6.c:24 
+
+  guard@uniq6.c:12
+  rho: allocuniq6.c:8
+  acq: 
+  through: 1uniq6.c:23 
+
+  guard@uniq6.c:12
+  rho: allocuniq6.c:8
+  acq: 
+  through: 2uniq6.c:24 
+*************************** DONE ***************************
+
+

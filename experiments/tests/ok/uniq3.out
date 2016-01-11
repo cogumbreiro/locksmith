@@ -1,0 +1,69 @@
+************************* STARTING *************************
+
+shared: &j:uniq3.c:5
+
+Warning: Possible data race: &j:uniq3.c:5 is not protected!
+ references:
+  dereference at uniq3.c:15
+    locations possibly dereferenced: 
+      &j:uniq3.c:5
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at uniq3.c:28 -> dostuff uniq3.c:28
+
+  dereference at uniq3.c:17
+    locations possibly dereferenced: 
+      &j:uniq3.c:5
+    locks acquired at dereference: 
+      l:uniq3.c:6
+      concrete l:uniq3.c:25
+    in: FORK at uniq3.c:28 -> dostuff uniq3.c:28
+
+  dereference at uniq3.c:15
+    locations possibly dereferenced: 
+      &j:uniq3.c:5
+    locks acquired at dereference: 
+      <empty>
+    in: FORK at uniq3.c:27 -> dostuff uniq3.c:27
+
+  dereference at uniq3.c:17
+    locations possibly dereferenced: 
+      &j:uniq3.c:5
+    locks acquired at dereference: 
+      l:uniq3.c:6
+      concrete l:uniq3.c:25
+    in: FORK at uniq3.c:27 -> dostuff uniq3.c:27
+
+  dereference at uniq3.c:15
+    locations possibly dereferenced: 
+      &j:uniq3.c:5
+    locks acquired at dereference: 
+      <empty>
+    in: main at uniq3.c:29 -> dostuff uniq3.c:28
+
+  dereference at uniq3.c:15
+    locations possibly dereferenced: 
+      &j:uniq3.c:5
+    locks acquired at dereference: 
+      <empty>
+    in: main at uniq3.c:29 -> dostuff uniq3.c:27
+
+  dereference at uniq3.c:17
+    locations possibly dereferenced: 
+      &j:uniq3.c:5
+    locks acquired at dereference: 
+      l:uniq3.c:6
+      concrete l:uniq3.c:25
+    in: main at uniq3.c:29 -> dostuff uniq3.c:28
+
+  dereference at uniq3.c:17
+    locations possibly dereferenced: 
+      &j:uniq3.c:5
+    locks acquired at dereference: 
+      l:uniq3.c:6
+      concrete l:uniq3.c:25
+    in: main at uniq3.c:29 -> dostuff uniq3.c:27
+
+*************************** DONE ***************************
+
+
