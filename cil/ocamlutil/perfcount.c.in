@@ -40,7 +40,7 @@ unsigned static longlong first_value;
 
 
 /* This is the function that actually reads the performance counter. */
-inline unsigned longlong read_ppc(void) {
+unsigned longlong read_ppc(void) {
   unsigned long pclow, pchigh;
   unsigned longlong lowhigh;
 

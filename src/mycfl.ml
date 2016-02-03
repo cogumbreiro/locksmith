@@ -52,7 +52,15 @@ let string_of_loc l = Pretty.sprint 80 (Cil.d_loc () l)
 
 type instantiation = int
 let inst_compare = (-)
-module InstHT = Inthash
+
+module IntHash =
+  struct
+    type t = int
+    let equal i j = i=j
+    let hash i = i land max_int
+  end
+
+module InstHT = Hashtbl.Make(IntHash)
 
 module rec Node :
   sig

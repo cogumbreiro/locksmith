@@ -40,7 +40,15 @@ module E = Errormsg
 type banshee_node
 type instantiation = int
 
-module InstHT = Inthash
+
+module IntHash =
+  struct
+    type t = int
+    let equal i j = i=j
+    let hash i = i land max_int
+  end
+
+module InstHT = Hashtbl.Make(IntHash)
 
 let string_of_inst = string_of_int
 
