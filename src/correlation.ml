@@ -652,28 +652,11 @@ let check_race (phiguards: (phi * guard) list) (r: rho) : bool =
   if !debug then ignore(E.log "checking protection for %a\n" d_rho r);
   if !do_group_warnings && RhoSet.mem r !racefound then true else
   if Shared.is_ever_shared r then begin
-    (*ignore(E.log " It is shared, check protection set\n");*)
     let crs = concrete_rhoset (get_rho_p2set_m r) in
     let ls = get_protection_set r in
-    if (LockSet.is_empty ls) then begin
-      if !do_group_warnings then begin
-        ignore(E.warn "Possible data race:\n unprotected locations:\n  %a\n references:\n  %a\n"
-          d_rhoset crs d_rho_guards (r, phiguards));
-      end else begin
-        ignore(E.warn "Possible data race: %a is not protected!\n references:\n  %a\n"
-          d_rho r d_rho_guards (r, phiguards));
-      end;
-      racefound := RhoSet.union crs !racefound;
-      true
-    end else if (LockSet.is_empty (concrete_lockset ls)) then begin
-      if !do_group_warnings then begin
-        ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
-          d_rhoset crs d_lockset ls d_rho_guards (r, phiguards));
-      end else begin
-        ignore(E.warn "Possible data race: %a is protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
-          d_rho r d_lockset ls d_rho_guards (r, phiguards));
-      end;
-      racefound := RhoSet.union crs !racefound;
+    if (LockSet.is_empty (concrete_lockset ls)) then begin
+      ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
+        d_rhoset crs d_lockset ls d_rho_guards (r, phiguards));
       true
     end else begin
       if !do_print_guarded_by then
@@ -682,7 +665,6 @@ let check_race (phiguards: (phi * guard) list) (r: rho) : bool =
     end
   end
     else false (* not shared *)
-  (*else ignore(E.log " It's not shared, no need to protect it\n")*)
 
 let check_races () : unit = begin
   let f p : (phi * guard) list =
