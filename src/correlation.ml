@@ -643,28 +643,16 @@ let d_rho_guards () (r, phiguards: rho * (phi * guard) list) : doc =
   in
   align ++ (print_guards nil relevant) ++ unalign
 
-(* Checks a concrete location at a given point phi for race (empty gb-set).
- * The given phi is normally a fork point (or the beginning of main()).
- * Returns true if there was a race on this location, even if it is a duplicate
- * and has been printed before.
- *)
-let check_race (phiguards: (phi * guard) list) (r: rho) : bool =
-  if !debug then ignore(E.log "checking protection for %a\n" d_rho r);
-  if !do_group_warnings && RhoSet.mem r !racefound then true else
-  if Shared.is_ever_shared r then begin
+(* Creates a list with all rhos that have a race *)
+let racy_rhos () : rho list =
+  let result = ref ([] :rho list) in
+  Labelflow.concrete_rho_iter ( fun r ->
     let crs = concrete_rhoset (get_rho_p2set_m r) in
     let ls = get_protection_set r in
-    if (LockSet.is_empty (concrete_lockset ls)) then begin
-      ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
-        d_rhoset crs d_lockset ls d_rho_guards (r, phiguards));
-      true
-    end else begin
-      if !do_print_guarded_by then
-        ignore(E.log "%a is protected by:\n  %a\n" d_rho r d_lockset ls);
-      false
-    end
-  end
-    else false (* not shared *)
+    if Shared.is_ever_shared r && LockSet.is_empty (concrete_lockset ls)
+    then result := r :: !result;
+  );
+  !result
 
 let check_races () : unit = begin
   let f p : (phi * guard) list =
@@ -677,11 +665,13 @@ let check_races () : unit = begin
     in List.map (fun g -> p,g) sorted_guards
   in
   let phiguards = List.flatten (List.map f !starting_phis) in
-  let count = ref 0 in
-  let all = ref 0 in
-  Labelflow.concrete_rho_iter (fun r -> incr all; if check_race phiguards r then incr count);
-  if !do_count_race_locations then
-    ignore(E.log "racy/total concrete locations: %d / %d\n" !count !all);
+  ignore(E.log "errors %d\n" (List.length (racy_rhos ())));
+  List.iter (fun r ->
+    let crs = concrete_rhoset (get_rho_p2set_m r) in
+    let ls = get_protection_set r in
+    ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
+      d_rhoset crs d_lockset ls d_rho_guards (r, phiguards))
+  ) (racy_rhos ());
 end
 
 let escapes (l: lock) (ls, rs: lockSet * rhoSet) : bool =
