@@ -636,18 +636,12 @@ let d_rho_guards () (r, phiguards: rho * (phi * guard) list) : doc =
         let d, rest = filter_guard d g gl [] in
         print_guards d (List.rev rest)
   in
-  let relevant = 
-    List.filter
-      (fun (_, g) -> RhoSet.mem r g.guard_correlation.corr_rhos)
-      phiguards
-  in
-  align ++ (print_guards nil relevant) ++ unalign
+  align ++ (print_guards nil phiguards) ++ unalign
 
 (* Creates a list with all rhos that have a race *)
 let racy_rhos () : rho list =
   let result = ref ([] :rho list) in
   Labelflow.concrete_rho_iter ( fun r ->
-    let crs = concrete_rhoset (get_rho_p2set_m r) in
     let ls = get_protection_set r in
     if Shared.is_ever_shared r && LockSet.is_empty (concrete_lockset ls)
     then result := r :: !result;
@@ -664,13 +658,18 @@ let check_races () : unit = begin
       List.sort GB.compare (GBSet.elements gset)
     in List.map (fun g -> p,g) sorted_guards
   in
-  let phiguards = List.flatten (List.map f !starting_phis) in
+  let all_guards = List.flatten (List.map f !starting_phis) in
   ignore(E.log "errors %d\n" (List.length (racy_rhos ())));
   List.iter (fun r ->
     let crs = concrete_rhoset (get_rho_p2set_m r) in
     let ls = get_protection_set r in
+    let guards = 
+      List.filter
+        (fun (_, g) -> RhoSet.mem r g.guard_correlation.corr_rhos)
+        all_guards
+    in
     ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
-      d_rhoset crs d_lockset ls d_rho_guards (r, phiguards))
+      d_rhoset crs d_lockset ls d_rho_guards (r, guards))
   ) (racy_rhos ());
 end
 
