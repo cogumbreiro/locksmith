@@ -608,22 +608,42 @@ let get_protection_set (r: rho) : lockSet =
 
 let racefound : rhoSet ref = ref RhoSet.empty
 
+(* Checks if two guards correlate. *)
+
+let guards_correlate g g' =
+  (Corr.compare g.guard_correlation g'.guard_correlation = 0)
+           && (Cil.compareLoc g.guard_location g'.guard_location = 0)
+           && (Rho.equal g'.guard_rho g.guard_rho)
+
+(* Given a list of phi-guard pairs, group the list by the guards that
+ * correlate. *)
+
+let rec group_rho_guards (guards: (phi * guard) list) : ((phi * guard) * (phi * guard) list) list =
+  match guards with
+    [] -> []
+  | (p,g)::gl -> 
+    let phi_guards_corr (p, g':phi * guard) = guards_correlate g g' in
+    let found, rest = List.partition phi_guards_corr gl in
+    let h = ((p,g), found) in
+    let t = group_rho_guards rest in
+    h :: t
+
+let d_guard_path () (g:guard) : doc =
+ List.fold_left
+     (fun d p -> d ++ dprintf " -> %a" Cil.d_loc (location_of_phi p))
+     nil
+     g.guard_path
+
 let d_rho_guards () (r, phiguards: rho * (phi * guard) list) : doc =
   let rec print_guards d gl =
     let rec filter_guard d g gl ret =
       match gl with
         [] -> d, ret
       | (p',g')::gl ->
-          if (Corr.compare g.guard_correlation g'.guard_correlation = 0)
-             && (Cil.compareLoc g.guard_location g'.guard_location = 0)
-             && (Rho.equal g'.guard_rho g.guard_rho)
+          if guards_correlate g g'
           then
             filter_guard
-              (d ++ dprintf "in: %a%t\n" d_phi p'
-                 (fun () -> List.fold_left
-                      (fun d p -> d ++ dprintf " -> %a" Cil.d_loc (location_of_phi p))
-                      nil
-                      g'.guard_path))
+              (d ++ dprintf "in: %a%a\n" d_phi p' d_guard_path g')
               g gl ret
           else filter_guard d g gl ((p',g')::ret)
     in
@@ -637,6 +657,7 @@ let d_rho_guards () (r, phiguards: rho * (phi * guard) list) : doc =
         print_guards d (List.rev rest)
   in
   align ++ (print_guards nil phiguards) ++ unalign
+
 
 (* Creates a list with all rhos that have a race *)
 let racy_rhos () : rho list =
