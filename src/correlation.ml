@@ -635,6 +635,7 @@ let d_guard_path () (g:guard) : doc =
      g.guard_path
 
 let d_rho_guards () (r, phiguards: rho * (phi * guard) list) : doc =
+  let d_entry () (p, g) = dprintf "in: %a%a\n" d_phi p d_guard_path g in
   let rec print_guards d gl =
     let rec filter_guard d g gl ret =
       match gl with
@@ -643,7 +644,7 @@ let d_rho_guards () (r, phiguards: rho * (phi * guard) list) : doc =
           if guards_correlate g g'
           then
             filter_guard
-              (d ++ dprintf "in: %a%a\n" d_phi p' d_guard_path g')
+              (d ++ d_entry () (p',g'))
               g gl ret
           else filter_guard d g gl ((p',g')::ret)
     in
@@ -657,7 +658,6 @@ let d_rho_guards () (r, phiguards: rho * (phi * guard) list) : doc =
         print_guards d (List.rev rest)
   in
   align ++ (print_guards nil phiguards) ++ unalign
-
 
 (* Creates a list with all rhos that have a race *)
 let racy_rhos () : rho list =
