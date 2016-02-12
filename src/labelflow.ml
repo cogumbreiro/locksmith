@@ -73,6 +73,7 @@ module type CFLT =
 
     val make_node : string -> bool -> Cil.fundec option -> Cil.location -> bool -> node
     val update_node_location : node -> Cil.location -> node
+    val get_node_location : node -> Cil.location
     val string_of_node : node -> string
     val dotstring_of_node : node -> string
     val fresh_inst : unit -> instantiation
@@ -373,6 +374,8 @@ let d_rho () rho =
     (if !debug then (CFL.dotstring_of_node rho.rho_cfl_node)
     else (CFL.string_of_node rho.rho_cfl_node))
 
+let get_rho_name rho = LN.string_of_label_name rho.rho_label_name
+
 let d_rhopath () (fromrho, torho: rho * rho) : doc =
   let path =
     try Graph.shortest_path fromrho.rho_cfl_node torho.rho_cfl_node 
@@ -494,6 +497,9 @@ let make_rho (n: LN.label_name) (concrete: bool) : rho =
 
 let update_rho_location rho loc =
   ignore (CFL.update_node_location rho.rho_cfl_node loc); rho
+
+let get_rho_location r =
+  CFL.get_node_location r.rho_cfl_node
 
 let count_rho () = !rho_no
 

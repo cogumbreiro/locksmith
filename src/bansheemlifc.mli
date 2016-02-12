@@ -46,6 +46,7 @@ module NodeHT : Hashtbl.S with type key = node
 
 val make_node : string -> bool -> Cil.fundec option -> Cil.location -> bool -> node
 val update_node_location : node -> Cil.location -> node
+val get_node_location : node -> Cil.location
 val string_of_node : node -> string
 val dotstring_of_node : node -> string
 val fresh_inst : unit -> instantiation

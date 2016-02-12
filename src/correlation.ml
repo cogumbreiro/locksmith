@@ -655,6 +655,12 @@ let print_race () crs ls e =
   ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
     d_rhoset crs d_lockset ls d_rho_guards e)
 
+let json_loc (l:Cil.location) =
+  `Assoc [
+    ("filename", `String l.file);
+    ("line", `Int l.line);
+    ("offset", `Int l.byte)]
+
 let json_lock l =
   `String (sprint 80 (d_lock () l))
 
@@ -662,7 +668,10 @@ let json_lockset ls =
   `List (List.map json_lock (LockSet.elements ls))
 
 let json_rho r : json =
-  `String (sprint 80 (d_rho () r))
+  `Assoc [
+    ("name", `String (get_rho_name r));
+    ("location", json_loc (get_rho_location r))
+  ]
 
 let json_phi p =
   `String (sprint 80 (d_phi () p))
@@ -672,12 +681,6 @@ let json_rhoset rs =
 
 let json_phi_path ps =
   `List (List.map json_phi ps)
-
-let json_loc (l:Cil.location) =
-  `Assoc [
-    ("filename", `String l.file);
-    ("line", `Int l.line);
-    ("offset", `Int l.byte)]
 
 let json_rho_guards (r, phiguards: rho * (phi * guard) list) :json =
   let json_thread (p, g) = `Assoc [ ("thread", json_phi_path (p::g.guard_path)) ] in

@@ -108,6 +108,8 @@ val get_stats: unit -> string
  *)
 val make_rho : Labelname.label_name -> bool -> rho
 val update_rho_location : rho -> Cil.location -> rho
+val get_rho_location : rho -> Cil.location
+val get_rho_name : rho -> string
 
 (* how many rhos have been created *)
 val count_rho : unit -> int

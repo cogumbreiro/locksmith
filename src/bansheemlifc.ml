@@ -155,6 +155,8 @@ end
 
 let update_node_location node loc = node.nloc <- loc; node
 
+let get_node_location node = node.nloc
+
 let dotstring_of_node n = n.nname ^"#"^ (string_of_int (Node.hash n)) ^ "\\n" ^ (Pretty.sprint 80 (Cil.d_loc () n.nloc))
 let string_of_node n = n.nname ^ ":" ^ (Pretty.sprint 80 (Cil.d_loc () n.nloc))
 

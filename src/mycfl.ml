@@ -181,6 +181,7 @@ let make_node (name: string) (concrete: bool) (func: Cil.fundec option) (loc: lo
   n
 end
 let update_node_location node loc = node.Node.node_location <- loc; node
+let get_node_location node = node.Node.node_location
 let dotstring_of_node n = n.Node.node_name ^"#"^ (string_of_int (Node.hash n)) ^ "\\n" ^ (Pretty.sprint 80 (Cil.d_loc () n.Node.node_location))
 let string_of_node n = n.Node.node_name ^ ":" ^ (Pretty.sprint 80 (Cil.d_loc () n.Node.node_location))
 
@@ -349,7 +350,6 @@ let get_all_that_reach_pn (n: node)
     !edges
     NodeSet.empty
   in
-  let reachpn2 = n.Node.node_pred_s in
   NodeSet.fold
     (fun (x: node) (s: 'b) -> add_node (find x) s)
     reachpn
@@ -364,7 +364,6 @@ let reaches x y =
   } in
   let b = EdgeSet.mem e !edges in
   let b' = NodeSet.mem x y.Node.node_pred_s in
-  (*NodeSet.iter (fun n -> ignore(E.log "%s\n" (string_of_node n))) y.Node.node_pred_s;*)
   assert (b = b');
   b
 
