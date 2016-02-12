@@ -38,6 +38,7 @@ open Pretty
 open Labelflow
 open Lockstate
 open Controlflow
+open Yojson.Basic
 
 module BW = Controlflow.BackwardsWorklist
 module E = Errormsg
@@ -615,49 +616,28 @@ let guards_correlate g g' =
            && (Cil.compareLoc g.guard_location g'.guard_location = 0)
            && (Rho.equal g'.guard_rho g.guard_rho)
 
-(* Given a list of phi-guard pairs, group the list by the guards that
- * correlate. *)
-
-let rec group_rho_guards (guards: (phi * guard) list) : ((phi * guard) * (phi * guard) list) list =
-  match guards with
-    [] -> []
-  | (p,g)::gl -> 
-    let phi_guards_corr (p, g':phi * guard) = guards_correlate g g' in
-    let found, rest = List.partition phi_guards_corr gl in
-    let h = ((p,g), found) in
-    let t = group_rho_guards rest in
-    h :: t
-
 let d_guard_path () (g:guard) : doc =
  List.fold_left
      (fun d p -> d ++ dprintf " -> %a" Cil.d_loc (location_of_phi p))
      nil
      g.guard_path
 
+let rec group_phiguards gl =
+  match gl with
+    [] -> []
+  | (p,g)::_ as gl ->
+      let ok, notok = List.partition (fun (p',g') -> guards_correlate g g') gl in
+      (g, ok) :: (group_phiguards notok)
+
 let d_rho_guards () (r, phiguards: rho * (phi * guard) list) : doc =
-  let d_entry () (p, g) = dprintf "in: %a%a\n" d_phi p d_guard_path g in
-  let rec print_guards d gl =
-    let rec filter_guard d g gl ret =
-      match gl with
-        [] -> d, ret
-      | (p',g')::gl ->
-          if guards_correlate g g'
-          then
-            filter_guard
-              (d ++ d_entry () (p',g'))
-              g gl ret
-          else filter_guard d g gl ((p',g')::ret)
-    in
-    match gl with
-      [] -> d
-    | (p,g)::_ as gl ->
-        let d = d ++ (if d <> nil then line else nil)
-                ++ (d_deref_report () (g,r))
-        in
-        let d, rest = filter_guard d g gl [] in
-        print_guards d (List.rev rest)
+  let d_thread () (p, g) = dprintf "in: %a%a\n" d_phi p d_guard_path g in
+
+  let d_print_guard () (g, ok) =
+    (d_deref_report () (g,r)) ++ ((d_list "" d_thread) () ok)
   in
-  align ++ (print_guards nil phiguards) ++ unalign
+  
+  let print_guards = (d_list "\n" d_print_guard) () (group_phiguards phiguards) in
+  align ++ print_guards ++ unalign
 
 (* Creates a list with all rhos that have a race *)
 let racy_rhos () : rho list =
@@ -668,6 +648,40 @@ let racy_rhos () : rho list =
     then result := r :: !result;
   );
   !result
+
+let print_race () crs ls e =
+  ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
+    d_rhoset crs d_lockset ls d_rho_guards e)
+
+let json_lock l =
+  `String (sprint 80 (d_lock () l))
+
+let json_lockset ls =
+  `List (List.map json_lock (LockSet.elements ls))
+
+let json_rho r =
+  `String (sprint 80 (d_rho () r))
+
+let json_phi p =
+  `String (sprint 80 (d_phi () p))
+
+let json_rhoset rs =
+  `List (List.map json_rho (RhoSet.elements rs))
+
+let json_phi_path ps =
+  `List (List.map json_phi ps)
+
+let json_rho_guards (r, phiguards: rho * (phi * guard) list) =
+  let json_thread (p, g) = `Assoc [ ("thread", json_phi_path (p::g.guard_path)) ] in
+
+  let json_guard (g, ts) = `Assoc [ ("threads", `List (List.map json_thread ts))] in
+  
+  `Assoc [ ("locations", `List (List.map json_guard (group_phiguards phiguards))) ]
+
+let print_race_json () rs ls e =
+  ignore(E.warn "'race': '%s'" (Yojson.Basic.pretty_to_string (json_rhoset rs)));
+  ignore(E.warn "'locks': %s" (Yojson.Basic.pretty_to_string (json_lockset ls)));
+  ignore(E.warn "'accesses': %s" (Yojson.Basic.pretty_to_string (json_rho_guards e)))
 
 let check_races () : unit = begin
   let f p : (phi * guard) list =
@@ -680,17 +694,12 @@ let check_races () : unit = begin
     in List.map (fun g -> p,g) sorted_guards
   in
   let all_guards = List.flatten (List.map f !starting_phis) in
-  ignore(E.log "errors %d\n" (List.length (racy_rhos ())));
   List.iter (fun r ->
     let crs = concrete_rhoset (get_rho_p2set_m r) in
     let ls = get_protection_set r in
-    let guards = 
-      List.filter
-        (fun (_, g) -> RhoSet.mem r g.guard_correlation.corr_rhos)
-        all_guards
-    in
-    ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
-      d_rhoset crs d_lockset ls d_rho_guards (r, guards))
+    let in_guard_corr (p,g) = RhoSet.mem r g.guard_correlation.corr_rhos in
+    let guards =  List.filter in_guard_corr all_guards
+    in print_race_json () crs ls (r, guards)
   ) (racy_rhos ());
 end
 
