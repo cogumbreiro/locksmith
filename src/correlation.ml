@@ -34,6 +34,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *)
+open Cil
+open Printf
 open Pretty
 open Labelflow
 open Lockstate
@@ -659,7 +661,7 @@ let json_lock l =
 let json_lockset ls =
   `List (List.map json_lock (LockSet.elements ls))
 
-let json_rho r =
+let json_rho r : json =
   `String (sprint 80 (d_rho () r))
 
 let json_phi p =
@@ -671,17 +673,31 @@ let json_rhoset rs =
 let json_phi_path ps =
   `List (List.map json_phi ps)
 
-let json_rho_guards (r, phiguards: rho * (phi * guard) list) =
-  let json_thread (p, g) = `Assoc [ ("thread", json_phi_path (p::g.guard_path)) ] in
+let json_loc (l:Cil.location) =
+  `Assoc [
+    ("filename", `String l.file);
+    ("line", `Int l.line);
+    ("offset", `Int l.byte)]
 
-  let json_guard (g, ts) = `Assoc [ ("threads", `List (List.map json_thread ts))] in
-  
-  `Assoc [ ("locations", `List (List.map json_guard (group_phiguards phiguards))) ]
+let json_rho_guards (r, phiguards: rho * (phi * guard) list) :json =
+  let json_thread (p, g) = `Assoc [ ("thread", json_phi_path (p::g.guard_path)) ] in
+  let json_guard (g, ts) = `Assoc [
+     ("threads", `List (List.map json_thread ts));
+     ("reference", json_rho r);
+     ("location", json_loc g.guard_location);
+     ("locks", json_lockset g.guard_correlation.corr_locks);
+     (* TODO: rhopath *)
+  ] in
+  `List (List.map json_guard (group_phiguards phiguards))
+
+let json_race rs ls e =
+  `Assoc [
+    ("locks", json_lockset ls);
+    ("conflicts", json_rho_guards e);
+  ]
 
 let print_race_json () rs ls e =
-  ignore(E.warn "'race': '%s'" (Yojson.Basic.pretty_to_string (json_rhoset rs)));
-  ignore(E.warn "'locks': %s" (Yojson.Basic.pretty_to_string (json_lockset ls)));
-  ignore(E.warn "'accesses': %s" (Yojson.Basic.pretty_to_string (json_rho_guards e)))
+  ignore(E.warn "%s" (Yojson.Basic.pretty_to_string (json_race rs ls e)))
 
 let check_races () : unit = begin
   let f p : (phi * guard) list =
