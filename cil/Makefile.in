@@ -122,7 +122,7 @@ cilly: $(OBJDIR)/cilly$(EXE)
 $(OBJDIR)/cilly$(EXE) : $(CILLY_MODULES:%=$(OBJDIR)/%.$(CMO)) \
                         $(CILLY_CMODULES:%=$(OBJDIR)/%.$(CMC))
 	@$(NARRATIVE) "Linking $(COMPILETOWHAT) $@ $(LINKMSG)"
-	$(AT)$(CAMLLINK) -verbose -o $@ \
+	$(CAMLLINK) $(EXTRA_LINK_FLAGS) -verbose -o $@ \
                     $(CILLY_LIBS:%=%.$(CMXA)) \
                     $(CILLY_LIBS:%=-cclib -l%) \
                     $^
@@ -277,7 +277,7 @@ OCAML_CIL_C_LIB_MODULES := $(CILLY_MODULES:main=) libmaincil
 # Build an OCAML library (CMA / CMXA) that exports our Cil stuff
 $(OBJDIR)/cil.$(CMXA): $(OCAML_CIL_LIB_CMODULES:%=$(OBJDIR)/lib%.a) \
                        $(OCAML_CIL_LIB_MODULES:%=$(OBJDIR)/%.$(CMO))
-	$(CAMLLINK) -a -o $@ -ccopt -L$(pkglibdir) \
+	$(AT)$(CAMLLINK) -a -o $@ -ccopt -L$(pkglibdir) \
                $(OCAML_CIL_LIB_CMODULES:%=-cclib -l%) \
                $(OCAML_CIL_LIB_MODULES:%=$(OBJDIR)/%.$(CMO))
 
@@ -290,7 +290,7 @@ $(OBJDIR)/libperfcount.a: %: %($(OBJDIR)/perfcount.$(CMC))
 ifeq ($(NATIVECAML),1)
 $(OBJDIR)/libcil.o: $(OCAML_CIL_LIB_CMODULES:%=$(OBJDIR)/lib%.a) \
                     $(OCAML_CIL_LIB_MODULES:%=$(OBJDIR)/%.$(CMO))
-	ocamlopt -output-obj -o $@ $(CILLY_LIBS:%=%.cmxa) $^
+	ocamlfind ocamlopt $(EXTRA_LINK_FLAGS) -output-obj -o $@ $(CILLY_LIBS:%=%.cmxa) $^
 else
 $(OBJDIR)/libcil.o:
 	@echo "Can only build $@ when NATIVECAML is 1."

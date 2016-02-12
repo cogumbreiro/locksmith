@@ -286,6 +286,9 @@ ifdef UNSAFE
  CAMLC          := $(CAMLC) -unsafe -noassert
 endif
 
+CAMLC          := ocamlfind $(CAMLC)
+CAMLLINK       := ocamlfind $(CAMLLINK)
+
 ifdef CAML_NOOPT
  ifdef WIN32
    COMPILE_FLAGS    += -ccopt /Zi -ccopt /Od

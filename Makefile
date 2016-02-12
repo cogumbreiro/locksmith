@@ -34,22 +34,23 @@ REGION_DIR = $(BANSHEE)/libcompat
 LINKFLAGS = \
 	     $(DYCKCFL_DIR)/dyckcfl.o $(DYCKCFL_DIR)/mr_dyckcfl.o \
 	     $(REGION_DIR)/libregions.a \
-	     $(ENGINE_DIR)/libnsengine.a
+	     $(ENGINE_DIR)/libnsengine.a  
 CAML_CFLAGS := -ccopt -I$(DYCKCFL_DIR) -ccopt -I$(REGION_DIR) -ccopt -I$(ENGINE_DIR)
-
+COMPILEFLAGS = -package yojson
 export LOCKSMITH_MODULES
 export LOCKSMITH_CMODULES
-#export LINKFLAGS
 export CAML_CFLAGS
 export CP4S
 
+EXTRA_LINK_FLAGS = -linkpkg $(COMPILEFLAGS)
+
 all:
 	$(AT)$(MAKE) -C banshee NO_BANSHEE_ROLLBACK=1 NO_HASH_BOUNDS=1 all
-	$(AT)LINKFLAGS="$(LINKFLAGS)" $(MAKE) -C cil
+	$(AT)LINKFLAGS="$(LINKFLAGS)" $(MAKE) -C cil COMPILEFLAGS="$(COMPILEFLAGS)" EXTRA_LINK_FLAGS="$(EXTRA_LINK_FLAGS)"
 
 profile:
 	$(AT)$(MAKE) -C banshee NO_BANSHEE_ROLLBACK=1 NO_HASH_BOUNDS=1 DEBUG=1 DEBUG_RALLOC=1 all
-	$(AT)LINKFLAGS="$(LINKFLAGS)" $(MAKE) -C cil PROFILE=1
+	$(AT)LINKFLAGS="$(LINKFLAGS)" $(MAKE) -C cil PROFILE=1 COMPILEFLAGS="$(COMPILEFLAGS)"
 
 clean:
 	$(AT)$(MAKE) -C banshee clean
