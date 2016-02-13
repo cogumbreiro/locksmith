@@ -727,8 +727,11 @@ let json_race r =
     ("conflicts", json_rho_guards r);
   ]
 
+let json_races rs =
+  `Assoc [("races", `List (List.map json_race rs))]
+
 let print_races_json rs =
-  print_string (Yojson.Basic.pretty_to_string (`List (List.map json_race rs)))
+  print_string (Yojson.Basic.pretty_to_string (json_races rs))
 
 let check_races () : unit = begin
   let f p : (phi * guard) list =
