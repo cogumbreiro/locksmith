@@ -673,9 +673,13 @@ let racy_rhos () : rho list =
   );
   !result
 
-let print_race () r =
-  ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
-    d_rhoset r.race_references d_lockset r.race_locks d_rho_guards (r.race_reference, r.race_threads))
+let print_races rs =
+  List.iter (fun r ->
+    ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
+      d_rhoset r.race_references
+      d_lockset r.race_locks
+      d_rho_guards (r.race_reference, r.race_threads))
+  ) rs
 
 let json_loc (l:Cil.location) =
   `Assoc [
@@ -696,7 +700,8 @@ let json_rho r : json =
   ]
 
 let json_phi p =
-  `String (sprint 80 (d_phi () p))
+(*  `String (sprint 80 (d_phi () p))*)
+  `String (dotstring_of_phi p)
 
 let json_rhoset rs =
   `List (List.map json_rho (RhoSet.elements rs))
@@ -722,8 +727,8 @@ let json_race r =
     ("conflicts", json_rho_guards r);
   ]
 
-let print_race_json () r =
-  print_string (Yojson.Basic.pretty_to_string (json_race r))
+let print_races_json rs =
+  print_string (Yojson.Basic.pretty_to_string (`List (List.map json_race rs)))
 
 let check_races () : unit = begin
   let f p : (phi * guard) list =
@@ -736,20 +741,20 @@ let check_races () : unit = begin
     in List.map (fun g -> p,g) sorted_guards
   in
   let all_guards = List.flatten (List.map f !starting_phis) in
-  List.iter (fun r ->
+  let all_races = List.map (fun r ->
     let crs = concrete_rhoset (get_rho_p2set_m r) in
     let ls = get_protection_set r in
     let in_guard_corr (p,g) = RhoSet.mem r g.guard_correlation.corr_rhos in
     let guards =  List.filter in_guard_corr all_guards in
-    let r = {
+    {
       race_references = crs;
       race_locks = ls;
       race_reference = r;
       race_threads = List.map make_thread guards;
-    } in
-    print_race () r;
-    print_race_json () r
-  ) (racy_rhos ());
+    }) (racy_rhos ())
+  in
+  print_races all_races;
+  print_races_json all_races
 end
 
 let escapes (l: lock) (ls, rs: lockSet * rhoSet) : bool =
