@@ -34,14 +34,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *)
+
+type guard
+
+type thread = Thread of (Controlflow.phi * guard)
+
+type race = {
+  race_reference: Labelflow.rho;
+  race_references: Labelflow.rhoSet;
+  race_locks: Labelflow.lockSet;
+  race_threads: thread list
+}
+
 val deref : Labelflow.rho -> Controlflow.phi -> Labelflow.effect -> unit
 val solve : unit -> unit
-(*val get_protection_set : Labelflow.rho -> Labelflow.lockSet*)
 val check_races : unit -> unit
-
-(* set this to print guarded-by inferred *)
-(*val do_print_guarded_by : bool ref*)
-
 val options : (string * Arg.spec * string) list
-
 val escapes : Labelflow.lock -> Labelflow.lockSet * Labelflow.rhoSet -> bool
+

@@ -77,6 +77,15 @@ type guard = { (* these are computed at solution time *)
   guard_path : phi list  (* path from dereference to main() or fork() *)
 }
 
+type thread = Thread of (Controlflow.phi * guard)
+
+type race = {
+  race_reference: rho;
+  race_references: rhoSet;
+  race_locks: lockSet;
+  race_threads: thread list
+}
+
 let guard_equals (g1: guard) (g2: guard) : bool =
   let corr_equals c1 c2 =
     if c1 == c2 then true
@@ -624,18 +633,31 @@ let d_guard_path () (g:guard) : doc =
      nil
      g.guard_path
 
-let rec group_phiguards gl =
-  match gl with
+let get_guards t =
+  match t with
+  | Thread e -> e
+
+
+let thread_phi t : phi =
+  match t with Thread (p, _) -> p
+
+let thread_guard t : guard =
+  match t with Thread (_, g) -> g
+
+let make_thread (p,g) = Thread (p, g)
+
+let rec group_phiguards (ts:thread list) : (guard * thread list) list =
+  match ts with
     [] -> []
-  | (p,g)::_ as gl ->
-      let ok, notok = List.partition (fun (p',g') -> guards_correlate g g') gl in
+  | Thread (_,g)::_ as gl ->
+      let ok, notok = List.partition (fun t -> guards_correlate g (thread_guard t)) gl in
       (g, ok) :: (group_phiguards notok)
 
-let d_rho_guards () (r, phiguards: rho * (phi * guard) list) : doc =
-  let d_thread () (p, g) = dprintf "in: %a%a\n" d_phi p d_guard_path g in
+let d_rho_guards () (r, phiguards:rho * thread list) : doc =
+  let d_thread () (Thread (p, g)) = dprintf "in: %a%a\n" d_phi p d_guard_path g in
 
-  let d_print_guard () (g, ok) =
-    (d_deref_report () (g,r)) ++ ((d_list "" d_thread) () ok)
+  let d_print_guard () (g,ts) =
+    (d_deref_report () (g,r)) ++ ((d_list "" d_thread) () ts)
   in
   
   let print_guards = (d_list "\n" d_print_guard) () (group_phiguards phiguards) in
@@ -651,9 +673,9 @@ let racy_rhos () : rho list =
   );
   !result
 
-let print_race () crs ls e =
+let print_race () r =
   ignore(E.warn "Possible data race:\n locations:\n  %a protected by non-linear or concrete lock(s):\n  %a\n references:\n  %a\n"
-    d_rhoset crs d_lockset ls d_rho_guards e)
+    d_rhoset r.race_references d_lockset r.race_locks d_rho_guards (r.race_reference, r.race_threads))
 
 let json_loc (l:Cil.location) =
   `Assoc [
@@ -679,28 +701,29 @@ let json_phi p =
 let json_rhoset rs =
   `List (List.map json_rho (RhoSet.elements rs))
 
-let json_phi_path ps =
-  `List (List.map json_phi ps)
+let json_phi_path ps = `List (List.map json_phi ps)
 
-let json_rho_guards (r, phiguards: rho * (phi * guard) list) :json =
-  let json_thread (p, g) = `Assoc [ ("thread", json_phi_path (p::g.guard_path)) ] in
-  let json_guard (g, ts) = `Assoc [
+let json_thread (Thread (p,g)) = json_phi_path (p::g.guard_path)
+
+let json_rho_guards (r:race) =
+  let json_guard (g, ts: guard * thread list) = `Assoc [
      ("threads", `List (List.map json_thread ts));
-     ("reference", json_rho r);
+     ("reference", json_rho r.race_reference);
      ("location", json_loc g.guard_location);
      ("locks", json_lockset g.guard_correlation.corr_locks);
      (* TODO: rhopath *)
   ] in
-  `List (List.map json_guard (group_phiguards phiguards))
+  `List (List.map json_guard (group_phiguards r.race_threads))
 
-let json_race rs ls e =
+let json_race r =
   `Assoc [
-    ("locks", json_lockset ls);
-    ("conflicts", json_rho_guards e);
+    ("locks", json_lockset r.race_locks);
+    ("references", json_rhoset r.race_references);
+    ("conflicts", json_rho_guards r);
   ]
 
-let print_race_json () rs ls e =
-  ignore(E.warn "%s" (Yojson.Basic.pretty_to_string (json_race rs ls e)))
+let print_race_json () r =
+  print_string (Yojson.Basic.pretty_to_string (json_race r))
 
 let check_races () : unit = begin
   let f p : (phi * guard) list =
@@ -717,8 +740,15 @@ let check_races () : unit = begin
     let crs = concrete_rhoset (get_rho_p2set_m r) in
     let ls = get_protection_set r in
     let in_guard_corr (p,g) = RhoSet.mem r g.guard_correlation.corr_rhos in
-    let guards =  List.filter in_guard_corr all_guards
-    in print_race_json () crs ls (r, guards)
+    let guards =  List.filter in_guard_corr all_guards in
+    let r = {
+      race_references = crs;
+      race_locks = ls;
+      race_reference = r;
+      race_threads = List.map make_thread guards;
+    } in
+    print_race () r;
+    print_race_json () r
   ) (racy_rhos ());
 end
 
