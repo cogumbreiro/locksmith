@@ -209,7 +209,7 @@ end
 let dotstring_of_phi (phi: phi) : string =
   "phi#" ^ (string_of_int phi.phi_id) ^ "\\n" ^
   (phi.phi_name^"\\n") ^
-  (Pretty.sprint 80 (Cil.d_loc () phi.phi_loc))
+  (Pretty.sprint 80 (Cil.d_loc () phi.phi_loc)) ^ ":" ^ (string_of_int phi.phi_loc.byte)
 
 let d_phi () (p: phi) : doc =
   if !debug then dprintf "%s#%d at %a" p.phi_name p.phi_id Cil.d_loc p.phi_loc
