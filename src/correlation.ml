@@ -731,7 +731,7 @@ let json_races rs =
   `Assoc [("races", `List (List.map json_race rs))]
 
 let print_races_json rs =
-  print_string (Yojson.Basic.pretty_to_string (json_races rs))
+  prerr_string (Yojson.Basic.pretty_to_string (json_races rs))
 
 let check_races () : unit = begin
   let f p : (phi * guard) list =
