@@ -731,7 +731,8 @@ let json_races rs =
   `Assoc [("races", `List (List.map json_race rs))]
 
 let print_races_json rs =
-  prerr_string (Yojson.Basic.pretty_to_string (json_races rs))
+  Printf.fprintf stdout "%s\n" (Yojson.Basic.pretty_to_string (json_races rs))
+  (*prerr_string (Yojson.Basic.pretty_to_string (json_races rs))*)
 
 let check_races () : unit = begin
   let f p : (phi * guard) list =
@@ -756,7 +757,7 @@ let check_races () : unit = begin
       race_threads = List.map make_thread guards;
     }) (racy_rhos ())
   in
-  print_races all_races;
+  (* print_races all_races; *)
   print_races_json all_races
 end
 
