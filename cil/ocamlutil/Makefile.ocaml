@@ -388,7 +388,7 @@ $(OBJDIR)/%.$(CMO): %.ml
              # They appear to be left in the current directory as .o files
 $(OBJDIR)/%.$(CMC): %.c
 	@$(NARRATIVE) "Compiling C file $< $(COMPILEMSG)"
-	$(AT)$(CAMLC) $(CAML_CFLAGS) -c $< -o $@
+	$(AT)$(CAMLC) $(CAML_CFLAGS) -c $< 
 	$(AT)mv -f $(basename $(notdir $<)).$(OBJ) $@
 
               # Special rule for profile.c

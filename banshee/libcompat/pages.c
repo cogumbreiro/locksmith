@@ -329,12 +329,13 @@ void set_region_range(void *from, void *to, region r)
          lastp = PAGENB((pageid)to - 1),
          lastm = MAPNB((pageid)to - 1);
 
-  while (firstm < lastm || firstp <= lastp)
+  while (firstm < lastm || firstp <= lastp) {
     if(firstp >= RMAXPAGE) {
       firstm++;
       firstp -= RMAXPAGE;
     }
     set_page_region(firstm, firstp++, r);
+  }
 }
 
 /* Multi-page allocation management */
